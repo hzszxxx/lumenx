@@ -19,7 +19,7 @@ export default function AppShell({ activeTab, onTabChange, onLogout, children }:
         <GlobalSidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
         <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
-      <BottomTabBar activeTab={activeTab} onTabChange={onTabChange} />
+      <BottomTabBar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
     </div>
   );
 }

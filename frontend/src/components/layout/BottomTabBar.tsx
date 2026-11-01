@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
+import { LogOut } from "lucide-react";
 import { GLOBAL_NAV_ITEMS, type GlobalTab } from "./GlobalSidebar";
 
 /**
@@ -12,9 +13,11 @@ import { GLOBAL_NAV_ITEMS, type GlobalTab } from "./GlobalSidebar";
 export default function BottomTabBar({
   activeTab,
   onTabChange,
+  onLogout,
 }: {
   activeTab: GlobalTab;
   onTabChange: (tab: GlobalTab) => void;
+  onLogout?: () => void;
 }) {
   const t = useTranslations("nav");
   return (
@@ -43,6 +46,17 @@ export default function BottomTabBar({
           </button>
         );
       })}
+      {onLogout && (
+        <button
+          type="button"
+          onClick={onLogout}
+          aria-label="退出登录"
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-2 text-text-muted hover:text-foreground transition-colors"
+        >
+          <LogOut size={20} strokeWidth={1.8} />
+          <span className="text-[0.625rem] font-medium leading-none">退出</span>
+        </button>
+      )}
     </nav>
   );
 }
