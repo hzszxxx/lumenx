@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, Layers, Wand2, Settings, FileText, Workflow, Users } from "lucide-react";
+import { LayoutGrid, Layers, Wand2, Settings, FileText, Workflow, Users, LogOut } from "lucide-react";
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
 import LumenXBranding from "./LumenXBranding";
@@ -11,6 +11,7 @@ export type GlobalTab = "workspace" | "library" | "editor" | "playground" | "ate
 interface GlobalSidebarProps {
   activeTab: GlobalTab;
   onTabChange: (tab: GlobalTab) => void;
+  onLogout?: () => void;
 }
 
 // Shared global nav model (workspace/library/playground + settings). Reused by
@@ -75,7 +76,7 @@ function NavButton({
  * 资产库/设置改走横向筛选后，竖向只剩这一条栏，故恢复完整品牌呈现。
  * 结构对所有主题统一，视觉身份由语义 token 切换（zero-leak）。
  */
-export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarProps) {
+export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: GlobalSidebarProps) {
   const t = useTranslations("nav");
 
   const handleNav = (id: GlobalTab, hash: string) => {
@@ -124,6 +125,16 @@ export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarP
           icon={Settings}
           onClick={() => handleNav("settings", "#/settings")}
         />
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-text-secondary hover:bg-hover-bg hover:text-foreground font-medium transition-colors"
+          >
+            <LogOut size={18} className="flex-shrink-0 text-text-muted group-hover:text-foreground" />
+            <span className="text-base">退出登录</span>
+          </button>
+        )}
         <div className="px-3 pt-2.5 font-mono text-[0.6875rem] tracking-wide text-text-muted">
           {APP_VERSION}
         </div>

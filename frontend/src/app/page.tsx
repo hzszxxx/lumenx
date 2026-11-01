@@ -17,7 +17,7 @@ import AppShell from "@/components/layout/AppShell";
 import type { GlobalTab } from "@/components/layout/GlobalSidebar";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
-import { getPlatformToken, platformApi } from "@/lib/platformApi";
+import { clearPlatformToken, getPlatformToken, platformApi } from "@/lib/platformApi";
 import { requireActiveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
 import { useTranslations } from "next-intl";
 import TauriMenuListener from "@/components/layout/TauriMenuListener";
@@ -755,6 +755,15 @@ export default function Home() {
     await Promise.all([syncProjects(), syncSeries()]);
   };
 
+  const handlePlatformLogout = async () => {
+    try {
+      await platformApi.logout();
+    } finally {
+      clearPlatformToken();
+      window.location.hash = "#/platform";
+    }
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!showCreateDropdown) return;
@@ -1331,7 +1340,7 @@ export default function Home() {
 
       {/* AppShell with GlobalSidebar + content */}
       <div className="relative z-10 flex-1 overflow-hidden">
-        <AppShell activeTab={activeTab} onTabChange={handleTabChange}>
+        <AppShell activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => void handlePlatformLogout()}>
           {renderContent()}
         </AppShell>
       </div>
