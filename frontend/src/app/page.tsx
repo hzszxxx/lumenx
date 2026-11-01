@@ -784,7 +784,7 @@ export default function Home() {
         setEpisodeId(null);
         return;
       }
-      if (hash === '#/platform') {
+      if (/^#\/platform(?:\?section=[^&]+)?$/.test(hash)) {
         setCurrentView('platform');
         setActiveTab('platform');
         setProjectId(null);
@@ -901,7 +901,7 @@ export default function Home() {
   }
 
   if (currentView === 'platform') {
-    return <PlatformPortal />;
+    return <AppShell activeTab="platform" onTabChange={(tab) => setActiveTab(tab)}><PlatformPortal /></AppShell>;
   }
 
   if (currentView === 'admin') {

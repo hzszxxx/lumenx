@@ -26,6 +26,11 @@ export const GLOBAL_NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: s
   { id: "settings", icon: Settings, hash: "#/settings" },
 ];
 
+const PLATFORM_SUBNAV = [
+  ["users", "用户管理"], ["compute", "算力与凭证"], ["skills", "视频 Skill"], ["xiangongyun", "仙宫云 H3"],
+  ["competitions", "赛事活动"], ["certification", "创作者认证"], ["tasks", "商业任务"], ["academy", "培训学院"],
+] as const;
+
 const APP_VERSION = "v0.2.0";
 
 function NavButton({
@@ -107,13 +112,16 @@ export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: Glob
       {/* Primary navigation */}
       <nav className="flex-1 flex flex-col gap-0.5 p-2.5" aria-label={t("mainNavAria")}>
         {GLOBAL_NAV_ITEMS.filter((item) => item.id !== "settings").map((item) => (
-          <NavButton
-            key={item.id}
-            active={activeTab === item.id}
-            label={t(item.id)}
-            icon={item.icon}
-            onClick={() => handleNav(item.id, item.hash)}
-          />
+          <div key={item.id}>
+            <NavButton active={activeTab === item.id} label={t(item.id)} icon={item.icon} onClick={() => handleNav(item.id, item.hash)} />
+            {item.id === "platform" && activeTab === "platform" && (
+              <div className="ml-7 mt-1 space-y-0.5 border-l border-glass-border pl-2" aria-label="创作者平台菜单">
+                {PLATFORM_SUBNAV.map(([section, label]) => (
+                  <button key={section} type="button" onClick={() => { onTabChange("platform"); window.location.hash = `#/platform?section=${section}`; }} className="w-full rounded-md px-2 py-1.5 text-left text-xs text-text-muted hover:bg-hover-bg hover:text-foreground">{label}</button>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </nav>
 
