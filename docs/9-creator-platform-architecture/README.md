@@ -25,6 +25,7 @@
 - 平台路由已受 `LUMENX_PLATFORM_ENABLED` 控制；认证、赛事白名单、培训/模板、认证考核、商业任务和模拟账本业务已实现。
 - 真实支付、提现渠道和外部回调按当前要求跳过；接受任务只写入模拟不可变账本。
 - 前端平台入口已接入 `#/platform`，目录为 `frontend/src/components/platform/`，账户 API/store 分别位于 `frontend/src/lib/platformApi.ts` 与 `frontend/src/store/platformStore.ts`。
+- 管理后台第一条纵向切片已接入独立 `#/admin` 路由：管理员概览、用户检索、角色/启停管理、邀请码生成和审计事件读取分别由 `/api/platform/admin/*` 与受保护的 `/api/platform/auth/invites` 提供；前端入口为 `frontend/src/components/platform/AdminConsole.tsx`。该切片不包含真实支付、提现或生产级运营报表。
 
 对应文件：`src/apps/platform/` 与 `tests/test_platform_*.py`。
 

@@ -5,6 +5,8 @@ const TOKEN_KEY = "lumenx_platform_token";
 export type PlatformUser = { id: string; username: string; email?: string | null; role: string };
 export type PlatformSession = { access_token: string; expires_at: string; user: PlatformUser };
 export type PlatformSkillVersion = { id: string; name: string; version: string; scope: string; owner_id?: string | null; project_id?: string | null; parent_version?: string | null; content_hash: string; status: string; created_at: string };
+export type AdminUser = { id: string; username: string; email?: string | null; nickname?: string | null; role: string; is_active: boolean | number; created_at: string; updated_at: string };
+export type AdminOverview = { users: { total: number; active: number; creators: number; admins: number }; tasks: { total: number; open: number }; competitions: { total: number; active: number }; submissions: { total: number; pending: number }; ledger_balance_cents: number };
 
 export function getPlatformToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -61,5 +63,11 @@ export const platformApi = {
   createSkillVersion: (payload: { manifest: { name: string; version: string; title: string; expected_tools: string[]; content_hash: string }; scope?: string; project_id?: string; parent_version?: string }) => request<PlatformSkillVersion>("/skills/versions", { method: "POST", body: JSON.stringify(payload) }),
   bindSkillVersion: (skillVersionId: string, active = true) => request(`/skills/versions/${skillVersionId}/bind?active=${active ? "true" : "false"}`, { method: "POST" }),
   resolveSkill: (name: string, projectId?: string) => request<Record<string, unknown>>(`/skills/${encodeURIComponent(name)}/resolve${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`),
+  adminOverview: () => request<AdminOverview>("/admin/overview"),
+  adminUsers: (params: { query?: string; role?: string; active?: string } = {}) => request<{ items: AdminUser[]; total: number; limit: number; offset: number }>(`/admin/users?${new URLSearchParams(params).toString()}`),
+  adminUpdateUser: (id: string, payload: { role?: string; is_active?: boolean }) => request<AdminUser>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  adminAuditEvents: () => request<{ items: Array<{ id: string; actor_id: string | null; event_type: string; entity_type: string; entity_id: string | null; payload_json: string; created_at: string }>; total: number }>("/admin/audit-events?limit=100"),
+  adminInvites: () => request<Array<{ id: string; code: string; max_uses: number; used_count: number; expires_at?: string | null; created_at: string }>>("/auth/invites"),
+  createAdminInvite: (payload: { code?: string; max_uses?: number; expires_at?: string }) => request("/auth/invites", { method: "POST", body: JSON.stringify(payload) }),
 };
 

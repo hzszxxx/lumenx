@@ -32,6 +32,12 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     except PlatformError as exc: raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
 
 
+def admin_user(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    if user.get("role") != "admin":
+        raise HTTPException(403, detail={"code": "forbidden", "message": "admin role required"})
+    return user
+
+
 def handle(fn):
     try: return fn()
     except PlatformError as exc: raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
@@ -101,6 +107,10 @@ class SkillWorkerClaimIn(BaseModel):
     worker_token: str = Field(min_length=20)
     lease_seconds: int = Field(default=300, gt=0, le=3600)
 
+class AdminUserUpdateIn(BaseModel):
+    role: str | None = None
+    is_active: bool | None = None
+
 
 @router.post("/auth/register")
 def register(body: RegisterIn, svc: PlatformService = Depends(service)): return handle(lambda: svc.register(body.username, body.password, body.email, invite_code=body.invite_code))
@@ -110,7 +120,7 @@ def create_registration_invite(body: RegistrationInviteIn, user=Depends(current_
     return handle(lambda: svc.create_registration_invite(user, body.code, body.max_uses, body.expires_at))
 
 @router.get("/auth/invites")
-def list_registration_invites(user=Depends(current_user), svc: PlatformService = Depends(service)):
+def list_registration_invites(user=Depends(admin_user), svc: PlatformService = Depends(service)):
     return handle(lambda: svc.list_registration_invites(user))
 
 @router.post("/auth/login")
@@ -123,6 +133,22 @@ def me(user=Depends(current_user), svc: PlatformService = Depends(service)): ret
 def logout(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), svc: PlatformService = Depends(service)):
     if credentials: svc.logout(credentials.credentials)
     return {"status": "logged_out"}
+
+@router.get("/admin/overview")
+def admin_overview(user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return svc.admin_overview(user)
+
+@router.get("/admin/users")
+def admin_users(query: str = "", role: str | None = None, active: bool | None = None, limit: int = 50, offset: int = 0, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return svc.admin_users(user, query=query, role=role, active=active, limit=limit, offset=offset)
+
+@router.patch("/admin/users/{user_id}")
+def admin_update_user(user_id: str, body: AdminUserUpdateIn, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.admin_update_user(user, user_id, role=body.role, is_active=body.is_active))
+
+@router.get("/admin/audit-events")
+def admin_audit_events(limit: int = 100, offset: int = 0, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return svc.admin_audit_events(user, limit=limit, offset=offset)
 
 @router.get("/usage/tokens")
 def token_usage(limit: int = 100, user=Depends(current_user), svc: PlatformService = Depends(service)):

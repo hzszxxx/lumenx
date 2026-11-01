@@ -328,3 +328,12 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 验证：平台注册/邀请码服务与 API 测试、前端 typecheck 待本切片统一回归。
 - 证据边界：没有实现短信验证码发送、手机号绑定或运营商实名校验；邀请码生成需要管理员 API 或受控初始化脚本。
 - 首次部署：`scripts/bootstrap_platform_admin.py` 提供一次性 admin 初始化路径，生产数据库初始化后应立即恢复邀请码强制配置。
+
+## 2026-11-01 仙宫云 H3 管理界面切片
+
+平台工作台新增“仙宫云 H3”入口，按账户绑定、余额/队列/GPU 状态、运行策略和五槽位实例池组织界面。Access Token 输入、运行策略和释放操作已提供交互反馈；真实仙宫云 API、余额同步、实例生命周期和 ComfyUI 队列尚未接入，界面不会伪造已连接状态。
+
+- 责任文件：`frontend/src/components/platform/XiangongyunSettings.tsx`、`frontend/src/components/platform/PlatformPortal.tsx`。
+- 分支/提交：`feature/skill-runtime-production` / `58e8408`。
+- 验证：`npm --prefix frontend run typecheck` 通过；`git diff --check` 通过。
+- 证据边界：当前为前端管理界面和本地状态骨架，真实仙宫云凭证代理、实例 API、费用同步及 H3 视频生成仍需后续现场接入和验收。

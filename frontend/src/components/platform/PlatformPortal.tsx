@@ -52,7 +52,7 @@ export default function PlatformPortal() {
     <main className="min-h-full p-6 md:p-10 bg-background">
       <header className="max-w-6xl mx-auto mb-8 flex items-start justify-between gap-6">
         <div><p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">Creator Platform · Account & Operations</p><h1 className="text-4xl font-display text-foreground mt-3">创作者平台</h1><p className="text-text-secondary mt-2">用户、认证、赛事、培训与商业任务统一工作台</p></div>
-        {user && <button type="button" onClick={() => void logout()} className="glass-button">退出登录</button>}
+        {user && <div className="flex gap-2">{user.role === "admin" && <button type="button" onClick={() => { window.location.hash = "#/admin"; }} className="glass-button">管理后台</button>}<button type="button" onClick={() => void logout()} className="glass-button">退出登录</button></div>}
       </header>
       <div className="max-w-6xl mx-auto grid lg:grid-cols-[220px_1fr] gap-6">
         <nav className="glass-panel p-3 h-fit space-y-1" aria-label="平台导航">

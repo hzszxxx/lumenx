@@ -53,6 +53,11 @@ class PlatformService:
     def _save_idem(self, c: sqlite3.Connection, actor: str, key: str, response: dict[str, Any]) -> None:
         c.execute("INSERT INTO idempotency_records VALUES (?,?,?,?)", (actor, key, json.dumps(response), now()))
 
+    @staticmethod
+    def _require_admin(actor: dict[str, Any]) -> None:
+        if actor.get("role") != "admin":
+            raise PlatformError("forbidden", "admin role required", 403)
+
     def _audit(self, c: sqlite3.Connection, actor: str | None, event: str, entity: str, entity_id: str | None, payload: dict[str, Any]) -> None:
         c.execute("INSERT INTO audit_events_ext VALUES (?,?,?,?,?,?,?,?)", (uid(), actor, uid(), event, entity, entity_id, json.dumps(payload), now()))
 
@@ -122,6 +127,69 @@ class PlatformService:
     def logout(self, token: str) -> None:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with connect(self.path) as c: c.execute("UPDATE platform_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL", (now(), token_hash))
+
+    def admin_overview(self, actor: dict[str, Any]) -> dict[str, Any]:
+        """Return bounded operational counters for the admin console."""
+        self._require_admin(actor)
+        with connect(self.path) as c:
+            users = c.execute("SELECT COUNT(*), SUM(is_active), SUM(role='creator'), SUM(role='admin') FROM platform_users").fetchone()
+            tasks = c.execute("SELECT COUNT(*), SUM(status IN ('published','claimed','in_progress','delivered','revision_requested','resubmitted')) FROM commercial_tasks").fetchone()
+            competitions = c.execute("SELECT COUNT(*), SUM(status IN ('enrolling','ongoing','judging')) FROM competitions").fetchone()
+            submissions = c.execute("SELECT COUNT(*), SUM(status='submitted') FROM platform_submissions").fetchone()
+            ledger = c.execute("SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_cents ELSE -amount_cents END),0) FROM ledger_entries").fetchone()[0]
+        return {
+            "users": {"total": users[0] or 0, "active": users[1] or 0, "creators": users[2] or 0, "admins": users[3] or 0},
+            "tasks": {"total": tasks[0] or 0, "open": tasks[1] or 0},
+            "competitions": {"total": competitions[0] or 0, "active": competitions[1] or 0},
+            "submissions": {"total": submissions[0] or 0, "pending": submissions[1] or 0},
+            "ledger_balance_cents": ledger,
+        }
+
+    def admin_users(self, actor: dict[str, Any], *, query: str = "", role: str | None = None, active: bool | None = None, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+        self._require_admin(actor)
+        limit = max(1, min(limit, 100)); offset = max(0, offset)
+        clauses: list[str] = []; params: list[Any] = []
+        if query.strip():
+            like = f"%{query.strip()}%"; clauses.append("(username LIKE ? OR COALESCE(email,'') LIKE ? OR COALESCE(nickname,'') LIKE ?)"); params.extend([like, like, like])
+        if role:
+            clauses.append("role=?"); params.append(role)
+        if active is not None:
+            clauses.append("is_active=?"); params.append(1 if active else 0)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        with connect(self.path) as c:
+            total = c.execute(f"SELECT COUNT(*) FROM platform_users{where}", params).fetchone()[0]
+            rows = c.execute(f"SELECT id,username,email,nickname,role,is_active,created_at,updated_at FROM platform_users{where} ORDER BY created_at DESC LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()
+        keys = ("id", "username", "email", "nickname", "role", "is_active", "created_at", "updated_at")
+        return {"items": [dict(zip(keys, row)) for row in rows], "total": total, "limit": limit, "offset": offset}
+
+    def admin_update_user(self, actor: dict[str, Any], user_id: str, *, role: str | None = None, is_active: bool | None = None) -> dict[str, Any]:
+        self._require_admin(actor)
+        if role is not None and role not in {"user", "creator", "reviewer", "client", "admin"}:
+            raise PlatformError("invalid_role", "unsupported role", 422)
+        if user_id == actor.get("id") and is_active is False:
+            raise PlatformError("self_deactivate", "an admin cannot deactivate their own account", 422)
+        with connect(self.path) as c:
+            row = c.execute("SELECT id,username,email,nickname,role,is_active,created_at,updated_at FROM platform_users WHERE id=?", (user_id,)).fetchone()
+            if not row: raise PlatformError("user_not_found", "user not found", 404)
+            before = {"role": row[4], "is_active": bool(row[5])}
+            next_role = role or row[4]; next_active = int(is_active if is_active is not None else bool(row[5]))
+            if row[4] == "admin" and next_role != "admin":
+                remaining = c.execute("SELECT COUNT(*) FROM platform_users WHERE role='admin' AND is_active=1 AND id<>?", (user_id,)).fetchone()[0]
+                if remaining < 1: raise PlatformError("last_admin", "cannot demote the last active admin", 422)
+            timestamp = now(); c.execute("UPDATE platform_users SET role=?,is_active=?,updated_at=? WHERE id=?", (next_role, next_active, timestamp, user_id))
+            self._audit(c, actor["id"], "admin.user_updated", "user", user_id, {"before": before, "after": {"role": next_role, "is_active": bool(next_active)}})
+            updated = c.execute("SELECT id,username,email,nickname,role,is_active,created_at,updated_at FROM platform_users WHERE id=?", (user_id,)).fetchone()
+        keys = ("id", "username", "email", "nickname", "role", "is_active", "created_at", "updated_at")
+        return dict(zip(keys, updated))
+
+    def admin_audit_events(self, actor: dict[str, Any], *, limit: int = 100, offset: int = 0) -> dict[str, Any]:
+        self._require_admin(actor)
+        limit = max(1, min(limit, 200)); offset = max(0, offset)
+        with connect(self.path) as c:
+            total = c.execute("SELECT COUNT(*) FROM audit_events_ext").fetchone()[0]
+            rows = c.execute("SELECT id,actor_id,event_type,entity_type,entity_id,payload_json,created_at FROM audit_events_ext ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+        keys = ("id", "actor_id", "event_type", "entity_type", "entity_id", "payload_json", "created_at")
+        return {"items": [dict(zip(keys, row)) for row in rows], "total": total, "limit": limit, "offset": offset}
 
     def _credentials_cipher(self) -> AESGCM:
         raw = self.config.credentials_key
