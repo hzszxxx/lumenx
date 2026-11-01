@@ -69,5 +69,6 @@ export const platformApi = {
   adminAuditEvents: () => request<{ items: Array<{ id: string; actor_id: string | null; event_type: string; entity_type: string; entity_id: string | null; payload_json: string; created_at: string }>; total: number }>("/admin/audit-events?limit=100"),
   adminInvites: () => request<Array<{ id: string; code: string; max_uses: number; used_count: number; expires_at?: string | null; created_at: string }>>("/auth/invites"),
   createAdminInvite: (payload: { code?: string; max_uses?: number; expires_at?: string }) => request("/auth/invites", { method: "POST", body: JSON.stringify(payload) }),
+  verifyXiangongyun: (access_token: string) => request<{ provider: string; verified: boolean; account: { nickname?: string; phone?: string; uuid?: string }; balance: number | null; instances: Array<Record<string, unknown>>; checked_at: string }>("/xiangongyun/verify", { method: "POST", body: JSON.stringify({ access_token }) }),
 };
 

@@ -13,6 +13,8 @@ import uuid
 from typing import Any
 from math import ceil
 import base64
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .config import PlatformConfig
@@ -190,6 +192,47 @@ class PlatformService:
             rows = c.execute("SELECT id,actor_id,event_type,entity_type,entity_id,payload_json,created_at FROM audit_events_ext ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
         keys = ("id", "actor_id", "event_type", "entity_type", "entity_id", "payload_json", "created_at")
         return {"items": [dict(zip(keys, row)) for row in rows], "total": total, "limit": limit, "offset": offset}
+
+    def xiangongyun_verify(self, actor: dict[str, Any], access_token: str) -> dict[str, Any]:
+        if not access_token or len(access_token.strip()) < 16:
+            raise PlatformError("invalid_xiangongyun_token", "仙宫云 Access Token 无效", 422)
+        token = access_token.strip()
+
+        def get(path: str) -> dict[str, Any]:
+            request = Request(
+                f"https://api.xiangongyun.com{path}",
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                method="GET",
+            )
+            try:
+                with urlopen(request, timeout=10) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            except HTTPError as exc:
+                if exc.code in {401, 403}:
+                    raise PlatformError("xiangongyun_unauthorized", "仙宫云 Token 无效或已过期", 401) from exc
+                raise PlatformError("xiangongyun_unavailable", f"仙宫云接口返回 HTTP {exc.code}", 502) from exc
+            except (URLError, TimeoutError, OSError, ValueError) as exc:
+                raise PlatformError("xiangongyun_unavailable", "无法连接仙宫云接口", 502) from exc
+            if isinstance(payload, dict) and payload.get("success") is False:
+                raise PlatformError("xiangongyun_api_error", str(payload.get("msg") or "仙宫云接口调用失败"), 502)
+            return payload if isinstance(payload, dict) else {}
+
+        whoami = get("/open/whoami")
+        balance = get("/open/balance")
+        instances = get("/open/instances")
+        account = whoami.get("data") if isinstance(whoami.get("data"), dict) else whoami
+        balance_data = balance.get("data") if isinstance(balance.get("data"), dict) else balance
+        instance_data = instances.get("data") if isinstance(instances.get("data"), dict) else instances
+        raw_items = instance_data.get("list", []) if isinstance(instance_data, dict) else []
+        safe_instances = [{key: item.get(key) for key in ("id", "name", "gpu_model", "gpu_used", "status", "price_per_hour", "data_center_name") if key in item} for item in raw_items if isinstance(item, dict)]
+        return {
+            "provider": "xiangongyun",
+            "verified": True,
+            "account": {key: account.get(key) for key in ("nickname", "phone", "uuid") if account.get(key) is not None},
+            "balance": balance_data.get("balance"),
+            "instances": safe_instances,
+            "checked_at": now(),
+        }
 
     def _credentials_cipher(self) -> AESGCM:
         raw = self.config.credentials_key

@@ -110,6 +110,8 @@ class SkillWorkerClaimIn(BaseModel):
 class AdminUserUpdateIn(BaseModel):
     role: str | None = None
     is_active: bool | None = None
+class XiangongyunVerifyIn(BaseModel):
+    access_token: str = Field(min_length=16, max_length=500)
 
 
 @router.post("/auth/register")
@@ -149,6 +151,10 @@ def admin_update_user(user_id: str, body: AdminUserUpdateIn, user=Depends(admin_
 @router.get("/admin/audit-events")
 def admin_audit_events(limit: int = 100, offset: int = 0, user=Depends(admin_user), svc: PlatformService = Depends(service)):
     return svc.admin_audit_events(user, limit=limit, offset=offset)
+
+@router.post("/xiangongyun/verify")
+def verify_xiangongyun(body: XiangongyunVerifyIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.xiangongyun_verify(user, body.access_token))
 
 @router.get("/usage/tokens")
 def token_usage(limit: int = 100, user=Depends(current_user), svc: PlatformService = Depends(service)):
