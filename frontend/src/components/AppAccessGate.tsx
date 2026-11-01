@@ -33,6 +33,7 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
     const [token, setToken] = useState("");
     const [messageKey, setMessageKey] = useState<string | null>(null);
     const [loginPending, setLoginPending] = useState(false);
+    const [isAdminConsolePath, setIsAdminConsolePath] = useState(false);
     const loginPendingRef = useRef(false);
     const mountedRef = useRef(false);
     const operationEpochRef = useRef(0);
@@ -91,6 +92,7 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
     }, [applySession]);
 
     useEffect(() => {
+        setIsAdminConsolePath(window.location.pathname === "/admin");
         mountedRef.current = true;
         const cleanupInterceptors = installAppAccessAxiosInterceptors();
         const handleExpired = (event: Event) => {
@@ -189,6 +191,12 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
             }
         }
     };
+
+    // The platform admin console has its own session boundary. It must remain
+    // reachable even when the Studio deployment access gate is not configured.
+    if (isAdminConsolePath) {
+        return <>{children}</>;
+    }
 
     const childContent = hasMountedChildren ? (
         <div hidden={state !== "ready"} aria-hidden={state !== "ready"} className={state === "ready" ? "contents" : undefined}>

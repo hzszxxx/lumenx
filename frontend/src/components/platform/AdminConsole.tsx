@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Activity, Ban, CheckCircle2, KeyRound, Shield, Users, type LucideIcon } from "lucide-react";
 import { platformApi, type AdminOverview, type AdminUser } from "@/lib/platformApi";
 import { usePlatformStore } from "@/store/platformStore";
@@ -8,13 +8,15 @@ import { usePlatformStore } from "@/store/platformStore";
 const roles = ["user", "creator", "reviewer", "client", "admin"];
 
 export default function AdminConsole() {
-  const { user, initialize, logout } = usePlatformStore();
+  const { user, initialize, login, logout, loading, error } = usePlatformStore();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [auditCount, setAuditCount] = useState(0);
   const [invite, setInvite] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   const refresh = async () => {
     const [nextOverview, nextUsers, audit] = await Promise.all([
@@ -26,7 +28,8 @@ export default function AdminConsole() {
   useEffect(() => { void initialize(); }, [initialize]);
   useEffect(() => { if (user?.role === "admin") void refresh().catch(error => setMessage(error instanceof Error ? error.message : "读取管理数据失败")); }, [user, query]);
 
-  if (!user) return <main className="min-h-full p-10 bg-background text-foreground"><div className="glass-panel max-w-xl mx-auto p-8"><h1 className="text-2xl font-display">管理后台</h1><p className="text-text-secondary mt-3">请先在创作者平台登录管理员账户。</p><button className="bg-primary rounded-lg px-4 py-2 mt-6" onClick={() => { window.location.hash = "#/platform"; }}>进入平台登录</button></div></main>;
+  const submitLogin = async (event: FormEvent) => { event.preventDefault(); setMessage(null); try { await login(username, password); setPassword(""); } catch { /* store exposes the error */ } };
+  if (!user) return <main className="min-h-full p-10 bg-background text-foreground"><div className="glass-panel max-w-xl mx-auto p-8"><p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">LumenX · Admin Console</p><h1 className="text-2xl font-display mt-3">管理员登录</h1><p className="text-text-secondary mt-3">使用平台管理员账户进入独立管理后台。</p><form onSubmit={submitLogin} className="space-y-4 mt-6"><input className="glass-input w-full" placeholder="管理员用户名" value={username} onChange={event => setUsername(event.target.value)} required /><input className="glass-input w-full" type="password" placeholder="管理员密码" value={password} onChange={event => setPassword(event.target.value)} required /><button className="bg-primary rounded-lg px-4 py-3 w-full font-semibold disabled:opacity-50" disabled={loading}>{loading ? "登录中…" : "登录管理后台"}</button></form>{(error || message) && <p role="status" className="text-sm text-status-failed-fg mt-4">{error || message}</p>}</div></main>;
   if (user.role !== "admin") return <main className="min-h-full p-10 bg-background text-foreground"><div className="glass-panel max-w-xl mx-auto p-8"><h1 className="text-2xl font-display">无权访问</h1><p className="text-text-secondary mt-3">当前账户角色为 {user.role}，管理后台仅限管理员。</p></div></main>;
 
   const updateRole = async (id: string, role: string) => { try { await platformApi.adminUpdateUser(id, { role }); setMessage("用户角色已更新"); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "更新失败"); } };
