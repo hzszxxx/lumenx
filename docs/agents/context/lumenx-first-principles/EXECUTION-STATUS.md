@@ -329,11 +329,22 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 证据边界：没有实现短信验证码发送、手机号绑定或运营商实名校验；邀请码生成需要管理员 API 或受控初始化脚本。
 - 首次部署：`scripts/bootstrap_platform_admin.py` 提供一次性 admin 初始化路径，生产数据库初始化后应立即恢复邀请码强制配置。
 
-## 2026-11-01 仙宫云 H3 管理界面切片
+## 2026-11-03 仙宫云绑定与 Skill 合同修复切片
 
-平台工作台新增“仙宫云 H3”入口，按账户绑定、余额/队列/GPU 状态、运行策略和五槽位实例池组织界面。Access Token 输入、运行策略和释放操作已提供交互反馈；真实仙宫云 API、余额同步、实例生命周期和 ComfyUI 队列尚未接入，界面不会伪造已连接状态。
+修复仙宫云绑定的生命周期和数据边界：账户快照改为 AES-GCM 加密字段，Provider 响应要求结构化 `data`、数值余额和实例列表，verify 回执返回 `credential_id`；撤销通用仙宫云凭证会同步删除绑定，重新验证不会复用失效绑定。verify/clear API 现在要求 `Idempotency-Key`，幂等记录保存请求指纹并拒绝参数冲突。平台默认配置恢复为关闭。
 
-- 责任文件：`frontend/src/components/platform/XiangongyunSettings.tsx`、`frontend/src/components/platform/PlatformPortal.tsx`。
-- 分支/提交：`feature/skill-runtime-production` / `58e8408`。
-- 验证：`npm --prefix frontend run typecheck` 通过；`git diff --check` 通过。
-- 证据边界：当前为前端管理界面和本地状态骨架，真实仙宫云凭证代理、实例 API、费用同步及 H3 视频生成仍需后续现场接入和验收。
+同时收紧 Product Skill 合同：manifest 必须包含 Atelier runtime 所需的描述、分类、提示模板和受控工具集合；system/workspace Skill 的创建和绑定仅限管理员；前端 Skill 编辑器生成完整 manifest，仙宫云界面失败重绑定会清空旧 slot，刷新按钮会实际读取状态 API。
+
+- 责任文件：`src/apps/platform/migrations/012_xiangongyun_bindings.sql`、`src/apps/platform/migrations/013_idempotency_and_xiangongyun_cleanup.sql`、`src/apps/platform/service.py`、`src/apps/platform/api.py`、`frontend/src/lib/platformApi.ts`、`frontend/src/components/platform/SkillSettings.tsx`、`frontend/src/components/platform/XiangongyunSettings.tsx`、`.env.example`、平台回归测试。
+- 分支/提交：`feature/skill-runtime-production` / 待提交。
+- 验证：隔离 runner 执行平台合同、数据库、service、admin 和 Skill API 测试（27 passed）；`npm --prefix frontend run typecheck` 通过；`git diff --check` 通过。
+- 证据边界：未执行真实仙宫云 Token、真实 Provider、生产 HTTPS、云端 Secret/KMS、集中式生产数据库或真实多用户部署；实例生命周期和 H3 生成接入仍是 deferred 能力。
+
+## 2026-11-01 独立管理后台第一条纵向切片
+
+新增受管理员角色保护的 Admin Console：管理员概览、用户搜索、角色/启停管理、邀请码生成和审计事件读取。后端新增 `/api/platform/admin/overview`、`/users`、`/audit-events`，前端新增 `#/admin` 与 `AdminConsole.tsx`；修改用户时禁止停用当前管理员及降级最后一个活跃管理员。
+
+- 责任文件：`src/apps/platform/service.py`、`src/apps/platform/api.py`、`tests/test_platform_admin_api.py`、`frontend/src/components/platform/AdminConsole.tsx`、`frontend/src/lib/platformApi.ts`、`frontend/src/app/page.tsx`、`frontend/src/components/platform/PlatformPortal.tsx`、平台架构 README。
+- 分支/提交：`feature/skill-runtime-production` / `e1479b2`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_admin_api.py tests/test_platform_skill_api.py -q`（5 passed）；`npm --prefix frontend run typecheck`（通过）。
+- 证据边界：该切片仍未提供全量审计筛选、用户密码重置、批量运营报表、真实支付/提现或生产级多管理员工作流；前端管理入口已经独立，但平台 API 仍由同一 FastAPI 组合根装配。

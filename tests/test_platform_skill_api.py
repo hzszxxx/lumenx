@@ -10,7 +10,7 @@ from src.apps.platform.service import PlatformService
 
 
 def _manifest(version="1.0.0", title="Story Scout"):
-    payload = {"name": "story-scout", "version": version, "title": title, "expected_tools": ["canvas.readProject"]}
+    payload = {"name": "story-scout", "version": version, "title": title, "description": "A controlled story planning skill", "category": "story", "prompt_template": "Plan the next scene: {{input}}", "expected_tools": ["canvas.readProject"]}
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return {**payload, "content_hash": hashlib.sha256(canonical.encode()).hexdigest()}
 

@@ -13,7 +13,7 @@ interface AppShellProps {
 
 export default function AppShell({ activeTab, onTabChange, onLogout, children }: AppShellProps) {
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-screen w-full flex-col">
       <OfflineBanner />
       <div className="flex min-h-0 flex-1">
         <GlobalSidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />

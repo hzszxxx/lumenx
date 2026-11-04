@@ -666,7 +666,7 @@ export default function Home() {
   const tc = useTranslations("common");
 
   useEffect(() => {
-    if (currentView === "platform" || currentView === "admin") {
+    if (currentView === "platform" || currentView === "admin" || currentView === "settings") {
       setPlatformAccess("ready");
       return;
     }

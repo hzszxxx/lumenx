@@ -54,10 +54,10 @@ beforeEach(() => {
 });
 
 describe('workspace project package import entry', () => {
-    it('opens the package import dialog from its own workspace button without reusing file import', () => {
+    it('opens the package import dialog from its own workspace button without reusing file import', async () => {
         renderWithIntl(<Home />);
 
-        fireEvent.click(screen.getByRole('button', { name: /导入工程包|Import Package/ }));
+        fireEvent.click(await screen.findByRole('button', { name: /导入工程包|Import Package/ }));
 
         expect(screen.getByRole('dialog', { name: 'project package import dialog' })).toBeInTheDocument();
         expect(screen.queryByRole('dialog', { name: 'script file import dialog' })).not.toBeInTheDocument();

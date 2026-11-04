@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from getpass import getpass
+from pathlib import Path
+
+# Allow direct execution from the repository root, where Python otherwise
+# places only ``scripts/`` on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.apps.platform.config import PlatformConfig
 from src.apps.platform.service import PlatformError, PlatformService

@@ -43,7 +43,8 @@ function renderWorkspace() {
     return renderWithIntl(<Home />);
 }
 
-function openCreateSeries() {
+async function openCreateSeries() {
+    await waitFor(() => expect(screen.getByRole('button', { name: /新建|New/ })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /新建|New/ }));
     fireEvent.click(screen.getByRole('button', { name: /新建系列|New Series/ }));
 }
@@ -68,7 +69,7 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockResolvedValueOnce(created);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([created]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
 
         await act(async () => fireEvent.click(createButton()));
@@ -81,7 +82,7 @@ describe('workspace create series readback', () => {
     it('keeps the dialog open and never navigates when the create acknowledgement is malformed', async () => {
         vi.mocked(api.createSeriesV2).mockResolvedValueOnce({ id: '', revision: 1, title: 'Created Series' } as Series);
         renderWorkspace();
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
 
         await act(async () => fireEvent.click(createButton()));
@@ -99,7 +100,7 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockResolvedValueOnce(created);
         renderWorkspace();
         vi.mocked(api.listSeries).mockReturnValue(readback.promise);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
 
         await act(async () => fireEvent.click(createButton()));
@@ -117,7 +118,7 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockResolvedValueOnce(created);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
 
         await act(async () => fireEvent.click(createButton()));
@@ -139,7 +140,7 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockResolvedValueOnce(acknowledged);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([stale]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
 
         await act(async () => fireEvent.click(createButton()));
@@ -161,11 +162,11 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockReturnValueOnce(pending.promise);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([created]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
         fireEvent.click(createButton());
         fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-        openCreateSeries();
+        await openCreateSeries();
 
         fireEvent.click(createButton());
 
@@ -179,13 +180,13 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockResolvedValueOnce(created);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
 
         await act(async () => fireEvent.click(createButton()));
         expect(await screen.findByRole('alert')).toHaveTextContent(/同步|sync|读取|read/i);
         fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-        openCreateSeries();
+        await openCreateSeries();
         const alert = await screen.findByRole('alert');
         vi.mocked(api.listSeries).mockResolvedValue([created]);
 
@@ -201,11 +202,11 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockReturnValueOnce(pending.promise);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([created]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
         fireEvent.click(createButton());
         fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-        openCreateSeries();
+        await openCreateSeries();
 
         await act(async () => pending.resolve(created));
 
@@ -219,7 +220,7 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockReturnValueOnce(pending.promise);
         const rendered = renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([created]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
         fireEvent.click(createButton());
         rendered.unmount();
@@ -235,7 +236,7 @@ describe('workspace create series readback', () => {
         vi.mocked(api.createSeriesV2).mockReturnValueOnce(pending.promise);
         renderWorkspace();
         vi.mocked(api.listSeries).mockResolvedValue([created]);
-        openCreateSeries();
+        await openCreateSeries();
         fillTitle();
         const create = createButton();
 

@@ -4,9 +4,11 @@ const TOKEN_KEY = "lumenx_platform_token";
 
 export type PlatformUser = { id: string; username: string; email?: string | null; role: string };
 export type PlatformSession = { access_token: string; expires_at: string; user: PlatformUser };
+export type PlatformSkillManifest = { name: string; version: string; title: string; description: string; category: "story" | "shot" | "review" | "sequence"; prompt_template: string; expected_tools: string[]; content_hash: string };
 export type PlatformSkillVersion = { id: string; name: string; version: string; scope: string; owner_id?: string | null; project_id?: string | null; parent_version?: string | null; content_hash: string; status: string; created_at: string };
 export type AdminUser = { id: string; username: string; email?: string | null; nickname?: string | null; role: string; is_active: boolean | number; created_at: string; updated_at: string };
 export type AdminOverview = { users: { total: number; active: number; creators: number; admins: number }; tasks: { total: number; open: number }; competitions: { total: number; active: number }; submissions: { total: number; pending: number }; ledger_balance_cents: number };
+export type XiangongyunStatus = { provider: "xiangongyun"; verified: true; credential_id: string; account: { nickname?: string; phone?: string; uuid?: string }; balance: number | null; instances: Array<Record<string, unknown>>; checked_at: string };
 
 export function getPlatformToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -60,7 +62,7 @@ export const platformApi = {
   rotateCredential: (credentialId: string, api_key: string) => request(`/credentials/${credentialId}/rotate`, { method: "POST", body: JSON.stringify({ api_key }) }),
   revokeCredential: (credentialId: string) => request(`/credentials/${credentialId}/revoke`, { method: "POST" }),
   skills: (name?: string, projectId?: string) => request<PlatformSkillVersion[]>(`/skills${name || projectId ? `?${new URLSearchParams({ ...(name ? { name } : {}), ...(projectId ? { project_id: projectId } : {}) }).toString()}` : ""}`),
-  createSkillVersion: (payload: { manifest: { name: string; version: string; title: string; expected_tools: string[]; content_hash: string }; scope?: string; project_id?: string; parent_version?: string }) => request<PlatformSkillVersion>("/skills/versions", { method: "POST", body: JSON.stringify(payload) }),
+  createSkillVersion: (payload: { manifest: PlatformSkillManifest; scope?: string; project_id?: string; parent_version?: string }) => request<PlatformSkillVersion>("/skills/versions", { method: "POST", body: JSON.stringify(payload) }),
   bindSkillVersion: (skillVersionId: string, active = true) => request(`/skills/versions/${skillVersionId}/bind?active=${active ? "true" : "false"}`, { method: "POST" }),
   resolveSkill: (name: string, projectId?: string) => request<Record<string, unknown>>(`/skills/${encodeURIComponent(name)}/resolve${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`),
   adminOverview: () => request<AdminOverview>("/admin/overview"),
@@ -69,6 +71,8 @@ export const platformApi = {
   adminAuditEvents: () => request<{ items: Array<{ id: string; actor_id: string | null; event_type: string; entity_type: string; entity_id: string | null; payload_json: string; created_at: string }>; total: number }>("/admin/audit-events?limit=100"),
   adminInvites: () => request<Array<{ id: string; code: string; max_uses: number; used_count: number; expires_at?: string | null; created_at: string }>>("/auth/invites"),
   createAdminInvite: (payload: { code?: string; max_uses?: number; expires_at?: string }) => request("/auth/invites", { method: "POST", body: JSON.stringify(payload) }),
-  verifyXiangongyun: (access_token: string) => request<{ provider: string; verified: boolean; account: { nickname?: string; phone?: string; uuid?: string }; balance: number | null; instances: Array<Record<string, unknown>>; checked_at: string }>("/xiangongyun/verify", { method: "POST", body: JSON.stringify({ access_token }) }),
+  verifyXiangongyun: (access_token: string, idempotencyKey = crypto.randomUUID()) => request<XiangongyunStatus>("/xiangongyun/verify", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ access_token }) }),
+  xiangongyunStatus: () => request<XiangongyunStatus | null>("/xiangongyun/status"),
+  clearXiangongyunBinding: (idempotencyKey = crypto.randomUUID()) => request<{ status: string }>("/xiangongyun/binding", { method: "DELETE", headers: { "Idempotency-Key": idempotencyKey } }),
 };
 

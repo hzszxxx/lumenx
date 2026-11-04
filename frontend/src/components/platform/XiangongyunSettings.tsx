@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { platformApi } from "@/lib/platformApi";
+import { useEffect, useState } from "react";
+import { platformApi, type XiangongyunStatus } from "@/lib/platformApi";
 
 type Slot = { id: number; label: string; status: string; generation: string; queue: string };
 
@@ -24,23 +24,60 @@ export default function XiangongyunSettings() {
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
+  const applyBinding = (result: XiangongyunStatus | null) => {
+    if (!result) {
+      setAccount(null); setBalance(null); setVerifiedAt(null); setSlots(initialSlots); return;
+    }
+    setAccount(result.account); setBalance(result.balance); setVerifiedAt(result.checked_at);
+    setSlots((items) => items.map((item, index) => index === 0 ? { ...item, label: `槽位 1 · ${result.account.nickname || "H3 实例"}`, status: "已验证" } : item));
+  };
+
+  useEffect(() => {
+    let active = true;
+    void platformApi.xiangongyunStatus().then(result => {
+      if (!active) return;
+      applyBinding(result);
+      if (result) setMessage("已加载最近一次仙宫云验证结果");
+    }).catch(() => {
+      if (active) setMessage("无法读取仙宫云绑定状态");
+    });
+    return () => { active = false; };
+  }, []);
+
   const bind = async () => {
     if (!token.trim()) return setMessage("请输入 Access Token 后再绑定");
     setChecking(true); setMessage("正在验证仙宫云账户…");
     try {
       const result = await platformApi.verifyXiangongyun(token.trim());
-      setAccount(result.account); setBalance(result.balance); setVerifiedAt(result.checked_at);
-      setSlots((items) => items.map((item, index) => index === 0 ? { ...item, label: `槽位 1 · ${result.account.nickname || "H3 实例"}`, status: "已验证" } : item));
-      setMessage("仙宫云账户验证成功"); setToken("");
+      applyBinding(result);
+      setMessage("仙宫云账户验证成功，绑定已保存"); setToken("");
     } catch (error) {
-      setAccount(null); setBalance(null); setVerifiedAt(null); setMessage(error instanceof Error ? error.message : "仙宫云验证失败");
+      applyBinding(null);
+      setMessage(error instanceof Error ? error.message : "仙宫云验证失败");
     } finally { setChecking(false); }
   };
 
-  const clearBinding = () => {
-    setToken("");
-    setAccount(null); setBalance(null); setVerifiedAt(null);
-    setMessage("已清除本地绑定信息");
+  const refreshBinding = async () => {
+    setChecking(true);
+    try {
+      const result = await platformApi.xiangongyunStatus();
+      applyBinding(result);
+      setMessage(result ? "已刷新最近一次仙宫云验证结果" : "尚未绑定仙宫云账户");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "无法刷新仙宫云绑定状态");
+    } finally { setChecking(false); }
+  };
+
+  const clearBinding = async () => {
+    setChecking(true);
+    try {
+      await platformApi.clearXiangongyunBinding();
+      applyBinding(null);
+      setToken("");
+      setMessage("仙宫云绑定已清除");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "清除仙宫云绑定失败");
+    } finally { setChecking(false); }
   };
 
   return (
@@ -59,7 +96,7 @@ export default function XiangongyunSettings() {
           <div className="flex gap-2 mt-2"><input id="xiangongyun-token" className="glass-input flex-1" type="password" placeholder="输入 Access Token 后验证账户" value={token} onChange={(event) => setToken(event.target.value)} /><button type="button" className="glass-button" onClick={() => void bind()} disabled={checking}>{checking ? "验证中…" : "验证并更新"}</button></div>
           <p className="text-xs text-text-muted mt-2">登录仙宫云网页不会自动共享给本地应用；这里通过 Access Token 查询账号、余额和实例状态。Token 不会回显。</p>
           {account && <div className="mt-4 rounded-lg border border-status-success-fg/30 bg-status-success-fg/10 p-3 text-sm"><p>账号：{account.nickname || "未提供昵称"}</p><p className="text-text-secondary mt-1">手机：{account.phone || "未提供"} · UUID：{account.uuid || "未提供"}</p></div>}
-          <div className="flex flex-wrap gap-2 justify-end mt-5"><a className="glass-button" href="https://www.xiangongyun.com/console/finance/recharge" target="_blank" rel="noreferrer">官方充值与控制台</a><button type="button" className="glass-button" onClick={() => setMessage(account ? "当前显示的是最近一次 API 验证结果" : "请先输入 Access Token 验证")}>刷新状态</button><button type="button" className="glass-button" onClick={clearBinding}>清除绑定</button></div>
+          <div className="flex flex-wrap gap-2 justify-end mt-5"><a className="glass-button" href="https://www.xiangongyun.com/console/finance/recharge" target="_blank" rel="noreferrer">官方充值与控制台</a><button type="button" className="glass-button" onClick={() => void refreshBinding()} disabled={checking}>刷新状态</button><button type="button" className="glass-button" onClick={clearBinding}>清除绑定</button></div>
           <p role="status" className="text-sm text-text-secondary mt-4">{message}</p>
         </div>
         <div className="p-6 border-b border-glass-border">

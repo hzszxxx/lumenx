@@ -7,6 +7,7 @@ immutable snapshots supplied by a future read-only resolver.
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import re
 import secrets
 import sqlite3
 import uuid
@@ -48,12 +49,21 @@ class PlatformService:
         self.path = self.config.sqlite_path()
         migrate(self.path)
 
-    def _idem(self, c: sqlite3.Connection, actor: str, key: str) -> dict[str, Any] | None:
-        row = c.execute("SELECT response_json FROM idempotency_records WHERE actor_id=? AND key=?", (actor, key)).fetchone()
-        return json.loads(row[0]) if row else None
+    def _idem(self, c: sqlite3.Connection, actor: str, key: str, request_hash: str | None = None) -> dict[str, Any] | None:
+        row = c.execute("SELECT response_json,request_hash FROM idempotency_records WHERE actor_id=? AND key=?", (actor, key)).fetchone()
+        if not row:
+            return None
+        if request_hash is not None and row[1] not in {None, request_hash}:
+            raise PlatformError("idempotency_key_reused", "Idempotency-Key was already used with different parameters", 409)
+        return json.loads(row[0])
 
-    def _save_idem(self, c: sqlite3.Connection, actor: str, key: str, response: dict[str, Any]) -> None:
-        c.execute("INSERT INTO idempotency_records VALUES (?,?,?,?)", (actor, key, json.dumps(response), now()))
+    def _save_idem(self, c: sqlite3.Connection, actor: str, key: str, response: dict[str, Any], request_hash: str | None = None) -> None:
+        c.execute("INSERT INTO idempotency_records (actor_id,key,response_json,created_at,request_hash) VALUES (?,?,?,?,?)", (actor, key, json.dumps(response), now(), request_hash))
+
+    @staticmethod
+    def _request_hash(payload: dict[str, Any]) -> str:
+        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _require_admin(actor: dict[str, Any]) -> None:
@@ -193,10 +203,17 @@ class PlatformService:
         keys = ("id", "actor_id", "event_type", "entity_type", "entity_id", "payload_json", "created_at")
         return {"items": [dict(zip(keys, row)) for row in rows], "total": total, "limit": limit, "offset": offset}
 
-    def xiangongyun_verify(self, actor: dict[str, Any], access_token: str) -> dict[str, Any]:
+    def xiangongyun_verify(self, actor: dict[str, Any], access_token: str, *, idempotency_key: str) -> dict[str, Any]:
         if not access_token or len(access_token.strip()) < 16:
             raise PlatformError("invalid_xiangongyun_token", "仙宫云 Access Token 无效", 422)
+        if not idempotency_key or len(idempotency_key) > 200:
+            raise PlatformError("idempotency_key_required", "Idempotency-Key is required", 422)
         token = access_token.strip()
+        request_hash = self._request_hash({"operation": "xiangongyun.verify", "access_token": token})
+        with connect(self.path) as c:
+            replay = self._idem(c, actor["id"], idempotency_key, request_hash)
+        if replay is not None:
+            return replay
 
         def get(path: str) -> dict[str, Any]:
             request = Request(
@@ -213,26 +230,148 @@ class PlatformService:
                 raise PlatformError("xiangongyun_unavailable", f"仙宫云接口返回 HTTP {exc.code}", 502) from exc
             except (URLError, TimeoutError, OSError, ValueError) as exc:
                 raise PlatformError("xiangongyun_unavailable", "无法连接仙宫云接口", 502) from exc
-            if isinstance(payload, dict) and payload.get("success") is False:
-                raise PlatformError("xiangongyun_api_error", str(payload.get("msg") or "仙宫云接口调用失败"), 502)
-            return payload if isinstance(payload, dict) else {}
+            if not isinstance(payload, dict) or ("success" in payload and payload["success"] is not True):
+                raise PlatformError("xiangongyun_api_error", "仙宫云接口返回格式无效", 502)
+            data = payload.get("data")
+            if not isinstance(data, dict):
+                raise PlatformError("xiangongyun_api_error", "仙宫云接口返回格式无效", 502)
+            return data
 
-        whoami = get("/open/whoami")
-        balance = get("/open/balance")
-        instances = get("/open/instances")
-        account = whoami.get("data") if isinstance(whoami.get("data"), dict) else whoami
-        balance_data = balance.get("data") if isinstance(balance.get("data"), dict) else balance
-        instance_data = instances.get("data") if isinstance(instances.get("data"), dict) else instances
-        raw_items = instance_data.get("list", []) if isinstance(instance_data, dict) else []
-        safe_instances = [{key: item.get(key) for key in ("id", "name", "gpu_model", "gpu_used", "status", "price_per_hour", "data_center_name") if key in item} for item in raw_items if isinstance(item, dict)]
-        return {
+        account = get("/open/whoami")
+        balance_data = get("/open/balance")
+        instance_data = get("/open/instances")
+        account_view: dict[str, str] = {}
+        for key in ("nickname", "phone", "uuid"):
+            value = account.get(key)
+            if value is not None:
+                if not isinstance(value, str):
+                    raise PlatformError("xiangongyun_api_error", "仙宫云账户响应格式无效", 502)
+                account_view[key] = value
+        balance_value = balance_data.get("balance")
+        if isinstance(balance_value, bool) or not isinstance(balance_value, (int, float)):
+            raise PlatformError("xiangongyun_api_error", "仙宫云余额响应格式无效", 502)
+        raw_items = instance_data.get("list")
+        if not isinstance(raw_items, list) or any(not isinstance(item, dict) for item in raw_items):
+            raise PlatformError("xiangongyun_api_error", "仙宫云实例响应格式无效", 502)
+        safe_instances = [
+            {key: item[key] for key in ("id", "name", "gpu_model", "gpu_used", "status", "price_per_hour", "data_center_name") if key in item}
+            for item in raw_items
+        ]
+        result = {
             "provider": "xiangongyun",
             "verified": True,
-            "account": {key: account.get(key) for key in ("nickname", "phone", "uuid") if account.get(key) is not None},
-            "balance": balance_data.get("balance"),
+            "account": account_view,
+            "balance": balance_value,
             "instances": safe_instances,
             "checked_at": now(),
         }
+        with connect(self.path) as c:
+            replay = self._idem(c, actor["id"], idempotency_key, request_hash)
+            if replay is not None:
+                return replay
+            result["credential_id"] = self._save_xiangongyun_binding(c, actor, token, result)
+            self._save_idem(c, actor["id"], idempotency_key, result, request_hash)
+        return result
+
+    def _save_xiangongyun_binding(self, c: sqlite3.Connection, actor: dict[str, Any], token: str, result: dict[str, Any]) -> str:
+        cipher = self._credentials_cipher()
+        timestamp = now()
+        account_nonce = secrets.token_bytes(12)
+        account_ciphertext = cipher.encrypt(
+            account_nonce,
+            json.dumps(result["account"], ensure_ascii=False, separators=(",", ":")).encode(),
+            f"{actor['id']}:xiangongyun:account".encode(),
+        )
+        token_nonce = secrets.token_bytes(12)
+        token_ciphertext = cipher.encrypt(token_nonce, token.encode(), f"{actor['id']}:xiangongyun".encode())
+        fingerprint = hashlib.sha256(token.encode()).hexdigest()
+        encoded_account = base64.urlsafe_b64encode(account_ciphertext).decode()
+        encoded_account_nonce = base64.urlsafe_b64encode(account_nonce).decode()
+        encoded_token = base64.urlsafe_b64encode(token_ciphertext).decode()
+        encoded_token_nonce = base64.urlsafe_b64encode(token_nonce).decode()
+        binding = c.execute("SELECT credential_id FROM platform_xiangongyun_bindings WHERE user_id=?", (actor["id"],)).fetchone()
+        credential_id = binding[0] if binding else None
+        if credential_id:
+            credential = c.execute("SELECT id,status,provider FROM platform_credentials WHERE id=? AND user_id=?", (credential_id, actor["id"])).fetchone()
+            if not credential or credential[1] != "active" or credential[2] != "xiangongyun":
+                c.execute("DELETE FROM platform_xiangongyun_bindings WHERE user_id=?", (actor["id"],))
+                credential_id = None
+        if credential_id is None:
+            existing = c.execute(
+                "SELECT id FROM platform_credentials WHERE user_id=? AND provider=? AND status='active' ORDER BY updated_at DESC LIMIT 1",
+                (actor["id"], "xiangongyun"),
+            ).fetchone()
+            credential_id = existing[0] if existing else uid()
+        if not c.execute("SELECT 1 FROM platform_credentials WHERE id=?", (credential_id,)).fetchone():
+            c.execute(
+                "INSERT INTO platform_credentials VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (credential_id, actor["id"], "xiangongyun", "仙宫云 H3", encoded_token, encoded_token_nonce, fingerprint, "active", timestamp, timestamp, timestamp, None),
+            )
+            event = "xiangongyun.binding_created"
+        else:
+            c.execute(
+                "UPDATE platform_credentials SET ciphertext_b64=?,nonce_b64=?,key_fingerprint=?,label=?,updated_at=?,last_verified_at=?,revoked_at=NULL,status='active' WHERE id=? AND user_id=? AND provider=?",
+                (encoded_token, encoded_token_nonce, fingerprint, "仙宫云 H3", timestamp, timestamp, credential_id, actor["id"], "xiangongyun"),
+            )
+            event = "xiangongyun.binding_verified"
+        instances_json = json.dumps(result["instances"], ensure_ascii=False, separators=(",", ":"))
+        updated = c.execute(
+            "UPDATE platform_xiangongyun_bindings SET account_ciphertext_b64=?,account_nonce_b64=?,balance=?,instances_json=?,checked_at=?,updated_at=?,credential_id=? WHERE user_id=?",
+            (encoded_account, encoded_account_nonce, result["balance"], instances_json, result["checked_at"], timestamp, credential_id, actor["id"]),
+        )
+        if updated.rowcount != 1:
+            c.execute(
+                "INSERT INTO platform_xiangongyun_bindings (user_id,credential_id,account_ciphertext_b64,account_nonce_b64,balance,instances_json,checked_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (actor["id"], credential_id, encoded_account, encoded_account_nonce, result["balance"], instances_json, result["checked_at"], timestamp, timestamp),
+            )
+            event = "xiangongyun.binding_created"
+        self._audit(c, actor["id"], event, "credential", credential_id, {"provider": "xiangongyun", "fingerprint": fingerprint[:12]})
+        return credential_id
+
+    def xiangongyun_status(self, actor: dict[str, Any]) -> dict[str, Any] | None:
+        with connect(self.path) as c:
+            row = c.execute(
+                "SELECT b.credential_id,b.account_ciphertext_b64,b.account_nonce_b64,b.balance,b.instances_json,b.checked_at FROM platform_xiangongyun_bindings b JOIN platform_credentials c ON c.id=b.credential_id WHERE b.user_id=? AND c.status='active' AND c.provider='xiangongyun'",
+                (actor["id"],),
+            ).fetchone()
+        if not row:
+            return None
+        cipher = self._credentials_cipher()
+        try:
+            account = json.loads(cipher.decrypt(base64.urlsafe_b64decode(row[2]), base64.urlsafe_b64decode(row[1]), f"{actor['id']}:xiangongyun:account".encode()).decode())
+        except Exception as exc:
+            raise PlatformError("credential_corrupt", "仙宫云绑定无法解密", 500) from exc
+        try:
+            instances = json.loads(row[4])
+        except (TypeError, ValueError):
+            instances = []
+        return {
+            "provider": "xiangongyun",
+            "verified": True,
+            "credential_id": row[0],
+            "account": account if isinstance(account, dict) else {},
+            "balance": row[3],
+            "instances": instances if isinstance(instances, list) else [],
+            "checked_at": row[5],
+        }
+
+    def clear_xiangongyun_binding(self, actor: dict[str, Any], *, idempotency_key: str) -> dict[str, str]:
+        if not idempotency_key or len(idempotency_key) > 200:
+            raise PlatformError("idempotency_key_required", "Idempotency-Key is required", 422)
+        request_hash = self._request_hash({"operation": "xiangongyun.clear"})
+        with connect(self.path) as c:
+            replay = self._idem(c, actor["id"], idempotency_key, request_hash)
+            if replay is not None:
+                return replay
+            timestamp = now()
+            rows = c.execute("SELECT id FROM platform_credentials WHERE user_id=? AND provider=? AND status='active'", (actor["id"], "xiangongyun")).fetchall()
+            c.execute("DELETE FROM platform_xiangongyun_bindings WHERE user_id=?", (actor["id"],))
+            c.execute("UPDATE platform_credentials SET status='revoked',revoked_at=?,updated_at=? WHERE user_id=? AND provider=? AND status='active'", (timestamp, timestamp, actor["id"], "xiangongyun"))
+            for row in rows:
+                self._audit(c, actor["id"], "xiangongyun.binding_cleared", "credential", row[0], {"provider": "xiangongyun"})
+            response = {"status": "cleared"}
+            self._save_idem(c, actor["id"], idempotency_key, response, request_hash)
+        return response
 
     def _credentials_cipher(self) -> AESGCM:
         raw = self.config.credentials_key
@@ -295,7 +434,11 @@ class PlatformService:
         with connect(self.path) as c:
             row = c.execute("SELECT provider FROM platform_credentials WHERE id=? AND user_id=?", (credential_id, actor["id"])).fetchone()
             if not row: raise PlatformError("credential_not_found", "credential not found", 404)
-            timestamp = now(); c.execute("UPDATE platform_credentials SET status='revoked',revoked_at=?,updated_at=? WHERE id=?", (timestamp, timestamp, credential_id)); self._audit(c, actor["id"], "credential.revoked", "credential", credential_id, {"provider": row[0]})
+            timestamp = now()
+            c.execute("UPDATE platform_credentials SET status='revoked',revoked_at=?,updated_at=? WHERE id=?", (timestamp, timestamp, credential_id))
+            if row[0] == "xiangongyun":
+                c.execute("DELETE FROM platform_xiangongyun_bindings WHERE user_id=? AND credential_id=?", (actor["id"], credential_id))
+            self._audit(c, actor["id"], "credential.revoked", "credential", credential_id, {"provider": row[0]})
         return {"id": credential_id, "status": "revoked"}
 
     def resolve_credential(self, actor: dict[str, Any], credential_id: str) -> dict[str, Any]:
@@ -353,14 +496,37 @@ class PlatformService:
     def _skill_manifest(manifest: dict[str, Any]) -> tuple[str, str, str, str]:
         if not isinstance(manifest, dict):
             raise PlatformError("invalid_skill_manifest", "Skill manifest must be an object")
-        forbidden = {"path", "source", "script", "command", "credential_ref", "provider_handle"}
+        forbidden = {"path", "source", "script", "command", "credential_ref", "provider_handle", "network", "url", "secret", "env"}
         if forbidden.intersection(manifest):
             raise PlatformError("invalid_skill_manifest", "Skill manifest cannot contain executable or secret fields")
-        name, version, content_hash = manifest.get("name"), manifest.get("version"), manifest.get("content_hash")
-        if not isinstance(name, str) or not name or len(name) > 64:
+        required = {"name", "version", "title", "description", "category", "prompt_template", "expected_tools", "content_hash"}
+        unknown = set(manifest) - required
+        if unknown:
+            raise PlatformError("invalid_skill_manifest", "Skill manifest contains unsupported fields")
+        missing = required - set(manifest)
+        if missing:
+            raise PlatformError("invalid_skill_manifest", "Skill manifest is missing required fields")
+        name, version, content_hash = manifest["name"], manifest["version"], manifest["content_hash"]
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9-]{2,63}", name):
             raise PlatformError("invalid_skill_manifest", "Skill name is invalid")
-        if not isinstance(version, str) or not version or len(version) > 32:
+        if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
             raise PlatformError("invalid_skill_manifest", "Skill version is invalid")
+        if not isinstance(manifest["title"], str) or not 1 <= len(manifest["title"]) <= 80:
+            raise PlatformError("invalid_skill_manifest", "Skill title is invalid")
+        if not isinstance(manifest["description"], str) or not 1 <= len(manifest["description"]) <= 280:
+            raise PlatformError("invalid_skill_manifest", "Skill description is invalid")
+        if manifest["category"] not in {"story", "shot", "review", "sequence"}:
+            raise PlatformError("invalid_skill_manifest", "Skill category is invalid")
+        if not isinstance(manifest["prompt_template"], str) or not 1 <= len(manifest["prompt_template"]) <= 4000:
+            raise PlatformError("invalid_skill_manifest", "Skill prompt template is invalid")
+        tools = manifest["expected_tools"]
+        if not isinstance(tools, list) or len(tools) > 16 or any(not isinstance(tool, str) for tool in tools):
+            raise PlatformError("invalid_skill_manifest", "Skill tools are invalid")
+        unsupported = set(tools) - {"canvas.readProject", "canvas.createVideoNode", "canvas.updateNodePrompt", "generation.createVideoCandidates"}
+        if unsupported:
+            raise PlatformError("invalid_skill_manifest", "Skill requests an unsupported tool")
+        if not isinstance(content_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", content_hash):
+            raise PlatformError("invalid_skill_manifest", "Skill content hash is invalid")
         canonical = json.dumps({k: manifest[k] for k in sorted(manifest) if k != "content_hash"}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         expected = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         if content_hash != expected:
@@ -370,8 +536,8 @@ class PlatformService:
     def create_skill_version(self, actor: dict[str, Any], manifest: dict[str, Any], *, scope: str = "user", project_id: str | None = None, parent_version: str | None = None) -> dict[str, Any]:
         if scope not in {"system", "workspace", "user", "project"}:
             raise PlatformError("invalid_skill_scope", "unsupported Skill scope")
-        if scope == "system" and actor.get("role") != "admin":
-            raise PlatformError("skill_admin_required", "system Skill versions require admin", 403)
+        if scope in {"system", "workspace"} and actor.get("role") != "admin":
+            raise PlatformError("skill_admin_required", f"{scope} Skill versions require admin", 403)
         if scope == "project" and not project_id:
             raise PlatformError("skill_project_required", "project Skill versions require project_id")
         if scope != "project" and project_id is not None:
@@ -395,7 +561,7 @@ class PlatformService:
         with connect(self.path) as c:
             row = c.execute("SELECT id,name,scope,owner_id,project_id,status FROM platform_skill_versions WHERE id=?", (skill_version_id,)).fetchone()
             if not row: raise PlatformError("skill_version_not_found", "Skill version not found", 404)
-            if row[2] == "system" and actor.get("role") != "admin": raise PlatformError("skill_admin_required", "system Skill versions require admin", 403)
+            if row[2] in {"system", "workspace"} and actor.get("role") != "admin": raise PlatformError("skill_admin_required", f"{row[2]} Skill versions require admin", 403)
             if row[2] in {"user", "project"} and row[3] != actor.get("id"): raise PlatformError("skill_forbidden", "Skill version belongs to another user", 403)
             c.execute("UPDATE platform_skill_versions SET status=? WHERE id=?", ("active" if active else "draft", skill_version_id))
             c.execute("DELETE FROM platform_skill_bindings WHERE name=? AND scope=? AND owner_id IS ? AND project_id IS ?", (row[1], row[2], row[3], row[4]))
@@ -417,7 +583,7 @@ class PlatformService:
     def list_skill_versions(self, actor: dict[str, Any], *, name: str | None = None, project_id: str | None = None) -> list[dict[str, Any]]:
         with connect(self.path) as c:
             rows = c.execute(
-                "SELECT id,name,version,scope,owner_id,project_id,parent_version,content_hash,status,created_at FROM platform_skill_versions WHERE (scope='system' OR (scope='user' AND owner_id=?) OR (scope='project' AND owner_id=? AND project_id=?)) AND (? IS NULL OR name=?) ORDER BY name,created_at DESC",
+                "SELECT id,name,version,scope,owner_id,project_id,parent_version,content_hash,status,created_at FROM platform_skill_versions WHERE (scope IN ('system','workspace') OR (scope='user' AND owner_id=?) OR (scope='project' AND owner_id=? AND project_id=?)) AND (? IS NULL OR name=?) ORDER BY name,created_at DESC",
                 (actor.get("id"), actor.get("id"), project_id, name, name),
             ).fetchall()
         keys = ("id", "name", "version", "scope", "owner_id", "project_id", "parent_version", "content_hash", "status", "created_at")

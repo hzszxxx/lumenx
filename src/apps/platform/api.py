@@ -82,6 +82,9 @@ class SkillManifestIn(BaseModel):
     name: str = Field(min_length=3, max_length=64)
     version: str = Field(min_length=1, max_length=32)
     title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=280)
+    category: str = Field(pattern=r"^(story|shot|review|sequence)$")
+    prompt_template: str = Field(min_length=1, max_length=4000)
     expected_tools: list[str] = Field(default_factory=list, max_length=16)
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
 class SkillVersionIn(BaseModel):
@@ -112,6 +115,9 @@ class AdminUserUpdateIn(BaseModel):
     is_active: bool | None = None
 class XiangongyunVerifyIn(BaseModel):
     access_token: str = Field(min_length=16, max_length=500)
+
+
+IdempotencyKey = Header(..., alias="Idempotency-Key", min_length=8, max_length=200)
 
 
 @router.post("/auth/register")
@@ -153,8 +159,16 @@ def admin_audit_events(limit: int = 100, offset: int = 0, user=Depends(admin_use
     return svc.admin_audit_events(user, limit=limit, offset=offset)
 
 @router.post("/xiangongyun/verify")
-def verify_xiangongyun(body: XiangongyunVerifyIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
-    return handle(lambda: svc.xiangongyun_verify(user, body.access_token))
+def verify_xiangongyun(body: XiangongyunVerifyIn, idempotency_key: str = IdempotencyKey, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.xiangongyun_verify(user, body.access_token, idempotency_key=idempotency_key))
+
+@router.get("/xiangongyun/status")
+def xiangongyun_status(user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.xiangongyun_status(user))
+
+@router.delete("/xiangongyun/binding")
+def clear_xiangongyun_binding(idempotency_key: str = IdempotencyKey, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.clear_xiangongyun_binding(user, idempotency_key=idempotency_key))
 
 @router.get("/usage/tokens")
 def token_usage(limit: int = 100, user=Depends(current_user), svc: PlatformService = Depends(service)):

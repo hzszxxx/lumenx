@@ -1,7 +1,11 @@
+import pytest
 from datetime import datetime, timedelta, timezone
 import base64
+import json
+from unittest.mock import patch
 
 from src.apps.platform.config import PlatformConfig
+from src.apps.platform.db import connect
 from src.apps.platform.service import PlatformError, PlatformService
 
 
@@ -98,7 +102,7 @@ def test_media_pricing_estimate_supports_model_fallback(tmp_path):
 def _skill_manifest(name="story-scout", version="1.0.0", title="Story Scout"):
     import hashlib
     import json
-    payload = {"name": name, "version": version, "title": title, "expected_tools": ["canvas.readProject"]}
+    payload = {"name": name, "version": version, "title": title, "description": "A controlled story planning skill", "category": "story", "prompt_template": "Plan the next scene: {{input}}", "expected_tools": ["canvas.readProject"]}
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     payload["content_hash"] = hashlib.sha256(canonical.encode()).hexdigest()
     return payload
@@ -217,6 +221,88 @@ def test_user_credentials_are_encrypted_isolated_and_rotatable(tmp_path):
         assert exc.code == "credential_revoked"
     else:
         raise AssertionError("revoked credential remained usable")
+def test_xiangongyun_binding_is_encrypted_and_survives_service_restart(tmp_path):
+    svc = credential_service(tmp_path)
+    user = svc.register("alice", "a" * 12)
+    payloads = {
+        "/open/whoami": {"data": {"nickname": "Demo", "phone": "180****4412", "uuid": "uuid-1"}},
+        "/open/balance": {"data": {"balance": 12.5}},
+        "/open/instances": {"data": {"list": [{"id": "instance-1", "name": "H3", "status": "running"}]}},
+    }
+
+    class Response:
+        def __init__(self, payload): self.payload = payload
+        def __enter__(self): return self
+        def __exit__(self, *_): return None
+        def read(self): return json.dumps(self.payload).encode()
+
+    def fake_urlopen(request, timeout):
+        assert timeout == 10
+        return Response(payloads[request.full_url.removeprefix("https://api.xiangongyun.com")])
+
+    with patch("src.apps.platform.service.urlopen", side_effect=fake_urlopen):
+        result = svc.xiangongyun_verify(user, "t" * 32, idempotency_key="xiangongyun-verify-1")
+        assert svc.xiangongyun_verify(user, "t" * 32, idempotency_key="xiangongyun-verify-1") == result
+        with pytest.raises(PlatformError, match="Idempotency-Key") as conflict:
+            svc.xiangongyun_verify(user, "u" * 32, idempotency_key="xiangongyun-verify-1")
+        assert conflict.value.code == "idempotency_key_reused"
+
+    assert result["verified"] is True
+    restarted = credential_service(tmp_path)
+    status = restarted.xiangongyun_status(user)
+    assert status["account"]["uuid"] == "uuid-1"
+    assert status["balance"] == 12.5
+    assert status["instances"][0]["id"] == "instance-1"
+    assert result["credential_id"]
+    assert restarted.resolve_credential(user, status["credential_id"])["secret"] == "t" * 32
+    with connect(svc.path) as connection:
+        stored = connection.execute("SELECT account_ciphertext_b64,account_nonce_b64 FROM platform_xiangongyun_bindings WHERE user_id=?", (user["id"],)).fetchone()
+        assert stored[0] and stored[1] and "Demo" not in stored[0]
+    assert restarted.revoke_credential(user, status["credential_id"])["status"] == "revoked"
+    assert restarted.xiangongyun_status(user) is None
+    with patch("src.apps.platform.service.urlopen", side_effect=fake_urlopen):
+        rebound = restarted.xiangongyun_verify(user, "r" * 32, idempotency_key="xiangongyun-verify-2")
+    assert rebound["credential_id"] != status["credential_id"]
+    assert restarted.clear_xiangongyun_binding(user, idempotency_key="xiangongyun-clear-1") == {"status": "cleared"}
+    assert restarted.xiangongyun_status(user) is None
+
+
+def test_xiangongyun_rejects_malformed_provider_payload(tmp_path):
+    svc = credential_service(tmp_path)
+    user = svc.register("alice", "a" * 12)
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *_): return None
+        def read(self): return b'{"success": true}'
+
+    with patch("src.apps.platform.service.urlopen", return_value=Response()):
+        with pytest.raises(PlatformError) as error:
+            svc.xiangongyun_verify(user, "t" * 32, idempotency_key="xiangongyun-malformed")
+    assert error.value.code == "xiangongyun_api_error"
+
+
+def test_skill_manifest_and_workspace_scope_are_restricted(tmp_path):
+    svc = service(tmp_path)
+    user = svc.register("alice", "a" * 12)
+    admin = svc.register("admin", "b" * 12, role="admin")
+    with pytest.raises(PlatformError) as workspace_error:
+        svc.create_skill_version(user, _skill_manifest(), scope="workspace")
+    assert workspace_error.value.code == "skill_admin_required"
+    invalid = _skill_manifest(); invalid["expected_tools"] = ["shell.exec"]
+    invalid["content_hash"] = __import__("hashlib").sha256(__import__("json").dumps({k: invalid[k] for k in sorted(invalid) if k != "content_hash"}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    with pytest.raises(PlatformError) as tool_error:
+        svc.create_skill_version(user, invalid)
+    assert tool_error.value.code == "invalid_skill_manifest"
+    extra = _skill_manifest(); extra["schema_version"] = 1
+    with pytest.raises(PlatformError) as extra_error:
+        svc.create_skill_version(user, extra)
+    assert extra_error.value.code == "invalid_skill_manifest"
+    workspace = svc.create_skill_version(admin, _skill_manifest(version="2.0.0"), scope="workspace")
+    svc.bind_skill_version(admin, workspace["id"])
+    assert svc.resolve_skill_version(user, "story-scout")["scope"] == "workspace"
+
+
 def test_certified_creator_claims_delivers_and_review_creates_simulated_ledger(tmp_path):
     svc = service(tmp_path)
     admin = svc.register("admin", "a" * 12, role="admin")
