@@ -740,6 +740,21 @@ class AtelierGenerationAttempt(BaseModel):
         return data
 
 
+class MediaCreditBinding(BaseModel):
+    """Frozen platform-credit reservation identity for one media request."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reservation_id: str = Field(..., min_length=1)
+    pricing_version: str = Field(..., min_length=1)
+    estimated_credits: int = Field(..., ge=0, strict=True)
+    provider: str = Field(..., min_length=1)
+    model: str = Field(..., min_length=1)
+    media_kind: Literal["image", "video", "audio"]
+    units: int = Field(..., ge=1, strict=True)
+    status: Literal["reserved", "settled", "released", "unknown"] = "reserved"
+
+
 class AtelierMediaGenerationAttempt(BaseModel):
     """Dormant strict image/audio generation attempt; not wired to public routes yet."""
 
@@ -757,6 +772,7 @@ class AtelierMediaGenerationAttempt(BaseModel):
     error_code: str | None = Field(None, min_length=1, max_length=128)
     output_ref: str | None = Field(None, min_length=1)
     provider_execution: ProviderExecutionRecord
+    credit_binding: MediaCreditBinding | None = None
     created_at: float = Field(..., allow_inf_nan=False)
     updated_at: float = Field(..., allow_inf_nan=False)
 
@@ -778,6 +794,13 @@ class AtelierMediaGenerationAttempt(BaseModel):
         elif self.output_ref is not None:
             raise ValueError("Atelier unfinished media generation output_ref must be null")
         return self
+
+    @model_serializer(mode="wrap")
+    def _serialize_media_attempt(self, handler):
+        data = handler(self)
+        if data.get("credit_binding") is None:
+            data.pop("credit_binding", None)
+        return data
 
 
 class AtelierGenerationRequestReceiptMember(BaseModel):
@@ -805,6 +828,7 @@ class AtelierGenerationRequestReceipt(BaseModel):
     candidate_id: str | None = Field(None, min_length=1)
     attempt_id: str | None = Field(None, min_length=1)
     execution_fingerprint: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
+    media_credit_binding: MediaCreditBinding | None = None
     members: list[AtelierGenerationRequestReceiptMember] | None = None
     base_revision: int = Field(..., ge=0, strict=True)
     committed_revision: int = Field(..., ge=0, strict=True)
@@ -846,6 +870,8 @@ class AtelierGenerationRequestReceipt(BaseModel):
     @model_serializer(mode="wrap")
     def _serialize_generation_receipt(self, handler):
         data = handler(self)
+        if data.get("media_credit_binding") is None:
+            data.pop("media_credit_binding", None)
         if data.get("schema_version") == 1:
             data.pop("members", None)
         else:
