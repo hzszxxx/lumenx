@@ -99,6 +99,19 @@ def test_media_pricing_estimate_supports_model_fallback(tmp_path):
     assert estimate["credits_per_unit"] == 4
 
 
+def test_media_credit_reservation_uses_pricing_version_and_is_idempotent(tmp_path):
+    svc = service(tmp_path)
+    admin = svc.register("admin", "a" * 12, role="admin")
+    creator = svc.register("media-user", "b" * 12)
+    svc.grant_credits(admin, creator["id"], 100, "trial", "media-grant-1")
+    reservation = svc.reserve_media_credits(creator, "dashscope", "wan2.7-image-pro", "image", 3, "img-1", "img-key-1")
+    replay = svc.reserve_media_credits(creator, "dashscope", "wan2.7-image-pro", "image", 3, "img-1", "img-key-1")
+    assert reservation["estimated_credits"] == 12
+    assert replay["reservation_id"] == reservation["reservation_id"]
+    settled = svc.settle_media_credits(creator, reservation["reservation_id"], 2, provider="dashscope", model="wan2.7-image-pro", media_kind="image")
+    assert settled["actual_credits"] == 8
+
+
 def _skill_manifest(name="story-scout", version="1.0.0", title="Story Scout"):
     import hashlib
     import json

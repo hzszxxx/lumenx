@@ -698,6 +698,22 @@ class PlatformService:
         return {"provider": provider, "model": model, "media_kind": media_kind, "units": units,
                 "pricing_version": row[0], "credits_per_unit": row[1], "estimated_credits": row[1] * units}
 
+    def reserve_media_credits(self, actor: dict[str, Any], provider: str, model: str, media_kind: str,
+                              units: int, generation_id: str, idempotency_key: str) -> dict[str, Any]:
+        """Create an idempotent reservation using the frozen media price version."""
+        estimate = self.estimate_media_credits(provider, model, media_kind, units)
+        return {**self.reserve_credits(actor, estimate["estimated_credits"], generation_id,
+                                        estimate["pricing_version"], idempotency_key), **estimate}
+
+    def settle_media_credits(self, actor: dict[str, Any], reservation_id: str,
+                             actual_units: int, *, provider: str, model: str,
+                             media_kind: str) -> dict[str, Any]:
+        if type(actual_units) is not int or actual_units < 0:
+            raise PlatformError("invalid_media_usage", "actual media units are invalid")
+        estimate = self.estimate_media_credits(provider, model, media_kind, max(actual_units, 1))
+        return self.settle_credits(actor, reservation_id,
+                                   estimate["credits_per_unit"] * actual_units)
+
     def estimate_credits(self, provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> dict[str, Any]:
         if min(prompt_tokens, completion_tokens) < 0:
             raise PlatformError("invalid_token_usage", "token counts cannot be negative")
