@@ -336,3 +336,48 @@ def test_app_resolver_can_use_real_platform_credit_callback(tmp_path, monkeypatc
     assert result.state is PaidAdmissionState.SUCCEEDED
     assert events == ["receipt", "submit", ("handle", "handle-1")]
     assert platform.credit_balance(actor)["available_credits"] == 15
+
+def test_app_resolver_replay_does_not_reserve_or_submit_again(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.comic_gen.paid_admission_composition import make_platform_credit_reserver
+    from src.apps.platform.config import PlatformConfig
+    from src.apps.platform.service import PlatformService
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    platform = PlatformService(PlatformConfig(enabled=True, database_url=f"sqlite:///{tmp_path / 'credits.db'}"))
+    admin = platform.register("admin", "a" * 12, role="admin")
+    actor = platform.register("creator", "b" * 12)
+    platform.grant_credits(admin, actor["id"], 20, "test", "grant-replay-1")
+    receipts = {}
+    events = []
+    def callbacks(**context):
+        reserve = make_platform_credit_reserver(
+            actor_for_user=lambda user_id: actor,
+            reserve_credits=lambda *args: platform.reserve_credits(*args),
+            estimated_credits=5,
+            pricing_version="pricing-replay-v1",
+        )
+        def save_receipt(identity):
+            receipts[identity.request_key] = {"request_fingerprint": identity.request_key, "reservation_id": "r1", "provider_handle": "h1"}
+            events.append("receipt")
+        return {
+            "save_receipt": save_receipt,
+            "reserve_credits": reserve,
+            "submit_provider": lambda identity: events.append("submit") or "h1",
+            "save_handle": lambda identity, handle: None,
+            "release_credits": lambda reservation: platform.release_credits(actor, reservation),
+            "load_receipt": lambda key: receipts[key],
+            "load_reservation": lambda key: {"idempotency_key": key, "reservation_id": "r1", "state": "succeeded"},
+            "query_provider": lambda handle, scope: None,
+        }
+    app = make_app(tmp_path / "app", paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity(actor["id"], "project-1", "attempt-1", "request-replay-1")
+    coordinator = app.state.paid_admission_request_resolver(
+        actor_user_id=actor["id"], identity=identity, project_owner_id="project-1", attempt_owner_id="attempt-1",
+    )
+    assert coordinator.start_for_identity(identity).state is PaidAdmissionState.SUCCEEDED
+    replay = coordinator.replay(request_key=identity.request_key)
+    assert replay.state is PaidAdmissionState.SUCCEEDED
+    assert events == ["receipt", "submit"]
+    assert platform.credit_balance(actor)["available_credits"] == 15
