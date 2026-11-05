@@ -4,6 +4,7 @@ from src.apps.atelier.paid_admission import PaidAdmissionState
 from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
 from src.apps.comic_gen.paid_admission_composition import (
     build_paid_admission_coordinator,
+    make_identity_credit_reserver,
     make_paid_admission_request_resolver,
     resolve_paid_admission_coordinator,
 )
@@ -77,3 +78,10 @@ def test_request_resolver_does_not_capture_identity_between_requests():
     coordinator = resolve(actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1")
     assert coordinator.start_for_identity(identity).state is PaidAdmissionState.SUCCEEDED
     assert seen == [identity]
+
+def test_identity_credit_reserver_passes_user_attempt_and_request_key():
+    calls = []
+    reserve = make_identity_credit_reserver(lambda user_id, attempt_id, request_key: calls.append((user_id, attempt_id, request_key)) or "reservation-1")
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "request-1")
+    assert reserve(identity) == "reservation-1"
+    assert calls == [("u1", "a1", "request-1")]

@@ -101,5 +101,13 @@ def make_paid_admission_request_resolver(
             attempt_owner_id=attempt_owner_id,
             **callbacks,
         )
-
     return resolve
+
+
+def make_identity_credit_reserver(
+    reserve: Callable[[str, str, str], str],
+) -> Callable[[PaidAdmissionIdentity], str]:
+    """Adapt Platform credit reservation to the shared ownership contract."""
+    def reserve_for_identity(identity: PaidAdmissionIdentity) -> str:
+        return reserve(identity.user_id, identity.attempt_id, identity.request_key)
+    return reserve_for_identity
