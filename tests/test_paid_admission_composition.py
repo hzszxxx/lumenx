@@ -115,3 +115,23 @@ def test_platform_credit_adapter_uses_real_service_reservation(tmp_path):
     )
     identity = PaidAdmissionIdentity(actor["id"], "project-1", "attempt-1", "request-real-1")
     assert reserve(identity)
+
+def test_platform_credit_adapter_replay_returns_same_reservation(tmp_path):
+    from src.apps.platform.config import PlatformConfig
+    from src.apps.platform.service import PlatformService
+
+    svc = PlatformService(PlatformConfig(enabled=True, database_url=f"sqlite:///{tmp_path / 'platform.db'}"))
+    admin = svc.register("admin", "a" * 12, role="admin")
+    actor = svc.register("user", "b" * 12)
+    svc.grant_credits(admin, actor["id"], 20, "test", "grant-replay-adapter-1")
+    reserve = make_platform_credit_reserver(
+        actor_for_user=lambda user_id: actor,
+        reserve_credits=lambda *args: svc.reserve_credits(*args),
+        estimated_credits=5,
+        pricing_version="pricing-replay-adapter-v1",
+    )
+    identity = PaidAdmissionIdentity(actor["id"], "project-1", "attempt-1", "request-replay-adapter-1")
+    first = reserve(identity)
+    second = reserve(identity)
+    assert first == second
+    assert svc.credit_balance(actor)["available_credits"] == 15
