@@ -202,3 +202,30 @@ def test_enabled_app_resolver_rejects_request_owner_mismatch(tmp_path, monkeypat
     identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
     with pytest.raises(ValueError, match="ownership_mismatch"):
         resolver(actor_user_id="u2", identity=identity, project_owner_id="p1", attempt_owner_id="a1")
+
+def test_enabled_app_resolver_runs_valid_paid_admission_callbacks_in_order(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    events = []
+    def callbacks(**context):
+        return {
+            "save_receipt": lambda identity: events.append(("receipt", identity)),
+            "reserve_credits": lambda identity: events.append(("reserve", identity)) or "r1",
+            "submit_provider": lambda identity: events.append(("submit", identity)) or "h1",
+            "save_handle": lambda identity, handle: events.append(("handle", identity, handle)),
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: None,
+        }
+    app = make_app(tmp_path, paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    result = app.state.paid_admission_request_resolver(
+        actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1",
+    ).start_for_identity(identity)
+    assert result.state is PaidAdmissionState.SUCCEEDED
+    assert [event[0] for event in events] == ["receipt", "reserve", "submit", "handle"]
+    assert all(event[1] is identity for event in events)
