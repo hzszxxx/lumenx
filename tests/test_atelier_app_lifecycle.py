@@ -427,3 +427,36 @@ def test_app_unknown_recovery_queries_without_reserve_or_submit(tmp_path, monkey
     assert recovered.state is PaidAdmissionState.HANDLE_SAVED
     assert events == ["receipt", "submit", ("query", "h1", {"provider": "p", "account": "a", "region": "r", "workspace": "w", "endpoint": "e"})]
     assert platform.credit_balance(actor)["available_credits"] == 15
+
+def test_app_unknown_recovery_without_query_identity_stays_manual(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    events = []
+    def callbacks(**context):
+        return {
+            "save_receipt": lambda identity: None,
+            "reserve_credits": lambda identity: "r1",
+            "submit_provider": lambda identity: "h1",
+            "save_handle": lambda identity, handle: None,
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: events.append("query") or pytest.fail("query must not run"),
+        }
+    app = make_app(tmp_path, paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "request-manual-1")
+    coordinator = app.state.paid_admission_request_resolver(
+        actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1",
+    )
+    result = coordinator.recover_unknown(
+        state=PaidAdmissionState.UNKNOWN,
+        reservation_id="r1",
+        provider_handle="h1",
+        query_identity=None,
+    )
+    assert result.state is PaidAdmissionState.UNKNOWN
+    assert result.error == "provider_query_identity_unavailable"
+    assert events == []
