@@ -363,3 +363,19 @@ def test_separate_process_cannot_open_second_atelier_writer(tmp_path):
         assert queue.get(timeout=2) == "StorageConflictError"
     finally:
         store.close()
+
+def test_process_exit_releases_writer_for_restart(tmp_path):
+    import multiprocessing
+    import os
+    from src.apps.atelier.storage import AtelierStorage
+
+    def child(root):
+        store = AtelierStorage(root)
+        os._exit(0)
+
+    process = multiprocessing.get_context("fork").Process(target=child, args=(str(tmp_path),))
+    process.start()
+    process.join(timeout=10)
+    assert process.exitcode == 0
+    restarted = AtelierStorage(tmp_path)
+    restarted.close()
