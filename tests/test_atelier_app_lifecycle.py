@@ -460,3 +460,27 @@ def test_app_unknown_recovery_without_query_identity_stays_manual(tmp_path, monk
     assert result.state is PaidAdmissionState.UNKNOWN
     assert result.error == "provider_query_identity_unavailable"
     assert events == []
+
+def test_app_replay_rejects_receipt_reservation_mismatch(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    def callbacks(**context):
+        return {
+            "save_receipt": lambda identity: None,
+            "reserve_credits": lambda identity: "r1",
+            "submit_provider": lambda identity: "h1",
+            "save_handle": lambda identity, handle: None,
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {"request_fingerprint": key, "reservation_id": "r1", "provider_handle": "h1"},
+            "load_reservation": lambda key: {"idempotency_key": key, "reservation_id": "r2", "state": "succeeded"},
+            "query_provider": lambda handle, scope: pytest.fail("mismatch must not query"),
+        }
+    app = make_app(tmp_path, paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "request-mismatch-1")
+    coordinator = app.state.paid_admission_request_resolver(
+        actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1",
+    )
+    with pytest.raises(ValueError, match="replay_reservation_mismatch"):
+        coordinator.replay(request_key=identity.request_key)
