@@ -2,8 +2,7 @@ import pytest
 
 from src.apps.atelier.paid_admission import PaidAdmissionState
 from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
-from src.apps.comic_gen.paid_admission_composition import build_paid_admission_coordinator
-
+from src.apps.comic_gen.paid_admission_composition import build_paid_admission_coordinator, resolve_paid_admission_coordinator
 
 def test_composition_factory_validates_owners_before_callbacks():
     events = []
@@ -43,4 +42,14 @@ def test_composition_factory_rejects_wrong_authenticated_actor():
             load_receipt=lambda key: {},
             load_reservation=lambda key: {},
             query_provider=lambda handle, scope: None,
+        )
+
+def test_disabled_platform_does_not_resolve_coordinator():
+    with pytest.raises(ValueError, match="platform_disabled"):
+        resolve_paid_admission_coordinator(
+            platform_enabled=False,
+            actor_user_id="u1",
+            identity=PaidAdmissionIdentity("u1", "p1", "a1", "r1"),
+            project_owner_id="p1",
+            attempt_owner_id="a1",
         )

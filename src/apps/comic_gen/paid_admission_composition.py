@@ -49,3 +49,22 @@ def build_paid_admission_coordinator(
         submit_provider_for_identity=submit_provider,
         save_handle_for_identity=save_handle,
     )
+
+def resolve_paid_admission_coordinator(
+    *,
+    platform_enabled: bool,
+    actor_user_id: str,
+    identity: PaidAdmissionIdentity,
+    project_owner_id: str,
+    attempt_owner_id: str,
+    **callbacks,
+) -> PaidAdmissionCoordinator:
+    if not platform_enabled:
+        raise ValueError("paid_admission_platform_disabled")
+    return build_paid_admission_coordinator(
+        identity=identity,
+        actor_user_id=actor_user_id,
+        project_owner_id=project_owner_id,
+        attempt_owner_id=attempt_owner_id,
+        **callbacks,
+    )
