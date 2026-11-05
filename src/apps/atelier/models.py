@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serial
 from ...models.provider_execution import ProviderExecutionRecord
 from .product_skills import AtelierProductSkillSnapshot
 from .skill_runtime import SkillExecutionBinding
+from .paid_admission import PaidAdmissionIntent
 
 
 class AtelierApprovalMode(str, Enum):
@@ -1215,6 +1216,7 @@ class AtelierProject(BaseModel):
     sequence_export_jobs: list[AtelierSequenceExportJob] = Field(default_factory=list)
     generation_attempts: list[AtelierGenerationAttempt | AtelierMediaGenerationAttempt] = Field(default_factory=list)
     generation_request_receipts: list[AtelierGenerationRequestReceipt] = Field(default_factory=list)
+    paid_admission_intents: list[PaidAdmissionIntent] = Field(default_factory=list)
     candidate_judgments: list[AtelierCandidateJudgment] = Field(default_factory=list)
     import_provenance: AtelierImportProvenance | None = None
     agent_compaction_summary: str | None = Field(

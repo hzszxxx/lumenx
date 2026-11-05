@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import threading
+import time
 import uuid
 from copy import deepcopy
 from contextlib import contextmanager
@@ -1124,6 +1125,49 @@ class AtelierStorage:
                 return self._copy(self._projects[project_id])
             except KeyError as exc:
                 raise AtelierProjectNotFound("Atelier project not found") from exc
+
+    def scan_paid_admission_recovery(self, project_id: str) -> list[tuple[str, str]]:
+        """Read restart actions without mutating the project or dispatching work."""
+        from .paid_admission import scan_recovery_intents
+
+        with self._lock:
+            self._check_open()
+            try:
+                project = self._projects[project_id]
+            except KeyError as exc:
+                raise AtelierProjectNotFound("Atelier project not found") from exc
+            return scan_recovery_intents(project.paid_admission_intents)
+
+    def apply_paid_admission_query_recovery(
+        self,
+        project_id: str,
+        *,
+        attempt_id: str,
+        expected_revision: int,
+        query_provider: Callable[[Any, dict[str, str]], Any],
+    ) -> AtelierProject:
+        from .paid_admission import apply_query_recovery
+
+        with self._lock:
+            self._check_open()
+            current = self._projects.get(project_id)
+            if current is None:
+                raise AtelierProjectNotFound("Atelier project not found")
+            if current.revision != expected_revision:
+                raise StorageConflictError("Atelier project changed; reload before paid admission recovery")
+            candidate = self._copy(current)
+            intent = next((item for item in candidate.paid_admission_intents if item.attempt_id == attempt_id), None)
+            if intent is None:
+                raise StorageError("Paid admission intent not found")
+            updated = apply_query_recovery(intent, query_provider=query_provider)
+            candidate.paid_admission_intents = [
+                updated if item.attempt_id == attempt_id else item
+                for item in candidate.paid_admission_intents
+            ]
+            candidate.revision += 1
+            candidate.updated_at = time.time()
+            committed = self._commit({**self._projects, project_id: _canonical_project(candidate, expected_id=project_id)})
+            return self._copy(committed[project_id])
 
     def save_managed_upload(self, chunks, *, filename: str, content_type: str | None):
         from .media_upload import save_managed_upload

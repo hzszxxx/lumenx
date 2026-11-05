@@ -135,3 +135,73 @@ def query_identity_from_scope(scope: dict[str, Any]) -> dict[str, str]:
     if any(not isinstance(value, str) or not value for value in required.values()):
         raise ValueError("provider_query_identity_incomplete")
     return required
+
+@dataclass(frozen=True)
+class PaidAdmissionIntent:
+    """Durable cross-store correlation record owned by Atelier."""
+
+    request_fingerprint: str
+    project_id: str
+    attempt_id: str
+    skill_content_hash: str
+    reservation_id: str | None = None
+    provider_handle: Any = None
+    provider_scope: dict[str, str] | None = None
+    state: PaidAdmissionState = PaidAdmissionState.ACCEPTED
+
+    def __post_init__(self) -> None:
+        import re
+
+        for name in ("request_fingerprint", "skill_content_hash"):
+            if re.fullmatch(r"[0-9a-f]{64}", getattr(self, name)) is None:
+                raise ValueError(f"paid_admission_invalid_{name}")
+        if not self.project_id or not self.attempt_id:
+            raise ValueError("paid_admission_identity_missing")
+        if self.state in {PaidAdmissionState.RESERVED, PaidAdmissionState.SUBMIT_PENDING, PaidAdmissionState.UNKNOWN, PaidAdmissionState.HANDLE_SAVED, PaidAdmissionState.SUCCEEDED} and not self.reservation_id:
+            raise ValueError("paid_admission_reservation_missing")
+
+def classify_recovery_intent(intent: PaidAdmissionIntent) -> str:
+    """Classify a persisted intent after restart without submitting anything."""
+    if intent.state is PaidAdmissionState.UNKNOWN:
+        if intent.provider_handle and intent.provider_scope:
+            return "query"
+        return "manual_confirmation"
+    if intent.state in {PaidAdmissionState.RESERVED, PaidAdmissionState.SUBMIT_PENDING}:
+        return "resume_only_if_durable_submit_proof"
+    if intent.state is PaidAdmissionState.HANDLE_SAVED:
+        return "query"
+    return "no_action"
+
+
+def scan_recovery_intents(intents: list[PaidAdmissionIntent]) -> list[tuple[str, str]]:
+    """Return deterministic restart actions keyed by attempt ID."""
+    return [(intent.attempt_id, classify_recovery_intent(intent)) for intent in intents]
+
+def apply_query_recovery(
+    intent: PaidAdmissionIntent,
+    *,
+    query_provider: Callable[[Any, dict[str, str]], Any],
+) -> PaidAdmissionIntent:
+    """Apply a successful query result to a copied intent; never submit."""
+    if classify_recovery_intent(intent) != "query":
+        raise ValueError("paid_admission_query_recovery_not_allowed")
+    identity = query_identity_from_scope(intent.provider_scope or {})
+    result = recover_paid_admission(
+        state=intent.state,
+        reservation_id=intent.reservation_id,
+        provider_handle=intent.provider_handle,
+        query_identity=identity,
+        query_provider=query_provider,
+    )
+    if result.state is not PaidAdmissionState.HANDLE_SAVED:
+        raise ValueError(result.error or "paid_admission_query_recovery_unknown")
+    return PaidAdmissionIntent(
+        request_fingerprint=intent.request_fingerprint,
+        project_id=intent.project_id,
+        attempt_id=intent.attempt_id,
+        skill_content_hash=intent.skill_content_hash,
+        reservation_id=intent.reservation_id,
+        provider_handle=result.provider_handle,
+        provider_scope=intent.provider_scope,
+        state=PaidAdmissionState.HANDLE_SAVED,
+    )
