@@ -40,6 +40,10 @@ class PaidAdmissionCoordinator:
     load_receipt: Callable[[str], dict[str, Any]]
     load_reservation: Callable[[str], dict[str, Any]]
     query_provider: Callable[[Any, dict[str, str]], Any]
+    save_receipt_for_identity: Callable[[PaidAdmissionIdentity], None] | None = None
+    reserve_credits_for_identity: Callable[[PaidAdmissionIdentity], str] | None = None
+    submit_provider_for_identity: Callable[[PaidAdmissionIdentity], Any] | None = None
+    save_handle_for_identity: Callable[[PaidAdmissionIdentity, Any], None] | None = None
 
     def start(self, *, request_key: str) -> PaidAdmissionResult:
         require_shared_idempotency_key(request_key, request_key)
@@ -56,6 +60,22 @@ class PaidAdmissionCoordinator:
     def start_for_identity(self, identity: PaidAdmissionIdentity) -> PaidAdmissionResult:
         if not isinstance(identity, PaidAdmissionIdentity):
             raise ValueError("paid_admission_identity_incomplete")
+        callbacks = (
+            self.save_receipt_for_identity,
+            self.reserve_credits_for_identity,
+            self.submit_provider_for_identity,
+            self.save_handle_for_identity,
+        )
+        if all(callback is not None for callback in callbacks):
+            return simulate_paid_admission(
+                receipt_key=identity.request_key,
+                reservation_key=identity.request_key,
+                save_receipt=lambda: callbacks[0](identity),
+                reserve_credits=lambda: callbacks[1](identity),
+                submit_provider=lambda: callbacks[2](identity),
+                save_handle=lambda handle: callbacks[3](identity, handle),
+                release_credits=self.release_credits,
+            )
         return self.start(request_key=identity.request_key)
 
     def replay(self, *, request_key: str) -> PaidAdmissionResult:

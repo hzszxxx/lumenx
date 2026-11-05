@@ -57,3 +57,24 @@ def test_identity_contract_requires_user_project_attempt_and_request():
     import pytest
     with pytest.raises(ValueError, match="identity_incomplete"):
         PaidAdmissionIdentity(user_id="", project_id="project-1", attempt_id="attempt-1", request_key="request-1")
+
+def test_identity_callbacks_receive_full_ownership_contract():
+    events = []
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    coordinator_instance = PaidAdmissionCoordinator(
+        save_receipt=lambda key: None,
+        reserve_credits=lambda key: "unused",
+        submit_provider=lambda key: None,
+        save_handle=lambda key, handle: None,
+        release_credits=lambda reservation: None,
+        load_receipt=lambda key: {},
+        load_reservation=lambda key: {},
+        query_provider=lambda handle, scope: None,
+        save_receipt_for_identity=lambda value: events.append(("receipt", value)),
+        reserve_credits_for_identity=lambda value: events.append(("reserve", value)) or "r1",
+        submit_provider_for_identity=lambda value: events.append(("submit", value)) or "h1",
+        save_handle_for_identity=lambda value, handle: events.append(("handle", value, handle)),
+    )
+    coordinator_instance.start_for_identity(identity)
+    assert [event[0] for event in events] == ["receipt", "reserve", "submit", "handle"]
+    assert all(event[1] is identity for event in events)
