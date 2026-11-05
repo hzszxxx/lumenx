@@ -1,5 +1,5 @@
 from src.apps.atelier.paid_admission import PaidAdmissionState
-from src.apps.atelier.paid_admission_coordinator import PaidAdmissionCoordinator, PaidAdmissionIdentity
+from src.apps.atelier.paid_admission_coordinator import PaidAdmissionCoordinator, PaidAdmissionIdentity, require_identity_ownership
 
 
 def coordinator(events):
@@ -78,3 +78,10 @@ def test_identity_callbacks_receive_full_ownership_contract():
     coordinator_instance.start_for_identity(identity)
     assert [event[0] for event in events] == ["receipt", "reserve", "submit", "handle"]
     assert all(event[1] is identity for event in events)
+
+def test_identity_ownership_must_match_all_domain_owners():
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    require_identity_ownership(identity, owner_user_id="u1", owner_project_id="p1", owner_attempt_id="a1")
+    import pytest
+    with pytest.raises(ValueError, match="ownership_mismatch"):
+        require_identity_ownership(identity, owner_user_id="u2", owner_project_id="p1", owner_attempt_id="a1")

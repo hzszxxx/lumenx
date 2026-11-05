@@ -78,6 +78,7 @@ class PaidAdmissionCoordinator:
             )
         return self.start(request_key=identity.request_key)
 
+
     def replay(self, *, request_key: str) -> PaidAdmissionResult:
         return replay_paid_admission(
             receipt_key=request_key,
@@ -101,3 +102,16 @@ class PaidAdmissionCoordinator:
             query_identity=query_identity,
             query_provider=self.query_provider,
         )
+def require_identity_ownership(
+    identity: PaidAdmissionIdentity,
+    *,
+    owner_user_id: str,
+    owner_project_id: str,
+    owner_attempt_id: str,
+) -> None:
+    if (
+        identity.user_id != owner_user_id
+        or identity.project_id != owner_project_id
+        or identity.attempt_id != owner_attempt_id
+    ):
+        raise ValueError("paid_admission_ownership_mismatch")
