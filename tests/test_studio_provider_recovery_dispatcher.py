@@ -97,6 +97,8 @@ def test_scan_queries_submitted_task_without_posting(tmp_path, monkeypatch):
     assert result == ("queried", "p", task_id)
     assert provider.submits == []
     assert len(provider.queries) == 1
+    assert provider.queries[0][1].scope.to_dict() == saved.provider_execution.scope
+    assert provider.queries[0][0].credential_ref == provider.queries[0][1].credential_ref
     assert saved.provider_execution.phase == "observed"
     assert saved.status == "processing"
     runtime.close()
