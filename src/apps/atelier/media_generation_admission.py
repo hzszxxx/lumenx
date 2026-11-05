@@ -96,6 +96,8 @@ class AtelierMediaGenerationAdmissionService:
         project_id: str,
         node_id: str,
         command: ImageCandidateCommand,
+        *,
+        billing_provider: BillingProvider | None = None,
     ) -> MediaGenerationAdmissionAck:
         batch_size = _image_batch_size(command)
         fingerprint = fingerprint_image_candidate_request(command, node_id=node_id)
@@ -103,9 +105,10 @@ class AtelierMediaGenerationAdmissionService:
         def apply(project: AtelierProject) -> None:
             preview = build_image_generation_preview(project, node_id, command)
             with self._bind_authority(media_kind="image", provider_model_id=expected_image_provider_model_id(preview.intent.model_id, mode=preview.intent.mode), preview=preview) as authority:
+                provider = billing_provider or self._billing_provider
                 billing = None
-                if self._billing_provider is not None:
-                    billing = self._billing_provider(
+                if provider is not None:
+                    billing = provider(
                         media_kind="image",
                         model=authority.provider_model_id,
                         units=batch_size,
@@ -138,6 +141,8 @@ class AtelierMediaGenerationAdmissionService:
         project_id: str,
         node_id: str,
         command: TTSCandidateCommand,
+        *,
+        billing_provider: BillingProvider | None = None,
     ) -> MediaGenerationAdmissionAck:
         fingerprint = fingerprint_tts_candidate_request(command, node_id=node_id)
 
