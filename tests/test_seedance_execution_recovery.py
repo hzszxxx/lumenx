@@ -91,6 +91,8 @@ def test_submit_uses_http_binding_and_frozen_data_without_upload(setup, mode, mo
     restarted.run_attempt('generation-1','attempt-1')
     assert len(provider.submits) == 1 and len(provider.queries) == 1 and len(provider.fetches) == 1
     assert provider.queries[0][0].provider_model_id == record.provider_model_id
+    assert provider.queries[0][1].scope == SCOPE and provider.queries[0][1].secret == 'http-key'
+    assert provider.queries[0][0].credential_ref == provider.queries[0][1].credential_ref
     assert storage.get_generation('generation-1').attempts[0].status == 'completed'
 
 
