@@ -261,3 +261,39 @@ def test_app_paid_admission_failures_preserve_unknown_state(tmp_path, monkeypatc
         actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1",
     ).start_for_identity(identity)
     assert result.state is PaidAdmissionState.UNKNOWN
+
+@pytest.mark.parametrize("failure", ["receipt", "reserve"])
+def test_app_paid_admission_pre_submit_failures_do_not_submit(tmp_path, monkeypatch, failure):
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    events = []
+    def callbacks(**context):
+        def save_receipt(identity):
+            events.append("receipt")
+            if failure == "receipt":
+                raise RuntimeError("receipt storage failure")
+        def reserve(identity):
+            events.append("reserve")
+            if failure == "reserve":
+                raise RuntimeError("credit service failure")
+            return "r1"
+        return {
+            "save_receipt": save_receipt,
+            "reserve_credits": reserve,
+            "submit_provider": lambda identity: events.append("submit") or "h1",
+            "save_handle": lambda identity, handle: events.append("handle"),
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: None,
+        }
+    app = make_app(tmp_path, paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    resolver = app.state.paid_admission_request_resolver(
+        actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1",
+    )
+    with pytest.raises(RuntimeError):
+        resolver.start_for_identity(identity)
+    assert events == ["receipt"] if failure == "receipt" else events == ["receipt", "reserve"]
