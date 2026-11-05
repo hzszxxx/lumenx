@@ -229,3 +229,35 @@ def test_enabled_app_resolver_runs_valid_paid_admission_callbacks_in_order(tmp_p
     assert result.state is PaidAdmissionState.SUCCEEDED
     assert [event[0] for event in events] == ["receipt", "reserve", "submit", "handle"]
     assert all(event[1] is identity for event in events)
+
+@pytest.mark.parametrize("failure", ["submit", "handle"])
+def test_app_paid_admission_failures_preserve_unknown_state(tmp_path, monkeypatch, failure):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    def callbacks(**context):
+        def submit(identity):
+            if failure == "submit":
+                raise RuntimeError("provider timeout")
+            return "h1"
+        def save_handle(identity, handle):
+            if failure == "handle":
+                raise RuntimeError("receipt disk failure")
+        return {
+            "save_receipt": lambda identity: None,
+            "reserve_credits": lambda identity: "r1",
+            "submit_provider": submit,
+            "save_handle": save_handle,
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: None,
+        }
+    app = make_app(tmp_path, paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    result = app.state.paid_admission_request_resolver(
+        actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1",
+    ).start_for_identity(identity)
+    assert result.state is PaidAdmissionState.UNKNOWN
