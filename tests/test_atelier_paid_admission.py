@@ -410,3 +410,43 @@ def test_process_restart_scans_unfinished_paid_intent(tmp_path):
         assert restarted.scan_paid_admission_recovery("project-1") == [("attempt-1", "manual_confirmation")]
     finally:
         restarted.close()
+
+def test_process_restart_query_recovers_persisted_handle(tmp_path):
+    import multiprocessing
+    import os
+    from src.apps.atelier.models import AtelierProject
+    from src.apps.atelier.paid_admission import PaidAdmissionIntent
+    from src.apps.atelier.storage import AtelierStorage
+
+    def child(root):
+        store = AtelierStorage(root)
+        project = AtelierProject(id="project-1", title="Canvas", created_at=1.0, updated_at=1.0)
+        project.paid_admission_intents.append(PaidAdmissionIntent(
+            request_fingerprint="a" * 64,
+            project_id="project-1",
+            attempt_id="attempt-1",
+            skill_content_hash="b" * 64,
+            reservation_id="reservation-1",
+            provider_handle={"task_id": "old"},
+            provider_scope={"provider": "seedance", "account_identity": "a1", "region": "cn", "workspace_id": "w1", "base_url": "https://provider"},
+            state=PaidAdmissionState.UNKNOWN,
+        ))
+        store.create_project(project)
+        os._exit(0)
+
+    process = multiprocessing.get_context("fork").Process(target=child, args=(str(tmp_path),))
+    process.start()
+    process.join(timeout=10)
+    assert process.exitcode == 0
+    restarted = AtelierStorage(tmp_path)
+    try:
+        assert restarted.scan_paid_admission_recovery("project-1") == [("attempt-1", "query")]
+        updated = restarted.apply_paid_admission_query_recovery(
+            "project-1",
+            attempt_id="attempt-1",
+            expected_revision=0,
+            query_provider=lambda handle, identity: {"task_id": handle["task_id"], "status": "succeeded"},
+        )
+        assert updated.paid_admission_intents[0].state is PaidAdmissionState.HANDLE_SAVED
+    finally:
+        restarted.close()
