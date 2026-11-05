@@ -338,3 +338,28 @@ def test_two_recovery_workers_only_one_commits(tmp_path):
         assert outcomes == ["committed", "conflict"]
     finally:
         store.close()
+
+def test_separate_process_cannot_open_second_atelier_writer(tmp_path):
+    import multiprocessing
+    from src.apps.atelier.storage import AtelierStorage
+
+    store = AtelierStorage(tmp_path)
+    queue = multiprocessing.Queue()
+
+    def child(root, result_queue):
+        try:
+            second = AtelierStorage(root)
+        except Exception as exc:
+            result_queue.put(type(exc).__name__)
+        else:
+            second.close()
+            result_queue.put("opened")
+
+    process = multiprocessing.get_context("fork").Process(target=child, args=(str(tmp_path), queue))
+    process.start()
+    process.join(timeout=10)
+    try:
+        assert process.exitcode == 0
+        assert queue.get(timeout=2) == "StorageConflictError"
+    finally:
+        store.close()
