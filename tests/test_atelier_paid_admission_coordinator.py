@@ -1,5 +1,5 @@
 from src.apps.atelier.paid_admission import PaidAdmissionState
-from src.apps.atelier.paid_admission_coordinator import PaidAdmissionCoordinator
+from src.apps.atelier.paid_admission_coordinator import PaidAdmissionCoordinator, PaidAdmissionIdentity
 
 
 def coordinator(events):
@@ -46,3 +46,14 @@ def test_coordinator_unknown_recovery_uses_query_callback_only():
     assert result.state is PaidAdmissionState.HANDLE_SAVED
     assert result.provider_handle["status"] == "succeeded"
     assert events == []
+
+
+def test_identity_contract_requires_user_project_attempt_and_request():
+    events = []
+    result = coordinator(events).start_for_identity(PaidAdmissionIdentity(
+        user_id="user-1", project_id="project-1", attempt_id="attempt-1", request_key="request-1",
+    ))
+    assert result.state is PaidAdmissionState.SUCCEEDED
+    import pytest
+    with pytest.raises(ValueError, match="identity_incomplete"):
+        PaidAdmissionIdentity(user_id="", project_id="project-1", attempt_id="attempt-1", request_key="request-1")

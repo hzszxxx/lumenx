@@ -19,6 +19,18 @@ from .paid_admission import (
 
 
 @dataclass(frozen=True)
+class PaidAdmissionIdentity:
+    user_id: str
+    project_id: str
+    attempt_id: str
+    request_key: str
+
+    def __post_init__(self) -> None:
+        if not all(isinstance(value, str) and value for value in (self.user_id, self.project_id, self.attempt_id, self.request_key)):
+            raise ValueError("paid_admission_identity_incomplete")
+
+
+@dataclass(frozen=True)
 class PaidAdmissionCoordinator:
     save_receipt: Callable[[str], None]
     reserve_credits: Callable[[str], str]
@@ -40,6 +52,11 @@ class PaidAdmissionCoordinator:
             save_handle=lambda handle: self.save_handle(request_key, handle),
             release_credits=self.release_credits,
         )
+
+    def start_for_identity(self, identity: PaidAdmissionIdentity) -> PaidAdmissionResult:
+        if not isinstance(identity, PaidAdmissionIdentity):
+            raise ValueError("paid_admission_identity_incomplete")
+        return self.start(request_key=identity.request_key)
 
     def replay(self, *, request_key: str) -> PaidAdmissionResult:
         return replay_paid_admission(
