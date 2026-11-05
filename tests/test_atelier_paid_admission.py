@@ -305,3 +305,36 @@ def test_duplicate_query_recovery_with_stale_revision_is_rejected(tmp_path):
             store.apply_paid_admission_query_recovery("project-1", attempt_id="attempt-1", expected_revision=0, query_provider=lambda h, i: pytest.fail("stale replay must not query"))
     finally:
         store.close()
+
+def test_two_recovery_workers_only_one_commits(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from src.apps.atelier.models import AtelierProject
+    from src.apps.atelier.paid_admission import PaidAdmissionIntent
+    from src.apps.atelier.storage import AtelierStorage
+    from src.utils.json_storage import StorageConflictError
+
+    project = AtelierProject(id="project-1", title="Canvas", created_at=1.0, updated_at=1.0)
+    project.paid_admission_intents.append(PaidAdmissionIntent(
+        request_fingerprint="a" * 64,
+        project_id="project-1",
+        attempt_id="attempt-1",
+        skill_content_hash="b" * 64,
+        reservation_id="reservation-1",
+        provider_handle={"task_id": "old"},
+        provider_scope={"provider": "seedance", "account_identity": "a1", "region": "cn", "workspace_id": "w1", "base_url": "https://provider"},
+        state=PaidAdmissionState.UNKNOWN,
+    ))
+    store = AtelierStorage(tmp_path)
+    try:
+        store.create_project(project)
+        def recover():
+            try:
+                store.apply_paid_admission_query_recovery("project-1", attempt_id="attempt-1", expected_revision=0, query_provider=lambda h, i: {"status": "succeeded"})
+                return "committed"
+            except StorageConflictError:
+                return "conflict"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = sorted(pool.map(lambda _: recover(), (1, 2)))
+        assert outcomes == ["committed", "conflict"]
+    finally:
+        store.close()
