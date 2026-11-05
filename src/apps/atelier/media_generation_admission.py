@@ -34,6 +34,7 @@ from .models import (
     AtelierGenerationRequestReceiptMember,
     AtelierMediaGenerationAttempt,
     AtelierProject,
+    MediaCreditBinding,
 )
 from .storage import AtelierStorage
 from .tts_commands import ATELIER_TTS_ENTRYPOINT, TTSCandidateCommand, fingerprint_tts_candidate_request
@@ -63,6 +64,7 @@ class MediaGenerationAdmissionAck(BaseModel):
 
 
 AuthorityProvider = Callable[..., ContextManager[MediaRuntimeAuthority]]
+BillingProvider = Callable[..., MediaCreditBinding]
 
 
 class AtelierMediaGenerationAdmissionService:
@@ -76,12 +78,14 @@ class AtelierMediaGenerationAdmissionService:
         clock: Callable[[], float] = time.time,
         id_factory: Callable[[], str] | None = None,
         server_storage_identity: Callable[[], str] | str = "server-store",
+        billing_provider: BillingProvider | None = None,
     ):
         self.storage = storage
         self._authority_provider = authority_provider
         self._clock = clock
         self._id_factory = id_factory or (lambda: uuid.uuid4().hex)
         self._server_storage_identity = server_storage_identity
+        self._billing_provider = billing_provider
 
     def read_request(self, project_id: str, client_request_id: str) -> MediaGenerationAdmissionAck:
         validate_client_request_id(client_request_id)
