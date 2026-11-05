@@ -111,3 +111,22 @@ def make_identity_credit_reserver(
     def reserve_for_identity(identity: PaidAdmissionIdentity) -> str:
         return reserve(identity.user_id, identity.attempt_id, identity.request_key)
     return reserve_for_identity
+
+def make_platform_credit_reserver(
+    *,
+    actor_for_user: Callable[[str], dict[str, Any]],
+    reserve_credits: Callable[[dict[str, Any], int, str, str, str], dict[str, Any]],
+    estimated_credits: int,
+    pricing_version: str,
+) -> Callable[[PaidAdmissionIdentity], str]:
+    """Adapt PlatformService.reserve_credits without importing it here."""
+    def reserve_for_identity(identity: PaidAdmissionIdentity) -> str:
+        actor = actor_for_user(identity.user_id)
+        if actor.get("id") != identity.user_id:
+            raise ValueError("paid_admission_ownership_mismatch")
+        result = reserve_credits(actor, estimated_credits, identity.attempt_id, pricing_version, identity.request_key)
+        reservation_id = result.get("reservation_id") if isinstance(result, dict) else None
+        if not isinstance(reservation_id, str) or not reservation_id:
+            raise ValueError("paid_admission_reservation_invalid")
+        return reservation_id
+    return reserve_for_identity

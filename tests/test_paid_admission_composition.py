@@ -6,6 +6,7 @@ from src.apps.comic_gen.paid_admission_composition import (
     build_paid_admission_coordinator,
     make_identity_credit_reserver,
     make_paid_admission_request_resolver,
+    make_platform_credit_reserver,
     resolve_paid_admission_coordinator,
 )
 
@@ -85,3 +86,15 @@ def test_identity_credit_reserver_passes_user_attempt_and_request_key():
     identity = PaidAdmissionIdentity("u1", "p1", "a1", "request-1")
     assert reserve(identity) == "reservation-1"
     assert calls == [("u1", "a1", "request-1")]
+
+def test_platform_credit_adapter_validates_actor_and_reservation_result():
+    calls = []
+    reserve = make_platform_credit_reserver(
+        actor_for_user=lambda user_id: {"id": user_id},
+        reserve_credits=lambda actor, amount, generation_id, pricing, key: calls.append((actor, amount, generation_id, pricing, key)) or {"reservation_id": "r1"},
+        estimated_credits=12,
+        pricing_version="pricing-v1",
+    )
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "request-1")
+    assert reserve(identity) == "r1"
+    assert calls == [({"id": "u1"}, 12, "a1", "pricing-v1", "request-1")]
