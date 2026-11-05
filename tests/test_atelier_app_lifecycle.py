@@ -179,3 +179,26 @@ def test_paid_admission_resolver_is_platform_gated(tmp_path, monkeypatch):
         paid_admission_callbacks_factory=lambda **context: {},
     )
     assert hasattr(enabled.state, "paid_admission_request_resolver")
+
+def test_enabled_app_resolver_rejects_request_owner_mismatch(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    def callbacks(**context):
+        return {
+            "save_receipt": lambda identity: None,
+            "reserve_credits": lambda identity: "r1",
+            "submit_provider": lambda identity: "h1",
+            "save_handle": lambda identity, handle: None,
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: None,
+        }
+    app = make_app(tmp_path, paid_admission_callbacks_factory=callbacks)
+    resolver = app.state.paid_admission_request_resolver
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    with pytest.raises(ValueError, match="ownership_mismatch"):
+        resolver(actor_user_id="u2", identity=identity, project_owner_id="p1", attempt_owner_id="a1")
