@@ -26,7 +26,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, StrictBool, StrictInt, StrictStr, field_validator
-from typing import Optional, Dict, List, Any, Annotated, Literal
+from typing import Optional, Dict, List, Any, Annotated, Literal, Callable
 import asyncio
 import math
 import time
@@ -103,6 +103,7 @@ from ..atelier.agent_loop_api import router as atelier_agent_loop_router
 from ..atelier.project_package_api import router as atelier_project_package_router
 from ..playground.api import router as playground_router
 from ..platform.api import router as platform_router
+from .paid_admission_composition import make_paid_admission_request_resolver
 from ..platform.config import PlatformConfig
 from ..platform.service import PlatformError, PlatformService
 
@@ -1052,6 +1053,7 @@ def create_app(
     access_session_ttl_seconds: int | None = None,
     access_max_sessions: int | None = None,
     access_cookie_secure: bool | None = None,
+    paid_admission_callbacks_factory: Callable[..., dict[str, Any]] | None = None,
 ) -> FastAPI:
     access_state = AppAccessState()
     target_app = FastAPI(
@@ -1078,6 +1080,11 @@ def create_app(
     if PlatformConfig.from_env().enabled:
         target_app.include_router(platform_router, prefix="/api/platform")
         target_app.state.platform_service = PlatformService(PlatformConfig.from_env())
+        if paid_admission_callbacks_factory is not None:
+            target_app.state.paid_admission_request_resolver = make_paid_admission_request_resolver(
+                platform_enabled=True,
+                callbacks_factory=paid_admission_callbacks_factory,
+            )
 
     @target_app.middleware("http")
     async def bind_platform_identity(request: Request, call_next):
