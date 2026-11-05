@@ -165,3 +165,17 @@ def test_atelier_mutations_obey_access_storage_identity_and_safe_validation(tmp_
             assert 'Infinity' not in rejected.text
         assert client.get(item, headers=headers).json()['revision'] == 0
         assert len(json.loads((tmp_path / 'atelier_projects.json').read_text())) == 1
+
+def test_paid_admission_resolver_is_platform_gated(tmp_path, monkeypatch):
+    from src.apps.platform.config import PlatformConfig
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=False)))
+    disabled = make_app(tmp_path / "disabled")
+    assert not hasattr(disabled.state, "paid_admission_request_resolver")
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    enabled = make_app(
+        tmp_path / "enabled",
+        paid_admission_callbacks_factory=lambda **context: {},
+    )
+    assert hasattr(enabled.state, "paid_admission_request_resolver")
