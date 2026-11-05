@@ -314,6 +314,7 @@ class AtelierMediaGenerationAdmissionService:
                 base_revision=project.revision,
                 committed_revision=project.revision + 1,
                 created_at=now,
+                media_credit_binding=credit_binding,
             )
         else:
             receipt = AtelierGenerationRequestReceipt(
@@ -328,6 +329,7 @@ class AtelierMediaGenerationAdmissionService:
                 base_revision=project.revision,
                 committed_revision=project.revision + 1,
                 created_at=now,
+                media_credit_binding=credit_binding,
             )
         project.generation_request_receipts.append(receipt)
         project.updated_at = now
