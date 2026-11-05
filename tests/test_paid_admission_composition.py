@@ -2,7 +2,11 @@ import pytest
 
 from src.apps.atelier.paid_admission import PaidAdmissionState
 from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
-from src.apps.comic_gen.paid_admission_composition import build_paid_admission_coordinator, resolve_paid_admission_coordinator
+from src.apps.comic_gen.paid_admission_composition import (
+    build_paid_admission_coordinator,
+    make_paid_admission_request_resolver,
+    resolve_paid_admission_coordinator,
+)
 
 def test_composition_factory_validates_owners_before_callbacks():
     events = []
@@ -53,3 +57,23 @@ def test_disabled_platform_does_not_resolve_coordinator():
             project_owner_id="p1",
             attempt_owner_id="a1",
         )
+
+def test_request_resolver_does_not_capture_identity_between_requests():
+    seen = []
+    def callbacks_factory(**context):
+        seen.append(context["identity"])
+        return {
+            "save_receipt": lambda value: None,
+            "reserve_credits": lambda value: "r1",
+            "submit_provider": lambda value: "h1",
+            "save_handle": lambda value, handle: None,
+            "release_credits": lambda reservation: None,
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: None,
+        }
+    resolve = make_paid_admission_request_resolver(platform_enabled=True, callbacks_factory=callbacks_factory)
+    identity = PaidAdmissionIdentity("u1", "p1", "a1", "r1")
+    coordinator = resolve(actor_user_id="u1", identity=identity, project_owner_id="p1", attempt_owner_id="a1")
+    assert coordinator.start_for_identity(identity).state is PaidAdmissionState.SUCCEEDED
+    assert seen == [identity]

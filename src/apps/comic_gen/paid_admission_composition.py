@@ -68,3 +68,38 @@ def resolve_paid_admission_coordinator(
         attempt_owner_id=attempt_owner_id,
         **callbacks,
     )
+
+def make_paid_admission_request_resolver(
+    *,
+    platform_enabled: bool,
+    callbacks_factory: Callable[..., dict[str, Any]],
+) -> Callable[..., PaidAdmissionCoordinator]:
+    """Create a request-scoped resolver; no actor/project is captured."""
+    if not platform_enabled:
+        raise ValueError("paid_admission_platform_disabled")
+
+    def resolve(
+        *,
+        actor_user_id: str,
+        identity: PaidAdmissionIdentity,
+        project_owner_id: str,
+        attempt_owner_id: str,
+    ) -> PaidAdmissionCoordinator:
+        callbacks = callbacks_factory(
+            actor_user_id=actor_user_id,
+            identity=identity,
+            project_owner_id=project_owner_id,
+            attempt_owner_id=attempt_owner_id,
+        )
+        if not isinstance(callbacks, dict):
+            raise ValueError("paid_admission_callbacks_invalid")
+        return resolve_paid_admission_coordinator(
+            platform_enabled=True,
+            actor_user_id=actor_user_id,
+            identity=identity,
+            project_owner_id=project_owner_id,
+            attempt_owner_id=attempt_owner_id,
+            **callbacks,
+        )
+
+    return resolve
