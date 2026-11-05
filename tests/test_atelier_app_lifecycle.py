@@ -380,4 +380,50 @@ def test_app_resolver_replay_does_not_reserve_or_submit_again(tmp_path, monkeypa
     replay = coordinator.replay(request_key=identity.request_key)
     assert replay.state is PaidAdmissionState.SUCCEEDED
     assert events == ["receipt", "submit"]
+
+def test_app_unknown_recovery_queries_without_reserve_or_submit(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.comic_gen.paid_admission_composition import make_platform_credit_reserver
+    from src.apps.platform.config import PlatformConfig
+    from src.apps.platform.service import PlatformService
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    platform = PlatformService(PlatformConfig(enabled=True, database_url=f"sqlite:///{tmp_path / 'credits.db'}"))
+    admin = platform.register("admin", "a" * 12, role="admin")
+    actor = platform.register("creator", "b" * 12)
+    platform.grant_credits(admin, actor["id"], 20, "test", "grant-unknown-1")
+    events = []
+    def callbacks(**context):
+        reserve = make_platform_credit_reserver(
+            actor_for_user=lambda user_id: actor,
+            reserve_credits=lambda *args: platform.reserve_credits(*args),
+            estimated_credits=5,
+            pricing_version="pricing-unknown-v1",
+        )
+        return {
+            "save_receipt": lambda identity: events.append("receipt"),
+            "reserve_credits": reserve,
+            "submit_provider": lambda identity: events.append("submit") or "h1",
+            "save_handle": lambda identity, handle: (_ for _ in ()).throw(RuntimeError("handle save failed")),
+            "release_credits": lambda reservation: platform.release_credits(actor, reservation),
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: events.append(("query", handle, scope)) or {"status": "succeeded"},
+        }
+    app = make_app(tmp_path / "app", paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity(actor["id"], "project-1", "attempt-1", "request-unknown-1")
+    coordinator = app.state.paid_admission_request_resolver(
+        actor_user_id=actor["id"], identity=identity, project_owner_id="project-1", attempt_owner_id="attempt-1",
+    )
+    result = coordinator.start_for_identity(identity)
+    assert result.state is PaidAdmissionState.UNKNOWN
+    recovered = coordinator.recover_unknown(
+        state=PaidAdmissionState.UNKNOWN,
+        reservation_id=result.reservation_id,
+        provider_handle=result.provider_handle,
+        query_identity={"provider": "p", "account": "a", "region": "r", "workspace": "w", "endpoint": "e"},
+    )
+    assert recovered.state is PaidAdmissionState.HANDLE_SAVED
+    assert events == ["receipt", "submit", ("query", "h1", {"provider": "p", "account": "a", "region": "r", "workspace": "w", "endpoint": "e"})]
     assert platform.credit_balance(actor)["available_credits"] == 15
