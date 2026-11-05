@@ -103,6 +103,15 @@ class AtelierMediaGenerationAdmissionService:
         def apply(project: AtelierProject) -> None:
             preview = build_image_generation_preview(project, node_id, command)
             with self._bind_authority(media_kind="image", provider_model_id=expected_image_provider_model_id(preview.intent.model_id, mode=preview.intent.mode), preview=preview) as authority:
+                billing = None
+                if self._billing_provider is not None:
+                    billing = self._billing_provider(
+                        media_kind="image",
+                        model=authority.provider_model_id,
+                        units=batch_size,
+                        generation_id=project.id,
+                        idempotency_key=command.client_request_id,
+                    )
                 self._append_image_admission(
                     project,
                     node_id,
@@ -111,6 +120,7 @@ class AtelierMediaGenerationAdmissionService:
                     preview=preview,
                     batch_size=batch_size,
                     request_fingerprint=fingerprint,
+                    credit_binding=billing,
                 )
 
         project, replayed = self.storage.apply_generation_admission(
@@ -156,6 +166,7 @@ class AtelierMediaGenerationAdmissionService:
         preview: AtelierImageGenerationPreview,
         batch_size: int,
         request_fingerprint: str,
+        credit_binding: MediaCreditBinding | None = None,
     ) -> None:
         scope = self.storage._media_write_scope()
         ids = [(self._id_factory(), self._id_factory()) for _ in range(batch_size)]
@@ -192,6 +203,7 @@ class AtelierMediaGenerationAdmissionService:
             entrypoint=ATELIER_IMAGE_ENTRYPOINT,
             client_request_id=command.client_request_id,
             request_fingerprint=request_fingerprint,
+            credit_binding=credit_binding,
         )
 
     def _append_tts_admission(
@@ -202,6 +214,7 @@ class AtelierMediaGenerationAdmissionService:
         *,
         authority: MediaRuntimeAuthority,
         request_fingerprint: str,
+        credit_binding: MediaCreditBinding | None = None,
     ) -> None:
         attempt_id, candidate_id = self._id_factory(), self._id_factory()
         prepared = build_tts_media_generation_preparation(
@@ -234,6 +247,7 @@ class AtelierMediaGenerationAdmissionService:
         entrypoint: Literal["atelier.provider_image.v1", "atelier.provider_audio.v1"],
         client_request_id: str,
         request_fingerprint: str,
+        credit_binding: MediaCreditBinding | None = None,
     ) -> None:
         if len(ids) != len(records):
             raise ValueError("Atelier media generation admission identity count mismatch")
@@ -259,6 +273,7 @@ class AtelierMediaGenerationAdmissionService:
                 error_code=None,
                 output_ref=None,
                 provider_execution=record,
+                credit_binding=credit_binding,
                 created_at=now,
                 updated_at=now,
             )
