@@ -441,12 +441,20 @@ def test_process_restart_query_recovers_persisted_handle(tmp_path):
     restarted = AtelierStorage(tmp_path)
     try:
         assert restarted.scan_paid_admission_recovery("project-1") == [("attempt-1", "query")]
+        observed = []
+        def query(handle, identity):
+            observed.append((handle, identity))
+            return {"task_id": handle["task_id"], "status": "succeeded"}
         updated = restarted.apply_paid_admission_query_recovery(
             "project-1",
             attempt_id="attempt-1",
             expected_revision=0,
-            query_provider=lambda handle, identity: {"task_id": handle["task_id"], "status": "succeeded"},
+            query_provider=query,
         )
+        assert observed == [(
+            {"task_id": "old"},
+            {"provider": "seedance", "account": "a1", "region": "cn", "workspace": "w1", "endpoint": "https://provider"},
+        )]
         assert updated.paid_admission_intents[0].state is PaidAdmissionState.HANDLE_SAVED
     finally:
         restarted.close()
