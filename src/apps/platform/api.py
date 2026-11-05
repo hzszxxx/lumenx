@@ -92,10 +92,21 @@ class SkillVersionIn(BaseModel):
     scope: str = "user"
     project_id: str | None = None
     parent_version: str | None = None
+class SkillDraftIn(BaseModel):
+    version: str = Field(min_length=1, max_length=32)
 class SkillRunIn(BaseModel):
     project_id: str = Field(min_length=1, max_length=128)
     binding: dict[str, Any]
     input_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+class SkillFeedbackIn(BaseModel):
+    project_id: str = Field(min_length=1, max_length=128)
+    skill_name: str = Field(pattern=r"^[a-z][a-z0-9-]{2,63}$")
+    skill_version: str = Field(min_length=1, max_length=32)
+    skill_content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    decision: str = Field(pattern=r"^(accepted|rejected|revision_requested)$")
+    qc_score: float | None = Field(default=None, ge=0, le=1)
+    note: str = Field(default="", max_length=2000)
+    run_id: str | None = Field(default=None, max_length=128)
 class SkillRunUpdateIn(BaseModel):
     status: str
     output_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -186,6 +197,17 @@ def create_skill_version(body: SkillVersionIn, user=Depends(current_user), svc: 
 def bind_skill_version(skill_version_id: str, active: bool = True, user=Depends(current_user), svc: PlatformService = Depends(service)):
     return handle(lambda: svc.bind_skill_version(user, skill_version_id, active=active))
 
+@router.post("/skills/versions/{skill_version_id}/draft")
+def clone_skill_version_as_draft(skill_version_id: str, body: SkillDraftIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.clone_skill_version_as_draft(user, skill_version_id, version=body.version))
+@router.post("/skills/versions/{skill_version_id}/rollback")
+def rollback_skill_binding(skill_version_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.rollback_skill_binding(user, skill_version_id))
+@router.get("/skills/versions/{skill_version_id}/diff")
+def compare_skill_versions(skill_version_id: str, against_version_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.compare_skill_versions(user, skill_version_id, against_version_id))
+
+
 @router.get("/skills/{name}/resolve")
 def resolve_skill_version(name: str, project_id: str | None = None, user=Depends(current_user), svc: PlatformService = Depends(service)):
     resolved = svc.resolve_skill_version(user, name, project_id=project_id)
@@ -195,6 +217,14 @@ def resolve_skill_version(name: str, project_id: str | None = None, user=Depends
 @router.get("/skills/runs")
 def skill_runs(project_id: str | None = None, limit: int = 50, user=Depends(current_user), svc: PlatformService = Depends(service)):
     return svc.list_skill_runs(user, project_id=project_id, limit=limit)
+
+@router.get("/skills/feedback")
+def skill_feedback(project_id: str | None = None, skill_name: str | None = None, limit: int = 50, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return svc.list_skill_feedback(user, project_id=project_id, skill_name=skill_name, limit=limit)
+
+@router.post("/skills/feedback")
+def create_skill_feedback(body: SkillFeedbackIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.record_skill_feedback(user, project_id=body.project_id, skill_name=body.skill_name, skill_version=body.skill_version, skill_content_hash=body.skill_content_hash, decision=body.decision, qc_score=body.qc_score, note=body.note, run_id=body.run_id))
 
 @router.post("/skills/runs")
 def create_skill_run(body: SkillRunIn, user=Depends(current_user), svc: PlatformService = Depends(service)):

@@ -336,6 +336,22 @@ def image_query_handle_from_record(record: ProviderExecutionRecord) -> ProviderH
     return handle_from_record(validated)
 
 
+def query_identity_from_record(record: ProviderExecutionRecord) -> dict[str, str]:
+    """Return persisted query authority; never derive missing values."""
+    if not isinstance(record, ProviderExecutionRecord):
+        raise ProviderRecoveryError("provider_query_identity_incomplete")
+    scope = record.scope
+    identity = {
+        "provider": scope.get("provider"),
+        "account": scope.get("account_identity"),
+        "region": scope.get("region"),
+        "workspace": scope.get("workspace_id"),
+        "endpoint": scope.get("base_url"),
+    }
+    if any(not isinstance(value, str) or not value for value in identity.values()):
+        raise ProviderRecoveryError("provider_query_identity_incomplete")
+    return identity
+
 def record_with_changes(record: ProviderExecutionRecord, **changes) -> ProviderExecutionRecord:
     payload = record.model_dump(mode="json")
     payload.update(changes)

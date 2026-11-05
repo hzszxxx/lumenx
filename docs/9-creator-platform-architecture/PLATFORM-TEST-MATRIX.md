@@ -18,12 +18,12 @@
 | 任务原子认领、交付、评审 | `PlatformService.claim_task` / `deliver_task` / `review_task` | `tests/test_platform_service.py::test_certified_creator_claims_delivers_and_review_creates_simulated_ledger` | 已通过 |
 | 模拟账本与余额重建 | `PlatformService.wallet` | `tests/test_platform_service.py::test_certified_creator_claims_delivers_and_review_creates_simulated_ledger` | 已通过 |
 | 截止时间释放与账单查询 | `PlatformService.release_expired_tasks` / `transactions` | service coverage pending | 已实现 |
-| 系统 Skill 默认加载与目录快照 | `src/apps/atelier/product_skills.py` | `tests/test_atelier_product_skills.py` | 当前仅有静态系统 Skill；用户覆盖待实现 |
-| Skill 版本哈希与父版本关系 | `skill_versions` / `effective_skill_snapshot` | 待新增 Skill contract tests | 方案已定义，未实现 |
-| 用户/项目 Skill 绑定与回滚 | `skill_bindings` | 待新增 API/service tests | 方案已定义，未实现 |
-| Skill 工具与成本权限交集 | Agent admission/authorization | 待新增 authorization tests | 不得通过 Skill 绕过审批或计费 |
-| Skill 运行快照与任务恢复 | `skill_runs` + generation receipt | 待新增 recovery tests | 已批准任务必须固定原 Skill 快照 |
-| 用户反馈驱动的 Skill 草稿 | `skill_feedback` + sandbox evaluator | 待定义 | 不自动覆盖线上版本 |
+| 系统 Skill 默认加载与目录快照 | `src/apps/atelier/product_skills.py` | `tests/test_atelier_product_skills.py` | 已通过；仅静态系统 Skill |
+| Skill 版本哈希与父版本关系 | `src/apps/platform/service.py` + `src/apps/atelier/skill_runtime.py` | `tests/test_platform_skill_api.py`, `tests/test_atelier_skill_runtime.py` | 已通过；manifest 哈希与运行绑定已校验 |
+| 用户/项目 Skill 绑定与回滚 | `src/apps/platform/service.py` + `src/apps/platform/migrations/007_skill_registry.sql` + `015_skill_binding_history.sql` | `tests/test_platform_skill_api.py`, `tests/test_platform_db.py` | 已通过显式绑定、历史记录与回滚 |
+| Skill 工具与成本权限交集 | `src/apps/atelier/skill_resolution.py` + Agent/Generation admission | `tests/test_atelier_skill_resolution.py`, `tests/test_atelier_skill_runtime.py`, `tests/test_atelier_generation_admission.py`, `tests/test_atelier_agent_admission.py` | 工具交集与 admission 集成已通过；成本策略与审批专项测试仍待补充 |
+| Skill 运行快照与任务恢复 | `src/apps/platform/service.py` + `src/apps/atelier/skill_runtime.py` | `tests/test_platform_skill_api.py`, `tests/test_atelier_skill_worker_contract.py`, `tests/test_skill_worker_main.py`, `tests/test_atelier_generation_admission.py` | 绑定/运行幂等、admission 快照已通过；生成任务跨重启恢复仍依赖统一 generation receipt |
+| 用户反馈驱动的 Skill 草稿 | `platform_skill_feedback` + `PlatformService.clone_skill_version_as_draft` | `tests/test_platform_skill_api.py` | 已实现反馈持久化与显式草稿复制；草稿仍不会自动激活 |
 | Skill 版本与绑定持久化 | `platform_skill_versions` / `platform_skill_bindings` | `tests/test_platform_db.py`；`tests/test_platform_service.py` | 当前切片通过；HTTP/API 与 UI 待接线 |
 | 用户/项目/系统解析顺序 | `PlatformService.resolve_skill_version` | `tests/test_platform_service.py::test_skill_versions_are_user_isolated_and_resolve_project_then_user` | 当前切片通过 |
 | Skill manifest 安全字段与哈希 | `PlatformService.create_skill_version` | `tests/test_platform_service.py::test_skill_manifest_rejects_executable_fields_and_bad_hash` | 当前切片通过；尚未接 Product Skill snapshot converter |

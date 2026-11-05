@@ -556,6 +556,58 @@ class PlatformService:
             raise PlatformError("skill_version_exists", "Skill version already exists", 409) from exc
         return {"id": skill_id, "name": name, "version": version, "scope": scope, "owner_id": owner_id, "project_id": project_id, "parent_version": parent_version, "content_hash": content_hash, "status": "draft", "created_at": timestamp}
 
+    def clone_skill_version_as_draft(self, actor: dict[str, Any], skill_version_id: str, *, version: str) -> dict[str, Any]:
+        with connect(self.path) as c:
+            row = c.execute(
+                "SELECT name,scope,owner_id,project_id,version,manifest_json FROM platform_skill_versions WHERE id=?",
+                (skill_version_id,),
+            ).fetchone()
+        if not row:
+            raise PlatformError("skill_version_not_found", "Skill version not found", 404)
+        if row[2] != actor.get("id") or row[1] not in {"user", "project"}:
+            raise PlatformError("skill_forbidden", "Only owned user/project Skills may be cloned", 403)
+        manifest = json.loads(row[5])
+        manifest["version"] = version
+        payload = {key: manifest[key] for key in manifest if key != "content_hash"}
+        manifest["content_hash"] = hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return self.create_skill_version(
+            actor,
+            manifest,
+            scope=row[1],
+            project_id=row[3],
+            parent_version=row[4],
+        )
+
+    def compare_skill_versions(self, actor: dict[str, Any], skill_version_id: str, against_version_id: str) -> dict[str, Any]:
+        with connect(self.path) as c:
+            rows = c.execute(
+                "SELECT id,name,version,scope,owner_id,project_id,parent_version,manifest_json,content_hash FROM platform_skill_versions WHERE id IN (?,?)",
+                (skill_version_id, against_version_id),
+            ).fetchall()
+        versions = {row[0]: row for row in rows}
+        if len(versions) != 2:
+            raise PlatformError("skill_version_not_found", "Skill version not found", 404)
+        current, against = versions[skill_version_id], versions[against_version_id]
+        if current[4] != actor.get("id") or against[4] != actor.get("id"):
+            raise PlatformError("skill_forbidden", "Skill version belongs to another user", 403)
+        if current[1] != against[1] or current[5] != against[5]:
+            raise PlatformError("skill_diff_scope_mismatch", "Skill versions are not comparable", 409)
+        current_manifest = json.loads(current[7])
+        against_manifest = json.loads(against[7])
+        changed = {
+            key: {"from": against_manifest.get(key), "to": current_manifest.get(key)}
+            for key in sorted(set(current_manifest) | set(against_manifest))
+            if current_manifest.get(key) != against_manifest.get(key)
+        }
+        return {
+            "skill_name": current[1],
+            "current": {"id": current[0], "version": current[2], "content_hash": current[8]},
+            "against": {"id": against[0], "version": against[2], "content_hash": against[8]},
+            "changed": changed,
+        }
+
     def bind_skill_version(self, actor: dict[str, Any], skill_version_id: str, *, active: bool = True) -> dict[str, Any]:
         timestamp = now()
         with connect(self.path) as c:
@@ -563,12 +615,27 @@ class PlatformService:
             if not row: raise PlatformError("skill_version_not_found", "Skill version not found", 404)
             if row[2] in {"system", "workspace"} and actor.get("role") != "admin": raise PlatformError("skill_admin_required", f"{row[2]} Skill versions require admin", 403)
             if row[2] in {"user", "project"} and row[3] != actor.get("id"): raise PlatformError("skill_forbidden", "Skill version belongs to another user", 403)
+            previous = c.execute("SELECT skill_version_id FROM platform_skill_bindings WHERE name=? AND scope=? AND owner_id IS ? AND project_id IS ? AND active=1", (row[1], row[2], row[3], row[4])).fetchone()
+            if previous and previous[0] != skill_version_id:
+                c.execute("INSERT INTO platform_skill_binding_history VALUES (?,?,?,?,?,?,?,?)", (uid(), row[1], row[2], row[3], row[4], previous[0], timestamp, actor.get("id")))
             c.execute("UPDATE platform_skill_versions SET status=? WHERE id=?", ("active" if active else "draft", skill_version_id))
             c.execute("DELETE FROM platform_skill_bindings WHERE name=? AND scope=? AND owner_id IS ? AND project_id IS ?", (row[1], row[2], row[3], row[4]))
             if active:
                 c.execute("INSERT INTO platform_skill_bindings VALUES (?,?,?,?,?,?,?,?,?)", (uid(), row[1], row[2], row[3], row[4], skill_version_id, 1, timestamp, timestamp))
             self._audit(c, actor.get("id"), "skill.version.bound", "skill_version", skill_version_id, {"active": active, "scope": row[2], "project_id": row[4]})
         return {"id": skill_version_id, "name": row[1], "scope": row[2], "project_id": row[4], "active": active}
+
+    def rollback_skill_binding(self, actor: dict[str, Any], skill_version_id: str) -> dict[str, Any]:
+        with connect(self.path) as c:
+            row = c.execute("SELECT name,scope,owner_id,project_id FROM platform_skill_versions WHERE id=?", (skill_version_id,)).fetchone()
+            if not row:
+                raise PlatformError("skill_version_not_found", "Skill version not found", 404)
+            if row[2] != actor.get("id") or row[1] not in {"user", "project"}:
+                raise PlatformError("skill_forbidden", "Skill version belongs to another user", 403)
+            previous = c.execute("SELECT skill_version_id FROM platform_skill_binding_history WHERE name=? AND scope=? AND owner_id IS ? AND project_id IS ? ORDER BY replaced_at DESC LIMIT 1", row).fetchone()
+        if not previous:
+            raise PlatformError("skill_rollback_unavailable", "No previous Skill binding is available", 409)
+        return self.bind_skill_version(actor, previous[0], active=True)
 
     def resolve_skill_version(self, actor: dict[str, Any], name: str, *, project_id: str | None = None) -> dict[str, Any] | None:
         order = [("project", actor.get("id"), project_id), ("user", actor.get("id"), None), ("workspace", None, None), ("system", None, None)]
@@ -683,6 +750,44 @@ class PlatformService:
         with connect(self.path) as c:
             rows = c.execute("SELECT id,project_id,skill_name,skill_version,skill_content_hash,request_fingerprint,status,input_hash,output_hash,error_code,created_at,updated_at FROM platform_skill_runs WHERE user_id=? AND (? IS NULL OR project_id=?) ORDER BY created_at DESC LIMIT ?", (actor["id"], project_id, project_id, limit)).fetchall()
         keys = ("id", "project_id", "skill_name", "skill_version", "skill_content_hash", "request_fingerprint", "status", "input_hash", "output_hash", "error_code", "created_at", "updated_at")
+        return [dict(zip(keys, row)) for row in rows]
+    def record_skill_feedback(
+        self,
+        actor: dict[str, Any],
+        *,
+        project_id: str,
+        skill_name: str,
+        skill_version: str,
+        skill_content_hash: str,
+        decision: str,
+        qc_score: float | None = None,
+        note: str = "",
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        if decision not in {"accepted", "rejected", "revision_requested"}:
+            raise PlatformError("invalid_skill_feedback", "unsupported feedback decision")
+        if len(skill_content_hash) != 64 or any(c not in "0123456789abcdef" for c in skill_content_hash):
+            raise PlatformError("invalid_skill_feedback", "invalid Skill content hash")
+        if qc_score is not None and not 0 <= qc_score <= 1:
+            raise PlatformError("invalid_skill_feedback", "QC score must be between 0 and 1")
+        feedback_id = uid()
+        timestamp = now()
+        with connect(self.path) as c:
+            c.execute(
+                "INSERT INTO platform_skill_feedback (id,user_id,project_id,skill_name,skill_version,skill_content_hash,run_id,decision,qc_score,note,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (feedback_id, actor["id"], project_id, skill_name, skill_version, skill_content_hash, run_id, decision, qc_score, note[:2000], timestamp),
+            )
+            self._audit(c, actor["id"], "skill.feedback.recorded", "skill_feedback", feedback_id, {"skill_name": skill_name, "decision": decision})
+        return {"id": feedback_id, "project_id": project_id, "skill_name": skill_name, "skill_version": skill_version, "decision": decision, "qc_score": qc_score, "note": note[:2000]}
+
+    def list_skill_feedback(self, actor: dict[str, Any], *, project_id: str | None = None, skill_name: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 200))
+        with connect(self.path) as c:
+            rows = c.execute(
+                "SELECT id,project_id,skill_name,skill_version,skill_content_hash,run_id,decision,qc_score,note,created_at FROM platform_skill_feedback WHERE user_id=? AND (? IS NULL OR project_id=?) AND (? IS NULL OR skill_name=?) ORDER BY created_at DESC LIMIT ?",
+                (actor["id"], project_id, project_id, skill_name, skill_name, limit),
+            ).fetchall()
+        keys = ("id", "project_id", "skill_name", "skill_version", "skill_content_hash", "run_id", "decision", "qc_score", "note", "created_at")
         return [dict(zip(keys, row)) for row in rows]
 
     def estimate_media_credits(self, provider: str, model: str, media_kind: str, units: int = 1) -> dict[str, Any]:

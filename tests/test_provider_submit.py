@@ -10,7 +10,6 @@ from dataclasses import FrozenInstanceError, replace
 import pytest
 import requests
 
-from src.config import Config
 from src.models.factory import ModelFactory
 from src.models.wanx import WanxModel
 from src.utils.generation_intent import normalize_generation_intent
@@ -19,7 +18,9 @@ from src.utils.media_versions import MediaVersion
 from src.utils.model_catalog import CatalogAccessor, load_generated_model_catalog
 
 
-def test_real_factory_exposes_independent_submit():
+def test_real_factory_exposes_independent_submit(monkeypatch):
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *args, **kwargs: None)
+    from src.config import Config
     config = Config()
     config.config = {"model": {"name": "wanx"}}
     assert callable(getattr(ModelFactory.create_model(config), "submit", None))
@@ -113,7 +114,9 @@ def transport(monkeypatch):
 
 
 @pytest.fixture
-def model(transport):
+def model(transport, monkeypatch):
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *args, **kwargs: None)
+    from src.config import Config
     config = Config()
     config.config = {"model": {"name": "wanx", "params": {"seed": 777, "audio": True}}}
     return ModelFactory.create_model(config)

@@ -72,6 +72,18 @@ def test_sandbox_rejects_scripts_and_unsupported_tools():
         convert_manifest_to_snapshot(manifest)
 
 
+def test_skill_cannot_override_approval_or_cost_policy():
+    manifest = platform_manifest() | {
+        "approval_policy": "auto",
+        "cost_policy": {"max_credits": 0},
+        "allowed_models": ["unregistered-model"],
+    }
+    report = validate_skill_manifest_sandbox(manifest)
+    assert not report.allowed
+    assert {"approval_policy", "cost_policy", "allowed_models"}.issubset(report.rejected_fields)
+    with pytest.raises(ValueError, match="sandbox_rejected"):
+        convert_manifest_to_snapshot(manifest)
+
 def test_video_request_binding_changes_when_skill_snapshot_changes():
     snapshot = resolve_product_skill_snapshot("story-scout")
     request = {"client_request_id": "request-1", "model_id": "wan/wan2.7-video#i2v", "prompt": "sunrise"}
