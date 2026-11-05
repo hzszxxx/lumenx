@@ -297,3 +297,42 @@ def test_app_paid_admission_pre_submit_failures_do_not_submit(tmp_path, monkeypa
     with pytest.raises(RuntimeError):
         resolver.start_for_identity(identity)
     assert events == ["receipt"] if failure == "receipt" else events == ["receipt", "reserve"]
+
+def test_app_resolver_can_use_real_platform_credit_callback(tmp_path, monkeypatch):
+    from src.apps.atelier.paid_admission import PaidAdmissionState
+    from src.apps.atelier.paid_admission_coordinator import PaidAdmissionIdentity
+    from src.apps.comic_gen.paid_admission_composition import make_platform_credit_reserver
+    from src.apps.platform.config import PlatformConfig
+    from src.apps.platform.service import PlatformService
+
+    monkeypatch.setattr("src.apps.comic_gen.api.PlatformConfig.from_env", classmethod(lambda cls: PlatformConfig(enabled=True)))
+    platform = PlatformService(PlatformConfig(enabled=True, database_url=f"sqlite:///{tmp_path / 'credits.db'}"))
+    admin = platform.register("admin", "a" * 12, role="admin")
+    actor = platform.register("creator", "b" * 12)
+    platform.grant_credits(admin, actor["id"], 20, "test", "grant-app-1")
+    events = []
+    def callbacks(**context):
+        reserve = make_platform_credit_reserver(
+            actor_for_user=lambda user_id: actor,
+            reserve_credits=lambda *args: platform.reserve_credits(*args),
+            estimated_credits=5,
+            pricing_version="pricing-app-v1",
+        )
+        return {
+            "save_receipt": lambda identity: events.append("receipt"),
+            "reserve_credits": reserve,
+            "submit_provider": lambda identity: events.append("submit") or "handle-1",
+            "save_handle": lambda identity, handle: events.append(("handle", handle)),
+            "release_credits": lambda reservation: platform.release_credits(actor, reservation),
+            "load_receipt": lambda key: {},
+            "load_reservation": lambda key: {},
+            "query_provider": lambda handle, scope: None,
+        }
+    app = make_app(tmp_path / "app", paid_admission_callbacks_factory=callbacks)
+    identity = PaidAdmissionIdentity(actor["id"], "project-1", "attempt-1", "request-app-1")
+    result = app.state.paid_admission_request_resolver(
+        actor_user_id=actor["id"], identity=identity, project_owner_id="project-1", attempt_owner_id="attempt-1",
+    ).start_for_identity(identity)
+    assert result.state is PaidAdmissionState.SUCCEEDED
+    assert events == ["receipt", "submit", ("handle", "handle-1")]
+    assert platform.credit_balance(actor)["available_credits"] == 15
