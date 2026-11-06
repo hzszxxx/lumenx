@@ -524,7 +524,7 @@
     "editor": "剧本编辑器",
     "playground": "创作台",
     "settings": "设置",
-    "workspaceAria": "LumenX Studio · 工作区",
+    "workspaceAria": "YingBan Studio · 工作区",
     "mainNavAria": "主导航",
     "atelier": "Atelier",
     "platform": "平台"
@@ -2383,9 +2383,9 @@
   },
   "appAccess": {
     "checkingTitle": "正在检查应用访问权限",
-    "checkingBody": "LumenX 会先确认本地会话，再打开工作区。",
+    "checkingBody": "YingBan 会先确认本地会话，再打开工作区。",
     "checkingStatus": "正在检查会话…",
-    "unlockTitle": "解锁 LumenX",
+    "unlockTitle": "解锁 YingBan",
     "unlockBody": "请输入此后端的应用访问令牌。Provider API Key 会在解锁后单独配置。",
     "tokenLabel": "访问令牌",
     "tokenPlaceholder": "输入访问令牌",
@@ -2393,7 +2393,7 @@
     "unlocking": "正在解锁…",
     "retry": "重试",
     "sessionError": "无法检查应用访问权限，请重试。",
-    "loginFailed": "无法解锁 LumenX，请检查令牌后重试。",
+    "loginFailed": "无法解锁 YingBan，请检查令牌后重试。",
     "expired": "会话已过期，请解锁后继续。"
   },
   "atelier": {
@@ -3000,7 +3000,7 @@
       "save": "保存"
     },
     "foundation": {
-      "title": "LumenX Atelier",
+      "title": "YingBan Atelier",
       "subtitle": "Graph-first 创作工作台",
       "returnWorkspace": "返回工作区",
       "createProject": "创建项目",

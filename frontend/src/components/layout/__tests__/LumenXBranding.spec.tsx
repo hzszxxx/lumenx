@@ -19,7 +19,7 @@ describe('LumenXBranding public logo assets', () => {
     it('renders the default dark logo under the configured app base path', () => {
         render(<LumenXBranding showSlogan={false} />);
 
-        expect(screen.getByAltText('LumenX')).toHaveAttribute('src', '/static/logo-dark.png');
+        expect(screen.getByAltText('YingBan')).toHaveAttribute('src', '/static/yingban-logo.png');
     });
 
     it('renders the selected light theme logo under the configured app base path after mount', async () => {
@@ -28,7 +28,7 @@ describe('LumenXBranding public logo assets', () => {
         render(<LumenXBranding showSlogan={false} />);
 
         await waitFor(() => {
-            expect(screen.getByAltText('LumenX')).toHaveAttribute('src', '/static/logo-light.png');
+            expect(screen.getByAltText('YingBan')).toHaveAttribute('src', '/static/yingban-logo.png');
         });
     });
 });

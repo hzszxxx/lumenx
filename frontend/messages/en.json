@@ -524,7 +524,7 @@
     "editor": "Script Editor",
     "playground": "Playground",
     "settings": "Settings",
-    "workspaceAria": "LumenX Studio · Workspace",
+    "workspaceAria": "YingBan Studio · Workspace",
     "mainNavAria": "Main navigation",
     "atelier": "Atelier",
     "platform": "Platform"
@@ -2383,9 +2383,9 @@
   },
   "appAccess": {
     "checkingTitle": "Checking app access",
-    "checkingBody": "LumenX is confirming the local session before opening the workspace.",
+    "checkingBody": "YingBan is confirming the local session before opening the workspace.",
     "checkingStatus": "Checking session…",
-    "unlockTitle": "Unlock LumenX",
+    "unlockTitle": "Unlock YingBan",
     "unlockBody": "Enter the app access token for this backend. Provider API keys are configured separately after unlock.",
     "tokenLabel": "Access token",
     "tokenPlaceholder": "Enter access token",
@@ -2393,7 +2393,7 @@
     "unlocking": "Unlocking…",
     "retry": "Retry",
     "sessionError": "Could not check app access. Try again.",
-    "loginFailed": "Could not unlock LumenX. Check the token and try again.",
+    "loginFailed": "Could not unlock YingBan. Check the token and try again.",
     "expired": "Session expired. Unlock to continue."
   },
   "atelier": {
@@ -3000,7 +3000,7 @@
       "save": "Save"
     },
     "foundation": {
-      "title": "LumenX Atelier",
+      "title": "YingBan Atelier",
       "subtitle": "Graph-first creation workspace",
       "returnWorkspace": "Return to workspace",
       "createProject": "Create project",

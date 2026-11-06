@@ -36,7 +36,7 @@ export default function BrandMark({ size = 18, className }: BrandMarkProps) {
       height={size}
       viewBox="0 0 18 18"
       role="img"
-      aria-label="LumenX"
+      aria-label="YingBan"
       className={className}
     >
       <defs>

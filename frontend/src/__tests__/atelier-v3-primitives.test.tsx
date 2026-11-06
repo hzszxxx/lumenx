@@ -291,7 +291,7 @@ describe("Atelier V3 primitives", () => {
       </>,
     );
 
-    expect(screen.getByRole("img", { name: "LumenX" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "YingBan" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
     fireEvent.click(screen.getByRole("button", { name: "Fit to view" }));
