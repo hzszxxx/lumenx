@@ -89,7 +89,7 @@ skill_feedback     采纳/拒绝、QC、返修、成本和用户备注
 
 当前持久化切片使用 `007_skill_registry.sql` 建立 Skill 版本和绑定表；它只保存经过哈希校验的 manifest JSON，不保存脚本路径、命令、凭证引用或 Provider handle。Skill API 已提供创建、列表、绑定和解析入口，前端工作台已提供账户级/项目级绑定界面。`skill_runtime.py` 负责静态沙箱检查、平台 manifest 到 Atelier snapshot 的严格转换，以及生成请求的 Skill 快照绑定；它不执行外部脚本。生成 attempt 现在保存 Skill binding，Agent loop 支持由组合根注入平台 manifest resolver，重启读回继续使用原绑定。隔离 worker 和反馈优化仍未实现。
 
-平台注册使用 `registration_invites` 邀请码表；生产 `PlatformConfig.from_env()` 默认要求邀请码，服务端在同一事务内校验有效期/剩余次数并消费邀请码后才创建用户。管理员可通过 `/api/platform/auth/invites` 创建和查看邀请码；邀请码只保存代码、次数和审计元数据，不保存短信验证码或明文凭证。测试夹具可显式关闭 `registration_invite_required`，不改变生产默认。
+平台注册使用 `registration_invites` 邀请码表；生产 `PlatformConfig.from_env()` 默认要求邀请码，服务端在同一事务内校验有效期/剩余次数并消费邀请码后才创建用户。管理员可通过 `/api/platform/auth/invites` 创建和查看邀请码；邀请码只保存代码、次数和审计元数据，不保存短信验证码或明文凭证。测试夹具可显式关闭 `registration_invite_required`，不改变生产默认。远程应用访问短码兑换出的会话可在首次平台注册时携带其哈希，服务端通过 `platform_test_access_bindings` 将该短码与一个平台用户绑定，并仅对该次测试注册免邀请码；长令牌、匿名请求和已绑定短码仍不能绕过注册门禁。
 
 首次部署没有管理员时，使用受控初始化命令 `scripts/bootstrap_platform_admin.py` 创建第一个 admin；该命令通过独立配置显式关闭邀请码限制，仅用于一次性 bootstrap，不开放为公共 API。
 

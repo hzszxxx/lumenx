@@ -331,6 +331,29 @@ def test_remote_test_code_exchanges_once_for_cookie_session(tmp_path, monkeypatc
         assert restarted.status_code == 401
 
 
+def test_test_access_session_allows_first_platform_registration_without_invite(tmp_path, monkeypatch):
+    monkeypatch.setenv("LUMENX_PLATFORM_ENABLED", "true")
+    monkeypatch.setenv("LUMENX_PLATFORM_REGISTRATION_INVITE_REQUIRED", "true")
+    monkeypatch.setenv("LUMENX_PLATFORM_DB_URL", f"sqlite:///{tmp_path / 'platform.db'}")
+    code = "ZX98CV76BN"
+    monkeypatch.setenv("LUMENX_ACCESS_CODES", code)
+    with make_remote_client(tmp_path) as client:
+        login = client.post("/auth/session", json={"token": code}, headers={"Origin": "https://studio.example"})
+        assert login.status_code == 200
+        created = client.post(
+            "/api/platform/auth/register",
+            json={"username": "tester", "password": "t" * 12},
+            headers={"Origin": "https://studio.example"},
+        )
+        assert created.status_code == 200, created.text
+        duplicate = client.post(
+            "/api/platform/auth/register",
+            json={"username": "tester-two", "password": "u" * 12},
+            headers={"Origin": "https://studio.example"},
+        )
+        assert duplicate.status_code == 409
+
+
 def test_remote_login_sets_secure_http_only_cookie_for_media_range(tmp_path):
     write_media(tmp_path / "media", "video/out.mp4", b"0123456789abcdef")
     with make_remote_client(tmp_path) as client:

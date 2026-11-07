@@ -132,7 +132,9 @@ IdempotencyKey = Header(..., alias="Idempotency-Key", min_length=8, max_length=2
 
 
 @router.post("/auth/register")
-def register(body: RegisterIn, svc: PlatformService = Depends(service)): return handle(lambda: svc.register(body.username, body.password, body.email, invite_code=body.invite_code))
+def register(request: Request, body: RegisterIn, svc: PlatformService = Depends(service)):
+    test_access_code_hash = getattr(request.state, "lumenx_test_access_code_hash", None)
+    return handle(lambda: svc.register(body.username, body.password, body.email, invite_code=body.invite_code, test_access_code_hash=test_access_code_hash))
 
 @router.post("/auth/invites")
 def create_registration_invite(body: RegistrationInviteIn, user=Depends(current_user), svc: PlatformService = Depends(service)):

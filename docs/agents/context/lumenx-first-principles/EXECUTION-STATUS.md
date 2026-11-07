@@ -348,3 +348,11 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 分支/提交：`feature/skill-runtime-production` / `e1479b2`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_admin_api.py tests/test_platform_skill_api.py -q`（5 passed）；`npm --prefix frontend run typecheck`（通过）。
 - 证据边界：该切片仍未提供全量审计筛选、用户密码重置、批量运营报表、真实支付/提现或生产级多管理员工作流；前端管理入口已经独立，但平台 API 仍由同一 FastAPI 组合根装配。
+
+## 2026-11-07 测试短码与平台注册边界切片
+
+远程应用访问短码兑换出的会话现在可以在首次平台注册时免重复输入邀请码；后端将短码哈希与平台用户写入 `platform_test_access_bindings`，同一短码只能绑定一个账户。普通长令牌、匿名请求和已绑定短码继续受生产邀请码门禁保护；前端已在已解锁测试会话中隐藏邀请码输入。
+
+- 责任文件：`src/utils/app_access.py`、`src/apps/comic_gen/api.py`、`src/apps/platform/migrations/016_test_access_bindings.sql`、`src/apps/platform/service.py`、`src/apps/platform/api.py`、`frontend/src/components/platform/PlatformPortal.tsx`、`frontend/src/lib/platformApi.ts`、`frontend/src/store/platformStore.ts`。
+- 验证：访问边界、平台 service/API 回归 54 项通过；前端 typecheck 通过；文档结构检查通过。
+- 证据边界：该切片只解决测试短码与首次平台注册的重复输入；不改变普通生产注册的邀请策略，也不建立完整账号生命周期或短信验证。

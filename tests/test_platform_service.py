@@ -61,6 +61,17 @@ def test_registration_requires_single_use_invite_when_enabled(tmp_path):
         raise AssertionError("single-use invite was reused")
 
 
+def test_test_access_binding_bypasses_invite_once(tmp_path):
+    path = tmp_path / "platform.db"
+    svc = PlatformService(PlatformConfig(enabled=True, database_url=f"sqlite:///{path}", registration_invite_required=True))
+    access_hash = "a" * 64
+    created = svc.register("tester", "t" * 12, test_access_code_hash=access_hash)
+    assert created["username"] == "tester"
+    with pytest.raises(PlatformError, match="already bound") as exc_info:
+        svc.register("tester-two", "u" * 12, test_access_code_hash=access_hash)
+    assert exc_info.value.code == "test_access_already_registered"
+
+
 def test_token_usage_is_recorded_and_summarized_per_platform_user(tmp_path):
     svc = service(tmp_path)
     user = svc.register("alice", "a" * 12)

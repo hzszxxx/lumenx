@@ -61,11 +61,13 @@ class AppAccessState:
     sessions: dict[str, float] = field(default_factory=dict)
     used_access_codes: set[str] = field(default_factory=set, repr=False)
     access_code_store_path: str | None = field(default=None, repr=False)
+    session_access_code_hashes: dict[str, str] = field(default_factory=dict, repr=False)
 
     def configure(self, config: AppAccessConfig) -> None:
         self.config = config
         self.sessions.clear()
         self.used_access_codes.clear()
+        self.session_access_code_hashes.clear()
 
     def configure_access_code_store(self, path: str | os.PathLike[str] | None) -> None:
         self.access_code_store_path = str(path) if path else None
@@ -105,19 +107,27 @@ class AppAccessState:
         self.used_access_codes.add(code)
         return True
 
+    def access_code_hash_for_session(self, sid: str | None) -> str | None:
+        if not self.validate_session(sid):
+            return None
+        return self.session_access_code_hashes.get(sid or "")
+
     def cleanup(self, *, now: float | None = None) -> None:
         current = time.time() if now is None else now
         expired = [sid for sid, expires_at in self.sessions.items() if expires_at <= current]
         for sid in expired:
             self.sessions.pop(sid, None)
+            self.session_access_code_hashes.pop(sid, None)
         while len(self.sessions) > self.config.max_sessions:
             oldest = min(self.sessions, key=self.sessions.get)
             self.sessions.pop(oldest, None)
 
-    def create_session(self) -> str:
+    def create_session(self, *, access_code_hash: str | None = None) -> str:
         self.cleanup()
         sid = secrets.token_urlsafe(32)
         self.sessions[sid] = time.time() + self.config.session_ttl_seconds
+        if access_code_hash:
+            self.session_access_code_hashes[sid] = access_code_hash
         self.cleanup()
         return sid
 
@@ -134,6 +144,7 @@ class AppAccessState:
     def revoke_session(self, sid: str | None) -> None:
         if sid:
             self.sessions.pop(sid, None)
+            self.session_access_code_hashes.pop(sid, None)
 
 
 def _constant_time_equal(left: str, right: str) -> bool:
@@ -410,16 +421,20 @@ def _ok_session(auth_required: bool, authenticated: bool) -> JSONResponse:
     return JSONResponse({"auth_required": auth_required, "authenticated": authenticated})
 
 
-def _mark_scope(scope: Scope, *, authenticated: bool, method: str | None = None) -> None:
+def _mark_scope(scope: Scope, *, authenticated: bool, method: str | None = None, test_access_code_hash: str | None = None) -> None:
     state_obj = scope.setdefault("state", {})
     if isinstance(state_obj, dict):
         state_obj["lumenx_authenticated"] = authenticated
         if method:
             state_obj["lumenx_auth_method"] = method
+        if test_access_code_hash:
+            state_obj["lumenx_test_access_code_hash"] = test_access_code_hash
     else:
         setattr(state_obj, "lumenx_authenticated", authenticated)
         if method:
             setattr(state_obj, "lumenx_auth_method", method)
+        if test_access_code_hash:
+            setattr(state_obj, "lumenx_test_access_code_hash", test_access_code_hash)
 
 
 class LumenXAccessMiddleware:
@@ -451,8 +466,9 @@ class LumenXAccessMiddleware:
 
         fetch_site = headers.get("sec-fetch-site")
         auth = self._authenticate(headers)
+        access_code_hash = self.state.access_code_hash_for_session(_cookies(headers).get(SESSION_COOKIE_NAME)) if auth[1] == "cookie" else None
         if auth[0]:
-            _mark_scope(scope, authenticated=True, method=auth[1])
+            _mark_scope(scope, authenticated=True, method=auth[1], test_access_code_hash=access_code_hash)
         else:
             _mark_scope(scope, authenticated=False)
 
@@ -575,14 +591,17 @@ class LumenXAccessMiddleware:
         tokens = self.state.config.tokens or ((self.state.config.token,) if self.state.config.token else ())
         token_ok = isinstance(provided, str) and any(_constant_time_equal(provided, expected) for expected in tokens)
         code_ok = False
+        access_code_hash = None
         if isinstance(provided, str):
             normalized_code = provided.strip().upper()
             if _ACCESS_CODE_RE.fullmatch(normalized_code):
                 code_ok = self.state.consume_access_code(normalized_code)
+                if code_ok:
+                    access_code_hash = hashlib.sha256(normalized_code.encode("utf-8")).hexdigest()
         if not token_ok and not code_ok:
             await self._send_response(scope, _unauthorized(), send, origin=origin)
             return
-        sid = self.state.create_session()
+        sid = self.state.create_session(access_code_hash=access_code_hash)
         response = _ok_session(True, True)
         response.set_cookie(
             SESSION_COOKIE_NAME,

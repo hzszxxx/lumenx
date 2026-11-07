@@ -73,13 +73,13 @@ class PlatformService:
     def _audit(self, c: sqlite3.Connection, actor: str | None, event: str, entity: str, entity_id: str | None, payload: dict[str, Any]) -> None:
         c.execute("INSERT INTO audit_events_ext VALUES (?,?,?,?,?,?,?,?)", (uid(), actor, uid(), event, entity, entity_id, json.dumps(payload), now()))
 
-    def register(self, username: str, password: str, email: str | None = None, role: str = "user", invite_code: str | None = None) -> dict[str, Any]:
+    def register(self, username: str, password: str, email: str | None = None, role: str = "user", invite_code: str | None = None, test_access_code_hash: str | None = None) -> dict[str, Any]:
         if len(password) < self.config.password_min_length: raise PlatformError("weak_password", "password is too short")
         if role not in {"user", "creator", "reviewer", "client", "admin"}: raise PlatformError("invalid_role", "unsupported role")
         digest, salt = hash_password(password); user_id = uid(); timestamp = now()
         try:
             with connect(self.path) as c:
-                if self.config.registration_invite_required:
+                if self.config.registration_invite_required and not test_access_code_hash:
                     normalized = (invite_code or "").strip().upper()
                     if not normalized:
                         raise PlatformError("invite_required", "a valid invitation code is required", 422)
@@ -89,7 +89,17 @@ class PlatformService:
                     )
                     if claimed.rowcount != 1:
                         raise PlatformError("invalid_invite", "invitation code is invalid, expired, or already used", 422)
+                if test_access_code_hash and c.execute(
+                    "SELECT 1 FROM platform_test_access_bindings WHERE access_code_hash=?",
+                    (test_access_code_hash,),
+                ).fetchone():
+                    raise PlatformError("test_access_already_registered", "this test access code is already bound to an account", 409)
                 c.execute("INSERT INTO platform_users VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, username, email, None, digest, salt, username, role, 1, timestamp, timestamp))
+                if test_access_code_hash:
+                    c.execute(
+                        "INSERT INTO platform_test_access_bindings(access_code_hash,user_id,created_at) VALUES (?,?,?)",
+                        (test_access_code_hash, user_id, timestamp),
+                    )
                 if role == "creator": c.execute("INSERT INTO creator_certifications VALUES (?,?,?,?,?,?,?,?,?,?)", (uid(), user_id, "unapplied", "standard", "direct_exam", None, None, None, None, timestamp))
                 self._audit(c, user_id, "user.registered", "user", user_id, {"role": role})
         except sqlite3.IntegrityError as exc: raise PlatformError("user_exists", "username or email already exists", 409) from exc
