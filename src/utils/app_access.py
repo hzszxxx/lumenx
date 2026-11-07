@@ -38,6 +38,7 @@ class _BodyTooLarge(Exception):
 class AppAccessConfig:
     mode: str = "local"
     token: str | None = field(default=None, repr=False)
+    tokens: tuple[str, ...] = field(default=(), repr=False)
     allowed_origins: tuple[str, ...] = ()
     session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     max_sessions: int = DEFAULT_MAX_SESSIONS
@@ -147,6 +148,18 @@ def _validate_token(mode: str, token: str | None) -> str | None:
     return candidate
 
 
+def _validate_tokens(mode: str, tokens: str | Iterable[str] | None) -> tuple[str, ...]:
+    if tokens is None:
+        return ()
+    raw = tokens.split(",") if isinstance(tokens, str) else list(tokens)
+    validated = []
+    for item in raw:
+        candidate = _validate_token(mode, str(item))
+        if candidate and candidate not in validated:
+            validated.append(candidate)
+    return tuple(validated)
+
+
 def resolve_app_access_config(
     *,
     mode: str | None = None,
@@ -161,13 +174,21 @@ def resolve_app_access_config(
         resolved_mode,
         token if token is not None else os.getenv("LUMENX_ACCESS_TOKEN"),
     )
+    configured_tokens = _validate_tokens(
+        resolved_mode,
+        os.getenv("LUMENX_ACCESS_TOKENS"),
+    )
+    resolved_tokens = tuple(dict.fromkeys((resolved_token,) + configured_tokens if resolved_token else configured_tokens))
+    if resolved_mode == "remote" and not resolved_tokens:
+        raise ValueError("LUMENX_ACCESS_TOKEN or LUMENX_ACCESS_TOKENS must contain at least one token")
     env_origins = os.getenv("LUMENX_ACCESS_ALLOWED_ORIGINS")
     resolved_cookie_secure = True if cookie_secure is None else bool(cookie_secure)
     if resolved_mode == "remote" and not resolved_cookie_secure:
         raise ValueError("LUMENX_ACCESS_COOKIE_SECURE must remain true in remote mode")
     return AppAccessConfig(
         mode=resolved_mode,
-        token=resolved_token,
+        token=resolved_tokens[0] if resolved_tokens else None,
+        tokens=resolved_tokens,
         allowed_origins=_split_origins(allowed_origins if allowed_origins is not None else env_origins),
         session_ttl_seconds=_validate_positive_int(
             session_ttl_seconds,
@@ -418,13 +439,13 @@ class LumenXAccessMiddleware:
         await self._call_app(scope, receive, send, origin=origin)
 
     def _authenticate(self, headers: dict[str, str]) -> tuple[bool, str | None]:
-        token = self.state.config.token or ""
+        tokens = self.state.config.tokens or ((self.state.config.token,) if self.state.config.token else ())
         authorization = headers.get("authorization") or ""
         if authorization:
             scheme, _, value = authorization.partition(" ")
             if scheme.lower() != "bearer" or not value:
                 return False, None
-            if _constant_time_equal(value, token):
+            if any(_constant_time_equal(value, expected) for expected in tokens):
                 return True, "bearer"
             if self.external_bearer_authenticator is not None:
                 try:
@@ -484,8 +505,8 @@ class LumenXAccessMiddleware:
             await self._send_response(scope, _unauthorized(), send, origin=origin)
             return
         provided = payload.get("token") if isinstance(payload, dict) else None
-        expected = self.state.config.token or ""
-        if not isinstance(provided, str) or not _constant_time_equal(provided, expected):
+        tokens = self.state.config.tokens or ((self.state.config.token,) if self.state.config.token else ())
+        if not isinstance(provided, str) or not any(_constant_time_equal(provided, expected) for expected in tokens):
             await self._send_response(scope, _unauthorized(), send, origin=origin)
             return
         sid = self.state.create_session()

@@ -5,7 +5,7 @@
 ## 运行方式
 
 - `LUMENX_ACCESS_MODE=local`（默认）：本机桌面/开发无需访问令牌。同 hostname 的开发端口可访问 API；例如 `http://127.0.0.1:3008` → `http://127.0.0.1:17177`。本地模式没有账户认证，应绑定可信的本地接口。
-- `LUMENX_ACCESS_MODE=remote`：启动时必须有至少 32 UTF-8 bytes 的 `LUMENX_ACCESS_TOKEN`，否则启动失败。该值是部署者生成的随机访问凭据，与 DashScope 等模型供应商密钥无关。
+- `LUMENX_ACCESS_MODE=remote`：启动时必须有至少一个至少 32 UTF-8 bytes 的 `LUMENX_ACCESS_TOKEN` 或 `LUMENX_ACCESS_TOKENS`（逗号分隔），否则启动失败。多令牌用于并行测试用户；每个令牌都能建立独立的内存会话。访问令牌与 DashScope 等模型供应商密钥无关。
 - 远程浏览器/桌面 webview 通过 HTTPS 同源应用入口登录；服务设置 Secure + HttpOnly + SameSite=Strict、Path=/ 的 `__Host-lumenx_session` cookie。页面请求和普通媒体 URL 共用此会话。令牌不得放到 URL、NEXT_PUBLIC_*、项目数据或持久化前端 store。
 - `LUMENX_ACCESS_ALLOWED_ORIGINS` 可列出逗号分隔的明确 http(s) origin，不能用通配符、路径或不透明 origin。允许 CORS 本身不保证跨站 cookie 可用；本阶段推荐并验证同源拓扑，跨站部署另行验收。
 - CLI 可对受保护接口发送 `Authorization: Bearer ...`。浏览器通过会话 cookie；不把 Bearer 塞进媒体 URL。

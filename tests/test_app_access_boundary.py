@@ -303,6 +303,16 @@ def test_remote_accepts_bearer_token_and_rejects_wrong_token_without_leak(tmp_pa
         assert TOKEN not in wrong.text
 
 
+def test_remote_accepts_multiple_configured_tokens(tmp_path, monkeypatch):
+    second = "second-access-" * 3
+    monkeypatch.setenv("LUMENX_ACCESS_TOKENS", f"{TOKEN},{second}")
+    with make_remote_client(tmp_path) as client:
+        for candidate in (TOKEN, second):
+            response = client.get("/projects/", headers={"Authorization": f"Bearer {candidate}"})
+            assert response.status_code == 200
+        assert client.get("/projects/", headers={"Authorization": "Bearer invalid"}).status_code == 401
+
+
 def test_remote_login_sets_secure_http_only_cookie_for_media_range(tmp_path):
     write_media(tmp_path / "media", "video/out.mp4", b"0123456789abcdef")
     with make_remote_client(tmp_path) as client:
