@@ -560,6 +560,7 @@ def _configure_runtime(
                 session_ttl_seconds=access_session_ttl_seconds,
                 max_sessions=access_max_sessions,
                 cookie_secure=access_cookie_secure,
+                access_code_store_path=(user_root or output_dir.parent) / ".runtime" / "access_code_redemptions.sqlite3",
             )
         _ensure_output_dirs(output_dir)
         from .pipeline import ComicGenPipeline

@@ -9,11 +9,14 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import sqlite3
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Any
 from urllib.parse import urlsplit, urlunsplit
 import re
+import hashlib
+from pathlib import Path
 from starlette.datastructures import MutableHeaders
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -57,14 +60,47 @@ class AppAccessState:
     config: AppAccessConfig = field(default_factory=AppAccessConfig)
     sessions: dict[str, float] = field(default_factory=dict)
     used_access_codes: set[str] = field(default_factory=set, repr=False)
+    access_code_store_path: str | None = field(default=None, repr=False)
 
     def configure(self, config: AppAccessConfig) -> None:
         self.config = config
         self.sessions.clear()
         self.used_access_codes.clear()
 
+    def configure_access_code_store(self, path: str | os.PathLike[str] | None) -> None:
+        self.access_code_store_path = str(path) if path else None
+        if self.access_code_store_path:
+            store = Path(self.access_code_store_path)
+            store.parent.mkdir(parents=True, exist_ok=True)
+            with sqlite3.connect(store) as db:
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS redeemed_access_codes (code_hash TEXT PRIMARY KEY, redeemed_at REAL NOT NULL)"
+                )
+                db.commit()
+
     def consume_access_code(self, code: str) -> bool:
-        if code not in self.config.access_codes or code in self.used_access_codes:
+        if code not in self.config.access_codes:
+            return False
+        if self.access_code_store_path:
+            digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+            try:
+                with sqlite3.connect(self.access_code_store_path, timeout=10.0) as db:
+                    db.execute("BEGIN IMMEDIATE")
+                    if db.execute(
+                        "SELECT 1 FROM redeemed_access_codes WHERE code_hash=?",
+                        (digest,),
+                    ).fetchone():
+                        db.rollback()
+                        return False
+                    db.execute(
+                        "INSERT INTO redeemed_access_codes(code_hash, redeemed_at) VALUES (?, ?)",
+                        (digest, time.time()),
+                    )
+                    db.commit()
+                    return True
+            except sqlite3.IntegrityError:
+                return False
+        if code in self.used_access_codes:
             return False
         self.used_access_codes.add(code)
         return True
@@ -242,6 +278,7 @@ def configure_app_access(
     session_ttl_seconds: int | None = None,
     max_sessions: int | None = None,
     cookie_secure: bool | None = None,
+    access_code_store_path: str | os.PathLike[str] | None = None,
 ) -> AppAccessConfig:
     config = resolve_app_access_config(
         mode=mode,
@@ -252,6 +289,7 @@ def configure_app_access(
         cookie_secure=cookie_secure,
     )
     state.configure(config)
+    state.configure_access_code_store(access_code_store_path)
     return config
 
 
