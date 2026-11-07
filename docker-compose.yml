@@ -12,6 +12,21 @@ services:
       - lumenx_user_data:/var/lib/lumenx
       # Preserve existing host projects while persisting configuration/logs too.
       - ./output:/var/lib/lumenx/output
+    command:
+      - python
+      - -m
+      - src.lumenx_server
+      - --data-dir
+      - /var/lib/lumenx
+      - --host
+      - 0.0.0.0
+      - --port
+      - "17177"
+      - --trusted-proxy-ips
+      - 127.0.0.1,172.29.0.3
+    networks:
+      default:
+        ipv4_address: 172.29.0.2
     ports:
       - "127.0.0.1:17177:17177"
     restart: unless-stopped
@@ -24,6 +39,9 @@ services:
       - "127.0.0.1:3000:80"
     depends_on:
       - backend
+    networks:
+      default:
+        ipv4_address: 172.29.0.3
     restart: unless-stopped
 
   redis:
@@ -129,3 +147,10 @@ volumes:
   lumenx_redis_data:
   lumenx_postgres_data:
   lumenx_prometheus_data:
+
+networks:
+  default:
+    name: lumenx_default
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
