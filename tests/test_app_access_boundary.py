@@ -313,6 +313,19 @@ def test_remote_accepts_multiple_configured_tokens(tmp_path, monkeypatch):
         assert client.get("/projects/", headers={"Authorization": "Bearer invalid"}).status_code == 401
 
 
+def test_remote_test_code_exchanges_once_for_cookie_session(tmp_path, monkeypatch):
+    code = "AB12CD34EF"
+    monkeypatch.setenv("LUMENX_ACCESS_CODES", code)
+    with make_remote_client(tmp_path) as client:
+        first = client.post("/auth/session", json={"token": code}, headers={"Origin": "https://studio.example"})
+        assert first.status_code == 200
+        assert client.get("/projects/").status_code == 200
+        second = client.post("/auth/session", json={"token": code}, headers={"Origin": "https://studio.example"})
+        assert second.status_code == 401
+        bearer = client.get("/projects/", headers={"Authorization": f"Bearer {code}"})
+        assert bearer.status_code == 401
+
+
 def test_remote_login_sets_secure_http_only_cookie_for_media_range(tmp_path):
     write_media(tmp_path / "media", "video/out.mp4", b"0123456789abcdef")
     with make_remote_client(tmp_path) as client:

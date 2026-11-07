@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Any
 from urllib.parse import urlsplit, urlunsplit
+import re
 from starlette.datastructures import MutableHeaders
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -28,6 +29,7 @@ _CORS_METHODS = "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
 _CORS_HEADERS = "Authorization, Content-Type, Range, X-LumenX-Environment, X-LumenX-Product"
 _EXPOSE_HEADERS = "Content-Disposition, Content-Range, Accept-Ranges"
 _MAX_LOGIN_BODY_BYTES = 4096
+_ACCESS_CODE_RE = re.compile(r"^[A-Z0-9]{10}$")
 
 
 class _BodyTooLarge(Exception):
@@ -39,6 +41,7 @@ class AppAccessConfig:
     mode: str = "local"
     token: str | None = field(default=None, repr=False)
     tokens: tuple[str, ...] = field(default=(), repr=False)
+    access_codes: tuple[str, ...] = field(default=(), repr=False)
     allowed_origins: tuple[str, ...] = ()
     session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     max_sessions: int = DEFAULT_MAX_SESSIONS
@@ -53,10 +56,18 @@ class AppAccessConfig:
 class AppAccessState:
     config: AppAccessConfig = field(default_factory=AppAccessConfig)
     sessions: dict[str, float] = field(default_factory=dict)
+    used_access_codes: set[str] = field(default_factory=set, repr=False)
 
     def configure(self, config: AppAccessConfig) -> None:
         self.config = config
         self.sessions.clear()
+        self.used_access_codes.clear()
+
+    def consume_access_code(self, code: str) -> bool:
+        if code not in self.config.access_codes or code in self.used_access_codes:
+            return False
+        self.used_access_codes.add(code)
+        return True
 
     def cleanup(self, *, now: float | None = None) -> None:
         current = time.time() if now is None else now
@@ -160,6 +171,22 @@ def _validate_tokens(mode: str, tokens: str | Iterable[str] | None) -> tuple[str
     return tuple(validated)
 
 
+def _validate_access_codes(mode: str, codes: str | Iterable[str] | None) -> tuple[str, ...]:
+    if codes is None:
+        return ()
+    if mode != "remote":
+        return ()
+    raw = codes.split(",") if isinstance(codes, str) else list(codes)
+    validated = []
+    for item in raw:
+        candidate = str(item).strip().upper()
+        if not _ACCESS_CODE_RE.fullmatch(candidate):
+            raise ValueError("LUMENX_ACCESS_CODES must contain unique 10-character A-Z/0-9 codes")
+        if candidate not in validated:
+            validated.append(candidate)
+    return tuple(validated)
+
+
 def resolve_app_access_config(
     *,
     mode: str | None = None,
@@ -179,6 +206,7 @@ def resolve_app_access_config(
         os.getenv("LUMENX_ACCESS_TOKENS"),
     )
     resolved_tokens = tuple(dict.fromkeys((resolved_token,) + configured_tokens if resolved_token else configured_tokens))
+    resolved_codes = _validate_access_codes(resolved_mode, os.getenv("LUMENX_ACCESS_CODES"))
     if resolved_mode == "remote" and not resolved_tokens:
         raise ValueError("LUMENX_ACCESS_TOKEN or LUMENX_ACCESS_TOKENS must contain at least one token")
     env_origins = os.getenv("LUMENX_ACCESS_ALLOWED_ORIGINS")
@@ -189,6 +217,7 @@ def resolve_app_access_config(
         mode=resolved_mode,
         token=resolved_tokens[0] if resolved_tokens else None,
         tokens=resolved_tokens,
+        access_codes=resolved_codes,
         allowed_origins=_split_origins(allowed_origins if allowed_origins is not None else env_origins),
         session_ttl_seconds=_validate_positive_int(
             session_ttl_seconds,
@@ -506,7 +535,13 @@ class LumenXAccessMiddleware:
             return
         provided = payload.get("token") if isinstance(payload, dict) else None
         tokens = self.state.config.tokens or ((self.state.config.token,) if self.state.config.token else ())
-        if not isinstance(provided, str) or not any(_constant_time_equal(provided, expected) for expected in tokens):
+        token_ok = isinstance(provided, str) and any(_constant_time_equal(provided, expected) for expected in tokens)
+        code_ok = False
+        if isinstance(provided, str):
+            normalized_code = provided.strip().upper()
+            if _ACCESS_CODE_RE.fullmatch(normalized_code):
+                code_ok = self.state.consume_access_code(normalized_code)
+        if not token_ok and not code_ok:
             await self._send_response(scope, _unauthorized(), send, origin=origin)
             return
         sid = self.state.create_session()
