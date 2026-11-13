@@ -10,6 +10,7 @@
 | artifact 不可变快照 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_artifact_snapshot_is_immutable_and_rejects_client_url_only_evidence` | Gate 0 合同通过 |
 | Core artifact resolver 查找/解析合同 | `src/core/artifact_resolver.py` | `tests/test_artifact_resolver_contract.py`；`tests/test_core_dependency_boundaries.py` | S1 中性合同通过；Studio/Atelier adapter 与平台接线仍待完成 |
 | Studio/Atelier artifact resolver adapters | `src/apps/comic_gen/artifact_resolver.py`；`src/apps/atelier/artifact_resolver.py` | `tests/test_artifact_resolver_adapters.py` | 只读 adapter 合同通过；所有权映射、真实媒体 probe 和平台接线仍待完成 |
+| 显式平台项目绑定 | `platform_project_bindings`; `/api/platform/admin/project-bindings` | `tests/test_platform_project_bindings.py` | 管理员创建/撤销、用户隔离、storage_id 约束和 API 管理边界通过；尚未接入 resolver ownership callback |
 | 幂等上下文与整数分账本字段 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_idempotency_and_ledger_contracts_reject_invalid_values` | Gate 0 合同通过 |
 | SQLite 迁移与恢复 | `src/apps/platform/db.py` | `tests/test_platform_db.py` | Sprint 1 第一切片通过 |
 | 账户会话、撤销、角色授权 | `src/apps/platform/service.py` + `api.py` | `tests/test_platform_service.py::test_auth_session_revocation_and_password_policy` | Sprint 1 通过 |

@@ -364,3 +364,11 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 分支/提交：`feature/skill-runtime-production` / `dafdb2a`（文档整理）；S1 Core 合同为 `a6bde25`，产品只读 adapter 为 `9e4f5b4`。
 - 验证：文档结构检查及回归通过；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（36 passed）。
 - 证据边界：Studio/Atelier adapter 仅在注入所有权检查和媒体证明时解析成果；当前没有平台用户到项目的现有归属映射，未接入平台赛事提交和任务交付；没有改变真实生成、支付或生产部署行为。
+
+## 2026-11-13 显式平台项目绑定切片
+
+新增 `017_project_bindings.sql` 和管理员项目绑定 API。平台现在可以按用户、产品、项目和可选 `storage_id` 保存 active/revoked 归属记录；创建/撤销写入审计事件，重复创建同一 active binding 返回幂等回执，resolver 可通过 `is_project_bound` 只读查询。该切片不允许普通用户自助认领项目，也未把 binding 自动接入提交接口。
+
+- 分支/提交：`feature/skill-runtime-production` / `a254ec3`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_project_bindings.py tests/test_platform_contracts.py tests/test_platform_service.py tests/test_platform_admin_api.py tests/test_core_dependency_boundaries.py -q`（56 passed）。
+- 证据边界：绑定只是平台授权事实，尚未证明对应 Studio/Atelier 项目实际存在；resolver ownership callback、真实媒体 probe 和平台提交接线仍待完成。

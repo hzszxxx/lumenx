@@ -46,6 +46,8 @@ project_id, project_title_snapshot, resolved_at
 
 当前 S1 合同切片已在 `src/core/artifact_resolver.py` 固化：`ArtifactLookup` 只接受产品、项目、成果身份、版本和哈希，不接受 URL、路径、标题或媒体类型；`ResolvedArtifact` 是不可变的服务端成果快照，包含归属用户、受管媒体引用、媒体类型、标题、来源类型和合同版本。Studio/Atelier 已有只读 adapter，但它们要求组合根显式注入用户归属检查和媒体证明；当前尚未接入平台提交行为。
 
+平台项目归属使用 `platform_project_bindings` 显式记录。只有管理员可创建或撤销绑定；resolver 的 ownership check 只能读取 active binding，并可额外约束 `storage_id`。用户不能通过提交 `project_id`、URL 或成果哈希自行创建归属关系。
+
 ## 5. 任务状态机
 
 ```text

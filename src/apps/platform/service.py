@@ -213,6 +213,76 @@ class PlatformService:
         keys = ("id", "actor_id", "event_type", "entity_type", "entity_id", "payload_json", "created_at")
         return {"items": [dict(zip(keys, row)) for row in rows], "total": total, "limit": limit, "offset": offset}
 
+    def bind_project(self, actor: dict[str, Any], *, user_id: str, product: str, project_id: str, storage_id: str | None = None) -> dict[str, Any]:
+        """Create an auditable project binding; only an admin may grant it."""
+        self._require_admin(actor)
+        if product not in {"studio", "atelier"}:
+            raise PlatformError("invalid_project_product", "project binding product is invalid", 422)
+        if not user_id.strip() or not project_id.strip():
+            raise PlatformError("invalid_project_binding", "user_id and project_id are required", 422)
+        timestamp = now()
+        with connect(self.path) as c:
+            if not c.execute("SELECT 1 FROM platform_users WHERE id=? AND is_active=1", (user_id,)).fetchone():
+                raise PlatformError("user_not_found", "project binding user was not found", 404)
+            existing = c.execute(
+                "SELECT id,storage_id FROM platform_project_bindings WHERE user_id=? AND product=? AND project_id=? AND status='active'",
+                (user_id, product, project_id),
+            ).fetchone()
+            if existing:
+                if existing[1] != storage_id:
+                    raise PlatformError("project_binding_conflict", "project is already bound to this user with another storage", 409)
+                return {"id": existing[0], "user_id": user_id, "product": product, "project_id": project_id, "storage_id": storage_id, "status": "active", "idempotent_replay": True}
+            binding_id = uid()
+            c.execute(
+                "INSERT INTO platform_project_bindings(id,user_id,product,project_id,storage_id,status,created_by,created_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,NULL)",
+                (binding_id, user_id, product, project_id, storage_id, "active", actor["id"], timestamp),
+            )
+            self._audit(c, actor["id"], "project.binding_created", "project_binding", binding_id, {"user_id": user_id, "product": product, "project_id": project_id, "storage_id": storage_id})
+        return {"id": binding_id, "user_id": user_id, "product": product, "project_id": project_id, "storage_id": storage_id, "status": "active", "idempotent_replay": False}
+
+    def revoke_project_binding(self, actor: dict[str, Any], binding_id: str) -> dict[str, Any]:
+        self._require_admin(actor)
+        timestamp = now()
+        with connect(self.path) as c:
+            row = c.execute("SELECT user_id,product,project_id,status FROM platform_project_bindings WHERE id=?", (binding_id,)).fetchone()
+            if not row:
+                raise PlatformError("project_binding_not_found", "project binding was not found", 404)
+            if row[3] == "revoked":
+                return {"id": binding_id, "status": "revoked", "idempotent_replay": True}
+            c.execute("UPDATE platform_project_bindings SET status='revoked',revoked_at=? WHERE id=? AND status='active'", (timestamp, binding_id))
+            self._audit(c, actor["id"], "project.binding_revoked", "project_binding", binding_id, {"user_id": row[0], "product": row[1], "project_id": row[2]})
+        return {"id": binding_id, "status": "revoked", "idempotent_replay": False}
+
+    def list_project_bindings(self, actor: dict[str, Any], *, user_id: str | None = None, product: str | None = None, include_revoked: bool = False) -> list[dict[str, Any]]:
+        self._require_admin(actor)
+        clauses = ["1=1"]
+        params: list[Any] = []
+        if user_id:
+            clauses.append("user_id=?"); params.append(user_id)
+        if product:
+            if product not in {"studio", "atelier"}:
+                raise PlatformError("invalid_project_product", "project binding product is invalid", 422)
+            clauses.append("product=?"); params.append(product)
+        if not include_revoked:
+            clauses.append("status='active'")
+        with connect(self.path) as c:
+            rows = c.execute(
+                f"SELECT id,user_id,product,project_id,storage_id,status,created_by,created_at,revoked_at FROM platform_project_bindings WHERE {' AND '.join(clauses)} ORDER BY created_at DESC",
+                params,
+            ).fetchall()
+        keys = ("id", "user_id", "product", "project_id", "storage_id", "status", "created_by", "created_at", "revoked_at")
+        return [dict(zip(keys, row)) for row in rows]
+
+    def is_project_bound(self, *, user_id: str, product: str, project_id: str, storage_id: str | None = None) -> bool:
+        if product not in {"studio", "atelier"}:
+            return False
+        with connect(self.path) as c:
+            row = c.execute(
+                "SELECT 1 FROM platform_project_bindings WHERE user_id=? AND product=? AND project_id=? AND status='active' AND (storage_id IS NULL OR storage_id=?) LIMIT 1",
+                (user_id, product, project_id, storage_id),
+            ).fetchone()
+        return row is not None
+
     def xiangongyun_verify(self, actor: dict[str, Any], access_token: str, *, idempotency_key: str) -> dict[str, Any]:
         if not access_token or len(access_token.strip()) < 16:
             raise PlatformError("invalid_xiangongyun_token", "仙宫云 Access Token 无效", 422)

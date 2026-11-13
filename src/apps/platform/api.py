@@ -76,6 +76,11 @@ class CreditGrantIn(BaseModel): user_id: str; amount_credits: int = Field(gt=0);
 class CreditReservationIn(BaseModel): estimated_credits: int = Field(gt=0); generation_id: str = Field(min_length=1, max_length=200); pricing_version: str = Field(min_length=1, max_length=100); idempotency_key: str = Field(min_length=8, max_length=200)
 class CreditSettleIn(BaseModel): actual_credits: int = Field(ge=0)
 class CredentialIn(BaseModel): provider: str = Field(min_length=1, max_length=50); label: str = Field(min_length=1, max_length=80); api_key: str = Field(min_length=16, max_length=500)
+class ProjectBindingIn(BaseModel):
+    user_id: str = Field(min_length=1, max_length=128)
+    product: str = Field(pattern=r"^(studio|atelier)$")
+    project_id: str = Field(min_length=1, max_length=128)
+    storage_id: str | None = Field(default=None, min_length=1, max_length=128)
 class CredentialRotateIn(BaseModel): api_key: str = Field(min_length=16, max_length=500)
 class SkillManifestIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -170,6 +175,18 @@ def admin_update_user(user_id: str, body: AdminUserUpdateIn, user=Depends(admin_
 @router.get("/admin/audit-events")
 def admin_audit_events(limit: int = 100, offset: int = 0, user=Depends(admin_user), svc: PlatformService = Depends(service)):
     return svc.admin_audit_events(user, limit=limit, offset=offset)
+
+@router.post("/admin/project-bindings")
+def admin_bind_project(body: ProjectBindingIn, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.bind_project(user, user_id=body.user_id, product=body.product, project_id=body.project_id, storage_id=body.storage_id))
+
+@router.get("/admin/project-bindings")
+def admin_project_bindings(user_id: str | None = None, product: str | None = None, include_revoked: bool = False, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.list_project_bindings(user, user_id=user_id, product=product, include_revoked=include_revoked))
+
+@router.post("/admin/project-bindings/{binding_id}/revoke")
+def admin_revoke_project_binding(binding_id: str, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.revoke_project_binding(user, binding_id))
 
 @router.post("/xiangongyun/verify")
 def verify_xiangongyun(body: XiangongyunVerifyIn, idempotency_key: str = IdempotencyKey, user=Depends(current_user), svc: PlatformService = Depends(service)):
