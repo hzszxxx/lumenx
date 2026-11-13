@@ -50,6 +50,8 @@ project_id, project_title_snapshot, resolved_at
 
 平台项目归属使用 `platform_project_bindings` 显式记录。只有管理员可创建或撤销绑定；resolver 的 ownership check 只能读取 active binding，并可额外约束 `storage_id`。用户不能通过提交 `project_id`、URL 或成果哈希自行创建归属关系。项目绑定和 resolver 注入是两个独立门槛，绑定存在不等于对应产品项目和媒体已经通过真实读取验证。
 
+Studio 的 `compute_budget_cny` 是产品项目自己的可选路由估算上限，随项目 revision 以 CAS 方式保存。服务端在只读 route admission 和已接线的 Wan3 ordered-media 提交前重新读取该值；超限返回稳定的 `project_budget_exceeded`，不会创建 Provider task。该值是人民币估算护栏，不代表平台积分余额、预扣 reservation 或供应商结算；后续积分 reservation 必须携带独立的计费身份和幂等回执。
+
 ## 5. 任务状态机
 
 ```text

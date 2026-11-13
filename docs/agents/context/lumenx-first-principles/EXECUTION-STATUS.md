@@ -452,3 +452,12 @@ Studio `stage=final` 且选择 Wan3 ordered-media 时，生成按钮在 Provider
 - 责任文件：`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/__tests__/StoryboardR2VSubmit.spec.tsx`、`src/apps/comic_gen/api.py`、`tests/test_studio_ordered_provider_entry.py`。
 - 验证：后端 30 passed；Storyboard UI 48 passed；前端 `test:all`（标准 142 files / 2120 tests，UI 107 files / 1852 tests）、typecheck、文档检查与 `git diff --check`。
 - 证据边界：当前 `budget_cny` 是该批次的服务端估算总额，用于防止客户端路由/价格漂移，不是用户可编辑的项目预算上限；真实项目预算设置、平台积分 reservation、供应商结算和云端部署仍未完成。
+
+## 2026-11-13 Studio 项目级算力预算上限切片
+
+Studio `Script` 新增可选 `compute_budget_cny`，通过 `GET/PUT /projects/{script_id}/compute_budget` 读取或保存；写入必须携带项目 `revision`，服务端使用 CAS，清空预算传 `null`。只读 route admission 和已接线的 Wan3 ordered-media Provider 提交都会重新读取该项目上限，估算批次超过上限时返回 `project_budget_exceeded`，不创建 Provider task。未设置上限的旧项目保持原有行为，旧项目 JSON 在空值时省略新字段。
+
+- 分支/提交：`feature/skill-runtime-production` / `2e91efc`。
+- 责任文件：`src/apps/comic_gen/models.py`、`src/apps/comic_gen/pipeline.py`、`src/apps/comic_gen/api.py`、`frontend/src/lib/api.ts`、`frontend/src/store/projectStore.ts`、`tests/test_studio_ordered_provider_entry.py`、`frontend/src/__tests__/compute-route-preview-api.test.ts`。
+- 验证：Studio 路由/存储/Provider 回归 106 passed；前端标准测试 142 files / 2121 tests、预算 API 3 tests、typecheck、文档检查与 `git diff --check` 通过。
+- 证据边界：这是 Studio 项目级人民币估算护栏，不是平台积分余额、积分 reservation、供应商结算或累计已消费金额；当前没有把项目 cap 自动换算为积分，也未接入真实商业生成全入口。
