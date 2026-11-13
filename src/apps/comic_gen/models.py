@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, Union, Literal
 from enum import Enum
 import time
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
 from ...utils.model_catalog import get_default_model_settings
 from ...utils.request_identity import REQUEST_IDENTITY_CONTRACT_VERSION, validate_client_request_id
@@ -661,6 +661,11 @@ class UnknownDubSource(BaseModel):
 class StoryboardFrame(BaseModel):
     id: str = Field(..., description="Unique identifier for the frame")
     scene_id: str = Field(..., description="Reference to the Scene ID")
+    shot_type: Literal[
+        "consistency_long", "action_hard", "emotion_closeup", "dialogue_av", "hero_cover", "filler"
+    ] = Field("consistency_long", description="Compute routing shot type")
+    urgency: Literal["high", "low"] = Field("low", description="Compute routing urgency")
+    stage: Literal["draft", "final", "post"] = Field("draft", description="Compute routing stage")
     character_ids: List[str] = Field(default_factory=list, description="List of Character IDs present in the frame")
     prop_ids: List[str] = Field(default_factory=list, description="List of Prop IDs present in the frame")
     
@@ -775,6 +780,17 @@ class StoryboardFrame(BaseModel):
         None,
         description="Task ID of the chosen final take for this frame (singular). Set in Assembly stage; read by Storyboard.",
     )
+
+    @model_serializer(mode="wrap")
+    def _serialize_compute_route_tags(self, handler):
+        data = handler(self)
+        if data.get("shot_type") == "consistency_long":
+            data.pop("shot_type", None)
+        if data.get("urgency") == "low":
+            data.pop("urgency", None)
+        if data.get("stage") == "draft":
+            data.pop("stage", None)
+        return data
 
     def clear_image_request_for_copy(self) -> None:
         """Keep copied media, without inheriting a worker or unqueryable state."""

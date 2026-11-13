@@ -53,6 +53,7 @@ from .models import (
     StoryboardFrame,
     VideoTask,
 )
+from ...core.compute_routing import RouteDecision, ShotRoutingRequest, default_compute_route_resolver
 from fastapi.responses import JSONResponse, Response
 from ...utils.json_storage import (
     StorageConflictError, StorageError, serialize_json,
@@ -3643,6 +3644,24 @@ def refine_single_frame(script_id: str, frame_id: str,
     except Exception as e:
         logger.error(f"Error in refine_single_frame: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/projects/{script_id}/frames/{frame_id}/compute_route", response_model=RouteDecision)
+def preview_compute_route(
+    script_id: str,
+    frame_id: str,
+    request: ShotRoutingRequest,
+    pipeline: Any = Depends(get_pipeline),
+):
+    """Return a read-only compute route and cost estimate for one storyboard frame."""
+
+    try:
+        script = pipeline.read_committed_script(script_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Script not found") from exc
+    if not any(frame.id == frame_id for frame in script.frames):
+        raise HTTPException(status_code=404, detail="Storyboard frame not found")
+    return default_compute_route_resolver().resolve(request)
 
 
 @router.post("/projects/{script_id}/storyboard/refine_batch")

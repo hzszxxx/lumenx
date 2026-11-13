@@ -81,3 +81,9 @@
 | 可灵开放平台 | 情绪戏正片 | 月用量 > 约 200 秒再开直调，之前走 LibTV/fal |
 | LibTV | 活动溢出 | 只开最便宜年付档；无通用 REST API（只有 Skill/MCP 会话接口），不进关键路径 |
 | fal.ai | 海外模型偶发 | Veo 3.1 Fast 等按量调用，不单独养厂商账号 |
+
+## 工程化入口
+
+路由规则已由 Core 只读解析器加载：`src/core/compute_routing.py`。Studio 分镜和 Atelier 节点支持 `shot_type`、`urgency`、`stage` 三个标签；旧数据缺字段时保持草稿层默认值。Studio 可通过 `POST /projects/{script_id}/frames/{frame_id}/compute_route` 获取只读路由预览，返回 provider、model、分辨率、fallback 和 `est_cost_cny`，不会提交生成或扣费。
+
+代表性验证：`tests/test_compute_routing.py` 覆盖草稿/正片/后期、high/low 紧急度、LibTV 活动价、Hero 镜禁用促销、H3 2K 升级、成本换算和 HTTP 预览。价格仍以本文件与 `routing.yaml` 的核查日期为准，下单前必须重新确认供应商结算页。

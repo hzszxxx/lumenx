@@ -555,6 +555,11 @@ class AtelierNode(BaseModel):
     id: str = Field(..., description="Unique node identifier")
     project_id: str = Field(..., description="Parent Atelier project ID")
     type: str = Field("idea", description="Node type, for example idea/image/video/audio/workflow")
+    shot_type: Literal[
+        "consistency_long", "action_hard", "emotion_closeup", "dialogue_av", "hero_cover", "filler"
+    ] = Field("consistency_long", description="Compute routing shot type for video nodes")
+    urgency: Literal["high", "low"] = Field("low", description="Compute routing urgency for video nodes")
+    stage: Literal["draft", "final", "post"] = Field("draft", description="Compute routing stage for video nodes")
     title: str = Field("", description="Short visible node title")
     prompt: str = Field("", description="Generation or planning prompt attached to this node")
     status: str = Field("draft", description="draft/pending/processing/completed/failed")
@@ -581,6 +586,17 @@ class AtelierNode(BaseModel):
     created_by: str = Field("user", description="user or agent")
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
+
+    @model_serializer(mode="wrap")
+    def _serialize_compute_route_tags(self, handler):
+        data = handler(self)
+        if data.get("shot_type") == "consistency_long":
+            data.pop("shot_type", None)
+        if data.get("urgency") == "low":
+            data.pop("urgency", None)
+        if data.get("stage") == "draft":
+            data.pop("stage", None)
+        return data
 
 
 class AtelierCandidateJudgment(BaseModel):
@@ -1253,6 +1269,8 @@ class AtelierProject(BaseModel):
         data = handler(self)
         if not data.get("candidate_judgments"):
             data.pop("candidate_judgments", None)
+        if not data.get("paid_admission_intents"):
+            data.pop("paid_admission_intents", None)
         if data.get("import_provenance") is None:
             data.pop("import_provenance", None)
         return data
