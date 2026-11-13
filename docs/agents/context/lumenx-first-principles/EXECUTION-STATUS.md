@@ -407,3 +407,12 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 责任文件：`tests/test_platform_artifact_resolver_http.py`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_db.py tests/test_platform_service.py tests/test_platform_project_bindings.py tests/test_platform_admin_api.py tests/test_platform_skill_api.py tests/test_platform_artifact_resolver_app.py tests/test_platform_artifact_resolver_http.py tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（73 passed）；`python3 docs/agents/tools/check_lumenx_refactor_docs.py` 通过。
 - 证据边界：这是隔离 FastAPI + 内存产品存储的端到端合同证据，不是公网部署、真实对象存储、真实用户数据或云端生产验收；下一步可进入三层算力路由解析器，云端 P10 仍保持 No-Go。
+
+## 2026-11-13 三层算力路由解析与 Studio 预览切片
+
+新增 `src/core/compute_routing.py`，只读加载 `docs/routing.yaml`，按 `stage × shot_type × urgency` 解析草稿、正片和后期路由，并计算带 2 秒 padding、正片 1.5 倍返工系数和 USD/CNY 换算的 `est_cost_cny`。Studio `StoryboardFrame` 与 Atelier `AtelierNode` 增加 `shot_type`、`urgency`、`stage` 标签；旧记录序列化时省略默认值，保持历史快照兼容。Studio 新增只读 `compute_route` 预览 API，不提交生成、不预扣积分。
+
+- 分支/提交：`feature/skill-runtime-production` / `512b236`。
+- 责任文件：`src/core/compute_routing.py`、`src/apps/comic_gen/api.py`、`src/apps/comic_gen/models.py`、`src/apps/atelier/models.py`、`tests/test_compute_routing.py`、`docs/SELECTION_TABLE.md`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_compute_routing.py tests/test_atelier_model_compatibility.py tests/test_atelier_storage.py tests/test_frame_refinement_commands.py tests/test_studio_storage_safety.py tests/test_app_lifecycle.py tests/test_studio_video_request_contract.py -q`（192 passed）；`python3 docs/agents/tools/check_lumenx_refactor_docs.py` 通过。
+- 证据边界：当前是配置驱动的推荐/预览，不会自动替换已有生成提交模型，也未接入真实厂商价格、Provider admission、前端 UI 成本卡片或预算上限；草稿/正片/后期规则仍需在真实项目中横评后冻结 preset。
