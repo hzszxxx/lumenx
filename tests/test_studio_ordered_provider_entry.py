@@ -102,6 +102,7 @@ def test_ordered_http_route_admission_binds_frame_tags_runtime_model_and_budget(
     request = payload(
         batch_size=2,
         duration=6,
+        resolution='720P',
         compute_route={
             'routing': {
                 'stage': 'final',
@@ -154,6 +155,26 @@ def test_ordered_http_route_admission_rejects_runtime_model_mismatch(entry):
     ))
     assert response.status_code == 422
     assert response.json()['code'] == 'route_runtime_model_mismatch'
+    assert runtime.read_committed_script('p').video_tasks == []
+    assert scheduled == []
+
+
+def test_ordered_http_route_admission_rejects_runtime_resolution_mismatch(entry):
+    runtime, client, scheduled, _, _ = entry
+    runtime.scripts['p'].frames[0].stage = 'final'
+    runtime._commit_storage('projects.json')
+    response = client.post(URL, json=payload(
+        duration=6,
+        resolution='1080P',
+        compute_route={
+            'routing': {'stage': 'final', 'shot_type': 'consistency_long', 'urgency': 'low', 'duration_sec': 6},
+            'batch_size': 1,
+            'budget_cny': 20,
+            'requested_resolution': '720p',
+        },
+    ))
+    assert response.status_code == 422
+    assert response.json()['code'] == 'route_runtime_resolution_mismatch'
     assert runtime.read_committed_script('p').video_tasks == []
     assert scheduled == []
 

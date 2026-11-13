@@ -4066,7 +4066,15 @@ def _validate_provider_route_admission(
     if not isinstance(runtime_model, str) or not runtime_model:
         raise RouteResolutionError("provider_model_required", "Provider model is required")
     request_with_runtime = admission.model_copy(update={"requested_runtime_model": runtime_model})
-    default_compute_route_resolver().admit(request_with_runtime)
+    decision = default_compute_route_resolver().admit(request_with_runtime)
+    request_resolution = raw.get("resolution")
+    route_resolution = decision.route.resolution
+    if request_resolution is not None and route_resolution is not None:
+        if str(request_resolution).lower() != route_resolution.lower():
+            raise RouteResolutionError(
+                "route_runtime_resolution_mismatch",
+                f"runtime_resolution={request_resolution!r} expected {route_resolution!r}",
+            )
 
 
 @router.post("/projects/{script_id}/motion_ref_requests/{client_request_id}/recover")

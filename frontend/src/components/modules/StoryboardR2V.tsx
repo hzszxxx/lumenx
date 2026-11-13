@@ -6,7 +6,7 @@ import { Plus, Loader2, Sparkles, PanelBottomOpen, PanelBottomClose } from "luci
 import StepPageHeader, { StepPill } from "@/components/shared/StepPageHeader";
 import { useTranslations } from "next-intl";
 import { useProjectStore, type Project } from "@/store/projectStore";
-import { API_URL, api, crudApi, type VideoTask, type RefineSSEEvent } from "@/lib/api";
+import { API_URL, api, crudApi, type ComputeRouteAdmissionRequest, type ComputeRoutePreviewRequest, type VideoTask, type RefineSSEEvent } from "@/lib/api";
 import { getRuntimeEnvironment, isCurrentRuntimeEnvironment, requireActiveRuntimeEnvironment, subscribeRuntimeEnvironment, type RuntimeEnvironment } from "@/lib/runtimeEnvironment";
 import { getAssetUrl } from "@/lib/utils";
 import { selectedVariantUrl } from "@/lib/characterImage";
@@ -1572,10 +1572,43 @@ function StoryboardR2VSession() {
 
         const providerOwner = providerOwnerFor(projectId, frameId, actionEnvironment);
 
+        const attachWan3RouteAdmission = async (input: Record<string, unknown>): Promise<Record<string, unknown>> => {
+            const runtimeModel = typeof input.model === "string" ? input.model : undefined;
+            if (shot.stage !== "final" || !isOrderedStudioProviderVideoModel(runtimeModel)) return input;
+            const frame = currentProject.frames?.find(candidate => candidate.id === frameId) as any;
+            if (!frame) throw new Error("Storyboard frame is no longer available");
+            const shotType = shot.shot_type ?? "consistency_long";
+            const routeRequest: ComputeRoutePreviewRequest = {
+                stage: "final",
+                shot_type: shotType,
+                urgency: shot.urgency ?? "low",
+                duration_sec: Number(input.duration),
+                has_dialogue: Boolean(shot.dialogueStructured?.line || frame.dialogue),
+                has_audio: Boolean(frame.audio_url),
+                closeup_or_hero: shotType === "emotion_closeup" || shotType === "hero_cover",
+                prefer_libtv_promo: false,
+            };
+            if (!Number.isFinite(routeRequest.duration_sec) || routeRequest.duration_sec <= 0) {
+                throw new Error("Invalid route admission duration");
+            }
+            const preview = await api.previewComputeRoute(projectId, frameId, routeRequest);
+            const budgetCny = Math.round(preview.est_cost_cny * effectiveCount * 100) / 100;
+            const admission: ComputeRouteAdmissionRequest = {
+                routing: routeRequest,
+                batch_size: effectiveCount,
+                budget_cny: budgetCny,
+                requested_provider: preview.provider,
+                requested_model: preview.model,
+                requested_resolution: preview.resolution ?? undefined,
+            };
+            await api.admitComputeRoute(projectId, frameId, admission);
+            return { ...input, compute_route: admission };
+        };
+
         const submitProviderInput = async (buildInput: () => Record<string, unknown>) => {
             store.setRunningOp(operation, true);
             try {
-                const input = buildInput();
+                const input = await attachWan3RouteAdmission(buildInput());
                 await withProviderVideoRequestLock(providerOwner, async () => {
                     if (!isCurrent()) return;
                     const lockedPending = readProviderVideoRequest({ owner: providerOwner });

@@ -706,6 +706,49 @@ describe('StoryboardR2V provider receipt video submit', () => {
         await waitFor(() => expect(localStorage.getItem(providerStorageKey())).toBeNull());
     });
 
+    it('runs canonical route admission before final Wan3 submission', async () => {
+        vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('request-wan3-final-admission');
+        installProviderLock();
+        const accepted = [orderedI2vTask('task-wan3-final-admission')];
+        const initial = projectWithWan3I2V();
+        initial.frames = [{
+            ...initial.frames[0],
+            stage: 'final',
+            shot_type: 'consistency_long',
+            urgency: 'low',
+        }];
+        const route = {
+            stage: 'final', shot_type: 'consistency_long', urgency: 'low',
+            provider: 'bailian', model: 'wan3', resolution: '720p', audio: false, promo: false,
+            rule_id: 'final.consistency_long', fallback: [], billed_duration_sec: 7,
+            est_cost_cny: 6.3, cost_note: 'preview',
+        };
+        vi.mocked(axios.post)
+            .mockResolvedValueOnce({ data: route })
+            .mockResolvedValueOnce({ data: {
+                route, batch_size: 1, budget_cny: 6.3, estimated_total_cny: 6.3, remaining_cny: 0,
+            } })
+            .mockResolvedValueOnce({ data: providerReceipt(accepted, 'request-wan3-final-admission') });
+        vi.mocked(axios.get).mockResolvedValueOnce({ data: enriched(wan3I2VServerProject(accepted, 4)) });
+        renderPage(initial);
+
+        fireEvent.click(within(firstShot()).getByRole('button', { name: 'retry video' }));
+
+        await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(3));
+        const postCalls = vi.mocked(axios.post).mock.calls;
+        expect(postCalls[0][0]).toContain('/compute_route');
+        expect(postCalls[1][0]).toContain('/compute_route/admission');
+        const providerPayload = postCalls[2][1] as Record<string, any>;
+        expect(providerPayload.compute_route).toMatchObject({
+            batch_size: 1,
+            budget_cny: 6.3,
+            requested_provider: 'bailian',
+            requested_model: 'wan3',
+            requested_resolution: '720p',
+        });
+        await waitFor(() => expect(localStorage.getItem(providerStorageKey())).toBeNull());
+    });
+
     it('routes Wan3 direct R2V asset references through the ordered provider journal', async () => {
         vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('request-wan3-r2v');
         installProviderLock();
