@@ -398,3 +398,12 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 责任文件：`src/apps/comic_gen/api.py`、`tests/test_platform_artifact_resolver_app.py`、`docs/9-creator-platform-architecture/PLATFORM-DATA-CONTRACT.md`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_app_lifecycle.py tests/test_atelier_app_lifecycle.py tests/test_studio_storage_safety.py tests/test_media_access_boundary.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（100 passed）；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_artifact_resolver_app.py tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（38 passed）。
 - 证据边界：已证明本地应用组合根可以装配 resolver，尚未证明真实平台用户已为每个 Studio/Atelier 项目建立绑定，也未做真实 HTTP 提交、远端对象存储、生产多副本或云端故障演练；No-Go 云端部署状态不变。
+
+## 2026-11-13 平台成果 HTTP 端到端验收切片
+
+新增真实 FastAPI 路由回归：管理员创建 Atelier 项目绑定，创作者通过 `/api/platform/competitions/{id}/submit` 提交成果，平台 resolver 读取 active binding、Atelier publication proof 和受管媒体证明，并用服务端标题、媒体类型和媒体引用覆盖客户端快照。
+
+- 分支/提交：`feature/skill-runtime-production` / `78b9302`。
+- 责任文件：`tests/test_platform_artifact_resolver_http.py`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_db.py tests/test_platform_service.py tests/test_platform_project_bindings.py tests/test_platform_admin_api.py tests/test_platform_skill_api.py tests/test_platform_artifact_resolver_app.py tests/test_platform_artifact_resolver_http.py tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（73 passed）；`python3 docs/agents/tools/check_lumenx_refactor_docs.py` 通过。
+- 证据边界：这是隔离 FastAPI + 内存产品存储的端到端合同证据，不是公网部署、真实对象存储、真实用户数据或云端生产验收；下一步可进入三层算力路由解析器，云端 P10 仍保持 No-Go。
