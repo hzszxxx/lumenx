@@ -101,6 +101,17 @@ class RouteDecision(BaseModel):
     cost_note: str = Field(min_length=1, max_length=240)
 
 
+class RouteRuntimeBinding(BaseModel):
+    """Mapping from a canonical route model to a generation entry contract."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    provider: str = Field(min_length=1, max_length=64)
+    model: str = Field(min_length=1, max_length=128)
+    contract_version: str = Field(min_length=1, max_length=64)
+    request_model_ids: tuple[str, ...] = Field(min_length=1, max_length=8)
+
+
 class RouteAdmissionRequest(BaseModel):
     """Generation-time preflight inputs layered over a resolved route."""
 
@@ -112,6 +123,7 @@ class RouteAdmissionRequest(BaseModel):
     requested_provider: str | None = Field(default=None, min_length=1, max_length=64)
     requested_model: str | None = Field(default=None, min_length=1, max_length=128)
     requested_resolution: str | None = Field(default=None, min_length=1, max_length=32)
+    requested_runtime_model: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class RouteAdmissionDecision(BaseModel):
@@ -164,6 +176,41 @@ class ComputeRouteResolver:
             route = self._resolve_post(request)
         return self._decision(request, **route)
 
+    def runtime_binding(self, decision: RouteDecision) -> RouteRuntimeBinding:
+        """Return the explicit runtime contract for a canonical route model."""
+
+        model_config = self._config.get("models", {}).get(decision.model)
+        runtime = model_config.get("runtime") if isinstance(model_config, dict) else None
+        if not isinstance(runtime, dict):
+            raise RouteResolutionError(
+                "route_runtime_unmapped",
+                f"No generation runtime binding for {decision.provider}/{decision.model}",
+            )
+        try:
+            request_model_ids = tuple(runtime["request_model_ids"])
+            contract_version = runtime["contract_version"]
+        except (KeyError, TypeError):
+            raise RouteResolutionError(
+                "routing_config_invalid",
+                f"Runtime binding for {decision.model} is incomplete",
+            ) from None
+        if (
+            not isinstance(contract_version, str)
+            or not contract_version
+            or not request_model_ids
+            or any(not isinstance(item, str) or not item for item in request_model_ids)
+        ):
+            raise RouteResolutionError(
+                "routing_config_invalid",
+                f"Runtime binding for {decision.model} is invalid",
+            )
+        return RouteRuntimeBinding(
+            provider=decision.provider,
+            model=decision.model,
+            contract_version=contract_version,
+            request_model_ids=request_model_ids,
+        )
+
     def admit(self, request: RouteAdmissionRequest) -> RouteAdmissionDecision:
         """Validate a route choice and batch budget without submitting work."""
 
@@ -178,6 +225,14 @@ class ComputeRouteResolver:
                 mismatches.append(f"{field}={requested!r} expected {expected!r}")
         if mismatches:
             raise RouteResolutionError("route_request_mismatch", "; ".join(mismatches))
+        if request.requested_runtime_model is not None:
+            binding = self.runtime_binding(decision)
+            if request.requested_runtime_model not in binding.request_model_ids:
+                raise RouteResolutionError(
+                    "route_runtime_model_mismatch",
+                    f"runtime_model={request.requested_runtime_model!r} not allowed for "
+                    f"{binding.provider}/{binding.model}",
+                )
         estimated_total = round(decision.est_cost_cny * request.batch_size, 2)
         if estimated_total > request.budget_cny:
             raise RouteResolutionError(
@@ -346,6 +401,7 @@ __all__ = [
     "RouteDecision",
     "RouteAdmissionDecision",
     "RouteAdmissionRequest",
+    "RouteRuntimeBinding",
     "RouteResolutionError",
     "ShotRoutingRequest",
     "ShotType",

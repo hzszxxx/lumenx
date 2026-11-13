@@ -67,6 +67,9 @@ models:
   wan3:
     name: "Wan 3.0"
     main_provider: "bailian"
+    runtime:
+      contract_version: "ordered-media-v1"
+      request_model_ids: ["wan3.0-video", "wan3.0-video-prime"]
     strengths: ["multi_reference", "consistency", "long_take"]
     max_duration_sec: 30
     max_references: 20

@@ -110,6 +110,21 @@ def test_route_admission_enforces_requested_route_and_batch_budget(resolver):
         ))
     assert mismatch_error.value.code == "route_request_mismatch"
 
+    runtime_binding = resolver.runtime_binding(admission.route)
+    assert runtime_binding.provider == "bailian"
+    assert runtime_binding.model == "wan3"
+    assert runtime_binding.contract_version == "ordered-media-v1"
+    assert runtime_binding.request_model_ids == ("wan3.0-video", "wan3.0-video-prime")
+
+    with pytest.raises(RouteResolutionError, match="not allowed") as runtime_error:
+        resolver.admit(RouteAdmissionRequest(
+            routing=request(shot_type=ShotType.CONSISTENCY_LONG, duration_sec=10),
+            batch_size=1,
+            budget_cny=20,
+            requested_runtime_model="seedance-2.0-i2v",
+        ))
+    assert runtime_error.value.code == "route_runtime_model_mismatch"
+
 
 def test_route_request_is_strict_and_requires_positive_duration():
     with pytest.raises(ValueError):

@@ -95,6 +95,69 @@ def test_ordered_http_batch_freezes_correct_media_and_commits_before_dispatch(en
     assert Script.model_validate(saved.model_dump()).provider_request_receipts == saved.provider_request_receipts
 
 
+def test_ordered_http_route_admission_binds_frame_tags_runtime_model_and_budget(entry):
+    runtime, client, scheduled, _, _ = entry
+    runtime.scripts['p'].frames[0].stage = 'final'
+    runtime._commit_storage('projects.json')
+    request = payload(
+        batch_size=2,
+        duration=6,
+        compute_route={
+            'routing': {
+                'stage': 'final',
+                'shot_type': 'consistency_long',
+                'urgency': 'low',
+                'duration_sec': 6,
+                'has_dialogue': False,
+                'has_audio': False,
+                'closeup_or_hero': False,
+            },
+            'batch_size': 2,
+            'budget_cny': 20,
+        },
+    )
+    response = client.post(URL, json=request)
+    assert response.status_code == 200, response.text
+    assert len(response.json()['task_ids']) == len(scheduled) == 2
+
+
+@pytest.mark.parametrize('compute_route,expected_code', [
+    ({
+        'routing': {'stage': 'final', 'shot_type': 'consistency_long', 'urgency': 'low', 'duration_sec': 6},
+        'batch_size': 1,
+        'budget_cny': 1,
+    }, 'route_budget_exceeded'),
+])
+def test_ordered_http_route_admission_rejects_before_provider_task_commit(entry, compute_route, expected_code):
+    runtime, client, scheduled, _, _ = entry
+    runtime.scripts['p'].frames[0].stage = 'final'
+    runtime._commit_storage('projects.json')
+    response = client.post(URL, json=payload(duration=6, compute_route=compute_route))
+    assert response.status_code == 422
+    assert response.json()['code'] == expected_code
+    assert runtime.read_committed_script('p').video_tasks == []
+    assert scheduled == []
+
+
+def test_ordered_http_route_admission_rejects_runtime_model_mismatch(entry):
+    runtime, client, scheduled, _, _ = entry
+    runtime.scripts['p'].frames[0].stage = 'final'
+    runtime._commit_storage('projects.json')
+    response = client.post(URL, json=payload(
+        duration=6,
+        model='seedance-2.0-i2v',
+        compute_route={
+            'routing': {'stage': 'final', 'shot_type': 'consistency_long', 'urgency': 'low', 'duration_sec': 6},
+            'batch_size': 1,
+            'budget_cny': 20,
+        },
+    ))
+    assert response.status_code == 422
+    assert response.json()['code'] == 'route_runtime_model_mismatch'
+    assert runtime.read_committed_script('p').video_tasks == []
+    assert scheduled == []
+
+
 def test_ordered_replay_needs_no_source_runtime_or_new_dispatch(entry):
     runtime, client, scheduled, _, _ = entry
     request = payload(generation_mode='i2v', image_url='uploads/source.png')

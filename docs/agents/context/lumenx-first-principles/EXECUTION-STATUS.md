@@ -434,3 +434,12 @@ Studio 分镜卡现在可以直接编辑并保存 `stage`、`shot_type`、`urgen
 - 责任文件：`src/core/compute_routing.py`、`src/apps/comic_gen/api.py`、`frontend/src/lib/api.ts`、`tests/test_compute_routing.py`、`frontend/src/__tests__/compute-route-preview-api.test.ts`。
 - 验证：后端路由/预算回归；前端路由 API 回归；Typecheck、全量前端测试、文档检查与 `git diff --check`。
 - 证据边界：这是生成前只读 admission 预检，不替换现有 Provider admission，不建立真实平台积分 reservation，也不证明供应商价格或云端部署已可用。
+
+## 2026-11-13 Wan3 runtime route admission 接线切片
+
+为 `docs/routing.yaml` 的 canonical `bailian/wan3` 增加显式 ordered-media runtime 映射：允许 `wan3.0-video` 与 `wan3.0-video-prime`，合同版本为 `ordered-media-v1`。`/projects/{script_id}/provider_video_tasks` 现在可选接收 `compute_route` admission：服务端重新读取已提交 Studio 分镜，校验 `stage`、`shot_type`、`urgency`、时长、对白/音频标记、批次预算和 runtime model；失败在创建 Provider task 前返回 typed error。
+
+- 分支/提交：`feature/skill-runtime-production` / 待提交。
+- 责任文件：`docs/routing.yaml`、`docs/SELECTION_TABLE.md`、`src/core/compute_routing.py`、`src/apps/comic_gen/api.py`、`tests/test_compute_routing.py`、`tests/test_studio_ordered_provider_entry.py`。
+- 验证：隔离 runner 执行路由与 ordered Provider admission 回归；随后执行 Provider 入口回归、前端 typecheck/全量测试、文档结构检查和 `git diff --check`。
+- 证据边界：仅 Wan3 ordered-media 已完成 canonical route 到现有生成合同的映射；Seedance、可灵、H3 等路由尚未接入同一 Provider admission。未建立真实供应商结算价、平台积分 reservation 或云端部署证明；不携带 `compute_route` 的历史请求保持兼容。

@@ -86,6 +86,8 @@
 
 路由规则已由 Core 只读解析器加载：`src/core/compute_routing.py`。Studio 分镜和 Atelier 节点支持 `shot_type`、`urgency`、`stage` 三个标签；旧数据缺字段时保持草稿层默认值。Studio 可通过 `POST /projects/{script_id}/frames/{frame_id}/compute_route` 获取只读路由预览，返回 provider、model、分辨率、fallback 和 `est_cost_cny`，不会提交生成或扣费。
 
+当前只有 Wan 3.0 正片路由完成了生成入口映射：canonical `bailian/wan3` 对应 Studio ordered-media 的 `wan3.0-video` 或 `wan3.0-video-prime`，合同版本为 `ordered-media-v1`。其他正片路由仍需各自完成 Provider admission 合同后才能接入同一门禁。
+
 代表性验证：`tests/test_compute_routing.py` 覆盖草稿/正片/后期、high/low 紧急度、LibTV 活动价、Hero 镜禁用促销、H3 2K 升级、成本换算和 HTTP 预览。价格仍以本文件与 `routing.yaml` 的核查日期为准，下单前必须重新确认供应商结算页。
 
 Studio 分镜生成行提供“路由预估”入口：它按当前分镜的 `stage`、`shot_type`、`urgency` 和时长请求同一预览接口，并展示渠道、模型、分辨率与人民币估算。该卡片是只读决策辅助，不改变现有生成按钮的模型参数，也不代表供应商已接单或已扣费。

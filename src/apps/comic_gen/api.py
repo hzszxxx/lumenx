@@ -3966,6 +3966,7 @@ class ProviderVideoTaskRequest(BaseModel):
 
     client_request_id: StrictStr
     batch_size: StrictInt = Field(1, ge=1, le=6)
+    compute_route: RouteAdmissionRequest | None = None
 
     @field_validator("client_request_id")
     @classmethod
@@ -3986,6 +3987,86 @@ class ProviderVideoContinueRequest(BaseModel):
 
     expected_attempt_id: StrictStr = Field(..., min_length=1, max_length=128)
     expected_fingerprint: StrictStr = Field(..., pattern=r"^[0-9a-f]{64}$")
+
+
+def _validate_provider_route_admission(
+    pipeline: Any,
+    script_id: str,
+    raw: dict[str, Any],
+    admission: RouteAdmissionRequest,
+    batch_size: int,
+) -> None:
+    """Bind an optional canonical route admission to the persisted Studio frame."""
+
+    try:
+        script = pipeline.read_committed_script(script_id)
+    except ValueError as exc:
+        raise RouteResolutionError("script_not_found", "Script not found") from exc
+    frame_id = raw.get("frame_id")
+    frame = next((candidate for candidate in script.frames if candidate.id == frame_id), None)
+    if frame is None:
+        raise RouteResolutionError("route_frame_owner_required", "Storyboard frame not found")
+
+    routing = admission.routing
+    if admission.batch_size != batch_size:
+        raise RouteResolutionError(
+            "route_batch_size_mismatch",
+            f"route batch_size={admission.batch_size} expected request batch_size={batch_size}",
+        )
+    frame_tags = {
+        "stage": getattr(frame.stage, "value", frame.stage),
+        "shot_type": getattr(frame.shot_type, "value", frame.shot_type),
+        "urgency": getattr(frame.urgency, "value", frame.urgency),
+    }
+    requested_tags = {
+        "stage": routing.stage.value,
+        "shot_type": routing.shot_type.value,
+        "urgency": routing.urgency.value,
+    }
+    mismatches = [
+        f"{field}={requested_tags[field]!r} expected {frame_tags[field]!r}"
+        for field in frame_tags
+        if requested_tags[field] != frame_tags[field]
+    ]
+    if mismatches:
+        raise RouteResolutionError("route_frame_tag_mismatch", "; ".join(mismatches))
+
+    duration = raw.get("duration")
+    if duration is not None:
+        try:
+            duration_matches = float(duration) == routing.duration_sec
+        except (TypeError, ValueError):
+            duration_matches = False
+        if not duration_matches:
+            raise RouteResolutionError(
+                "route_duration_mismatch",
+                f"duration_sec={routing.duration_sec!r} expected request duration={duration!r}",
+            )
+
+    dialogue_structured = getattr(frame, "dialogue_structured", None)
+    structured_line = (
+        dialogue_structured.get("line") if isinstance(dialogue_structured, dict)
+        else getattr(dialogue_structured, "line", None)
+    )
+    expected_has_dialogue = bool(structured_line or getattr(frame, "dialogue", None))
+    expected_has_audio = bool(getattr(frame, "audio_url", None))
+    expected_closeup_or_hero = routing.shot_type.value in {"emotion_closeup", "hero_cover"}
+    if routing.has_dialogue != expected_has_dialogue or routing.has_audio != expected_has_audio:
+        raise RouteResolutionError(
+            "route_frame_media_mismatch",
+            "route dialogue/audio flags do not match the persisted frame",
+        )
+    if routing.closeup_or_hero != expected_closeup_or_hero:
+        raise RouteResolutionError(
+            "route_shot_shape_mismatch",
+            "route closeup_or_hero flag does not match shot_type",
+        )
+
+    runtime_model = raw.get("model") or raw.get("model_id")
+    if not isinstance(runtime_model, str) or not runtime_model:
+        raise RouteResolutionError("provider_model_required", "Provider model is required")
+    request_with_runtime = admission.model_copy(update={"requested_runtime_model": runtime_model})
+    default_compute_route_resolver().admit(request_with_runtime)
 
 
 @router.post("/projects/{script_id}/motion_ref_requests/{client_request_id}/recover")
@@ -4049,6 +4130,13 @@ def create_provider_video_tasks(
     raw = request.model_dump(exclude_unset=True)
     raw.pop("client_request_id")
     raw.pop("batch_size", None)
+    route_admission = request.compute_route
+    raw.pop("compute_route", None)
+    if route_admission is not None:
+        try:
+            _validate_provider_route_admission(active_pipeline, script_id, raw, route_admission, request.batch_size)
+        except RouteResolutionError as exc:
+            return JSONResponse(status_code=422, content={"code": exc.code, "detail": str(exc)})
     try:
         result = active_pipeline.admit_provider_video_tasks_with_receipt(
             script_id, raw,
