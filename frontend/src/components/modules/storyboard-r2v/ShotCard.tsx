@@ -32,6 +32,7 @@ import PreviewImage from "@/components/shared/preview/PreviewImage";
 import PreviewVideo from "@/components/shared/preview/PreviewVideo";
 import { useProjectStore, type Character } from "@/store/projectStore";
 import { selectedVariantUrl } from "@/lib/characterImage";
+import type { ComputeRoutePreview } from "@/lib/api";
 
 type AssetChipReference = {
     id: string;
@@ -101,6 +102,10 @@ export interface ShotNode {
     shotSize?: string | null;
     cameraAngle?: string | null;
     transitionHint?: string | null;
+    /** Compute routing contract tags persisted on the Studio frame. */
+    shot_type?: "consistency_long" | "action_hard" | "emotion_closeup" | "dialogue_av" | "hero_cover" | "filler";
+    urgency?: "high" | "low";
+    stage?: "draft" | "final" | "post";
 
     /** When true, the user has manually pinned an active take. Hero
      *  shows a "Pinned" chip; autoSelectLatestVideo skips this frame on
@@ -166,6 +171,8 @@ interface ShotCardProps {
      *  active take (shot.isVideoPinned=true), the hero shows a "📌 Pinned"
      *  chip; clicking it fires onUnpinVideo to resume auto latest-wins. */
     onUnpinVideo?: () => void;
+    /** Read-only compute route and cost preview; never submits generation. */
+    onPreviewComputeRoute?: () => Promise<ComputeRoutePreview>;
 }
 
 export default function ShotCard({
@@ -200,6 +207,7 @@ export default function ShotCard({
     inFlightCount = 0,
     onRefineFrame,
     onUnpinVideo,
+    onPreviewComputeRoute,
 }: ShotCardProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -209,6 +217,9 @@ export default function ShotCard({
     // discards the modal's draft without touching parent state.
     const [expandOpen, setExpandOpen] = useState(false);
     const [promptPreviewOpen, setPromptPreviewOpen] = useState(false);
+    const [computeRoute, setComputeRoute] = useState<ComputeRoutePreview | null>(null);
+    const [computeRouteLoading, setComputeRouteLoading] = useState(false);
+    const [computeRouteError, setComputeRouteError] = useState(false);
     // currentProjectId — needed by PolishPanel to look up the
     // project's PromptConfig override server-side.
     const currentProjectId = useProjectStore((state) => state.currentProject?.id);
@@ -245,6 +256,19 @@ export default function ShotCard({
     //     image, dedup'd by id. No references → empty → text-only.
     const generationBlocked = !!generationBlockedMessage;
     const generationActionable = canGenerate && inFlightCount === 0 && !generationBlocked;
+
+    const previewComputeRoute = async () => {
+        if (!onPreviewComputeRoute || computeRouteLoading) return;
+        setComputeRouteLoading(true);
+        setComputeRouteError(false);
+        try {
+            setComputeRoute(await onPreviewComputeRoute());
+        } catch {
+            setComputeRouteError(true);
+        } finally {
+            setComputeRouteLoading(false);
+        }
+    };
 
     const polishImageUrls = useCallback((): string[] => {
         if (shot.tabMode === "direct_r2v") {
@@ -1015,6 +1039,18 @@ export default function ShotCard({
                                         {genSummary}
                                     </span>
                                 )}
+                                {onPreviewComputeRoute && (
+                                    <button
+                                        type="button"
+                                        onClick={previewComputeRoute}
+                                        disabled={computeRouteLoading}
+                                        className="inline-flex items-center gap-1 rounded-full border border-glass-border bg-surface-inset px-2.5 py-1.5 font-mono text-[0.625rem] text-text-secondary transition-colors hover:border-primary/45 hover:text-foreground disabled:cursor-wait disabled:opacity-60"
+                                        title={t("computeRoutePreviewHint")}
+                                    >
+                                        {computeRouteLoading ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                                        {t("computeRoutePreview")}
+                                    </button>
+                                )}
                                 <span className="font-mono text-[0.59375rem] uppercase tracking-[0.1em] text-text-muted hidden sm:inline">
                                     {t("countLabel")}
                                 </span>
@@ -1071,6 +1107,20 @@ export default function ShotCard({
                                     )}
                                 </motion.button>
                             </div>
+                            {onPreviewComputeRoute && (computeRoute || computeRouteError) ? (
+                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-glass-border bg-surface-inset/70 px-3 py-2 font-mono text-[0.625rem] text-text-secondary">
+                                    {computeRouteError ? (
+                                        <span className="text-status-failed-fg">{t("computeRoutePreviewFailed")}</span>
+                                    ) : computeRoute ? (
+                                        <>
+                                            <span className="text-foreground">{computeRoute.provider} · {computeRoute.model}</span>
+                                            {computeRoute.resolution ? <span>{computeRoute.resolution}</span> : null}
+                                            <span className="text-primary">¥{computeRoute.est_cost_cny.toFixed(2)} est.</span>
+                                            <span className="text-text-muted">{t("computeRoutePreviewReadOnly")}</span>
+                                        </>
+                                    ) : null}
+                                </div>
+                            ) : null}
                         </div>
 
                         {/* Disclosure bar — controls attached panel visibility */}

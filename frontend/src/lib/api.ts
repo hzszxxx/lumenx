@@ -14,6 +14,45 @@ export { API_URL } from "@/lib/apiUrl";
 
 export type ProviderMode = "dashscope" | "vendor";
 
+export type ComputeStage = "draft" | "final" | "post";
+export type ComputeShotType =
+    | "consistency_long"
+    | "action_hard"
+    | "emotion_closeup"
+    | "dialogue_av"
+    | "hero_cover"
+    | "filler";
+export type ComputeUrgency = "high" | "low";
+export type ComputePostOperation = "upscale" | "frame_interpolation" | "assembly";
+
+export interface ComputeRoutePreviewRequest {
+    stage: ComputeStage;
+    shot_type: ComputeShotType;
+    urgency: ComputeUrgency;
+    duration_sec: number;
+    has_dialogue?: boolean;
+    has_audio?: boolean;
+    closeup_or_hero?: boolean;
+    prefer_libtv_promo?: boolean;
+    post_operation?: ComputePostOperation | null;
+}
+
+export interface ComputeRoutePreview {
+    stage: ComputeStage;
+    shot_type: ComputeShotType;
+    urgency: ComputeUrgency;
+    provider: string;
+    model: string;
+    resolution: string | null;
+    audio: boolean;
+    promo: boolean;
+    rule_id: string;
+    fallback: string[];
+    billed_duration_sec: number;
+    est_cost_cny: number;
+    cost_note: string;
+}
+
 export interface SeriesImportEpisodePreview {
     episode_number: number;
     title: string;
@@ -1023,6 +1062,18 @@ export const api = {
             expected_revision: expectedRevision
         });
         return res.data;
+    },
+
+    previewComputeRoute: async (
+        scriptId: string,
+        frameId: string,
+        request: ComputeRoutePreviewRequest,
+    ): Promise<ComputeRoutePreview> => {
+        const res = await axios.post(
+            `${API_URL}/projects/${scriptId}/frames/${frameId}/compute_route`,
+            request,
+        );
+        return res.data as ComputeRoutePreview;
     },
 
     updateProjectStyle: async (scriptId: string, stylePreset: string, stylePrompt?: string) => {

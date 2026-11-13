@@ -2603,6 +2603,21 @@ function StoryboardR2VSession() {
                             inFlightCount={shotInFlight}
                             onRefineFrame={() => handleRefineFrame(shot.id)}
                             onUnpinVideo={() => changeActiveVideo(shot.id, null)}
+                            onPreviewComputeRoute={projectId ? async () => {
+                                const frame = currentProject?.frames?.find((candidate: any) => candidate.id === shot.id);
+                                const shotType = shot.shot_type ?? "consistency_long";
+                                return api.previewComputeRoute(projectId, shot.id, {
+                                    stage: shot.stage ?? "draft",
+                                    shot_type: shotType,
+                                    urgency: shot.urgency ?? "low",
+                                    duration_sec: paramsState.duration,
+                                    has_dialogue: Boolean(shot.dialogueStructured?.line || frame?.dialogue),
+                                    has_audio: Boolean(frame?.audio_url),
+                                    closeup_or_hero: shotType === "emotion_closeup" || shotType === "hero_cover",
+                                    // Promo is opt-in; preview follows the safe direct route by default.
+                                    prefer_libtv_promo: false,
+                                });
+                            } : undefined}
                             onUpdateDialogue={async (text: string) => {
                                 try { await updateInlineDialogue(shot.id, text); }
                                 catch (e) { debugLog.error("Studio", "update dialogue failed", e); }

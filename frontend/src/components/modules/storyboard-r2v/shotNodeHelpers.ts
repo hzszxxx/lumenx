@@ -29,6 +29,9 @@ type FrameToShotInput = FrameDubLike & {
     shot_size?: string | null;
     camera_angle?: string | null;
     transition_hint?: string | null;
+    shot_type?: ShotNode["shot_type"];
+    urgency?: ShotNode["urgency"];
+    stage?: ShotNode["stage"];
     is_video_pinned?: unknown;
     final_take_id?: string | null;
 };
@@ -262,6 +265,9 @@ export function frameToShotNode(
         shotSize: frame.shot_size ?? null,
         cameraAngle: frame.camera_angle ?? null,
         transitionHint: frame.transition_hint ?? null,
+        shot_type: frame.shot_type,
+        urgency: frame.urgency,
+        stage: frame.stage,
         isVideoPinned: Boolean(frame.is_video_pinned),
         finalTakeId: frame.final_take_id ?? null,
     });
