@@ -409,6 +409,24 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('StoryboardR2V video submit readback', () => {
+    it('edits and reads back the project compute budget with revision CAS', async () => {
+        const initial = projectWithVideoTasks();
+        vi.mocked(axios.put).mockResolvedValueOnce({ data: { id: initial.id, revision: 4, compute_budget_cny: 12.5 } });
+        vi.mocked(axios.get).mockResolvedValueOnce({ data: enriched({ ...ack(initial.frames, initial.id, 4), compute_budget_cny: 12.5 }) });
+        renderPage(initial);
+
+        const input = screen.getByRole('spinbutton', { name: /project budget|项目预算/i });
+        fireEvent.change(input, { target: { value: '12.5' } });
+        fireEvent.click(screen.getByRole('button', { name: /save|保存/i }));
+
+        await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+            `${API_URL}/projects/${initial.id}/compute_budget`,
+            { budget_cny: 12.5, expected_revision: initial.revision },
+        ));
+        await waitFor(() => expect(axios.get).toHaveBeenCalled());
+        await waitFor(() => expect(useProjectStore.getState().currentProject?.compute_budget_cny).toBe(12.5));
+    });
+
     it('routes failed-state retry through batch submit and accepts only after committed task readback', async () => {
         const accepted = videoTask('task-1');
         vi.mocked(axios.post).mockResolvedValueOnce({ data: accepted });

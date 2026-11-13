@@ -166,6 +166,8 @@ function StoryboardR2VSession() {
     const audioOperation = dialogueAudioOperationKey(projectId ?? "");
     const audioBusy = useProjectStore(state => !!state.runningOps[audioOperation]);
     const command = useFrameCommand(projectId);
+    const [computeBudgetDraft, setComputeBudgetDraft] = useState("");
+    const [computeBudgetSaving, setComputeBudgetSaving] = useState(false);
     const requiresReadback = command.error === 'savedReadFailed' || command.error === 'submitUnconfirmed';
     const { isBusy: isStructureBusy, setError: setCommandError } = command;
     const editSavesRef = useRef(new Set<Promise<unknown>>());
@@ -187,6 +189,11 @@ function StoryboardR2VSession() {
         readSessionVersion.current += 1;
         return () => { readSessionVersion.current += 1; };
     }, [currentProject?.id, currentProject?.readEnvironment]);
+
+    useEffect(() => {
+        const budget = currentProject?.compute_budget_cny;
+        setComputeBudgetDraft(budget == null ? "" : String(budget));
+    }, [currentProject?.id, currentProject?.compute_budget_cny]);
 
     const currentProjectReadGuard = useCallback((expectedProjectId: string, expectedEnvironment = getRuntimeEnvironment()) => {
         const version = readSessionVersion.current;
@@ -685,6 +692,37 @@ function StoryboardR2VSession() {
         setExpandedShots(previous => new Set(Array.from(previous).filter(id => ids.has(id))));
         lastStructureRevisionRef.current = snapshot.revision;
     }, []);
+
+    const saveComputeBudget = useCallback(async () => {
+        if (!currentProject?.id || computeBudgetSaving) return;
+        const raw = computeBudgetDraft.trim();
+        const budget = raw === "" ? null : Number(raw);
+        if (budget !== null && (!Number.isFinite(budget) || budget < 0)) {
+            toast.error(t("computeBudgetInvalid"));
+            return;
+        }
+        const projectId = currentProject.id;
+        const environment = requireActiveRuntimeEnvironment();
+        const isCurrent = currentProjectReadGuard(projectId, environment);
+        if (!isCurrent()) return;
+        setComputeBudgetSaving(true);
+        try {
+            const saved = await api.updateComputeBudget(projectId, budget, currentProject.revision);
+            if (!isCurrent() || saved?.id !== projectId) throw new ProjectReadbackError("Compute budget save acknowledgement is invalid");
+            await readProjectOnce(projectId, undefined, { isCurrent: snapshot =>
+                isCurrent() && snapshot.compute_budget_cny === budget
+                    && snapshot.revision === saved.revision });
+            toast.success(t("computeBudgetSaved"));
+        } catch (error) {
+            if (isCurrent()) {
+                setComputeBudgetDraft(currentProject.compute_budget_cny == null ? "" : String(currentProject.compute_budget_cny));
+                setCommandError(error instanceof ProjectReadbackError ? "savedReadFailed" : "failedEdits");
+                toast.error(t("computeBudgetSaveFailed"));
+            }
+        } finally {
+            if (isCurrentRuntimeEnvironment(environment.key, environment.generation)) setComputeBudgetSaving(false);
+        }
+    }, [computeBudgetDraft, computeBudgetSaving, currentProject, currentProjectReadGuard, setCommandError, t]);
 
     const handleSmartGenerate = useCallback(async () => {
         if (!currentProject?.id || isStructureBusy()) return;
@@ -2506,6 +2544,32 @@ function StoryboardR2VSession() {
                         <Plus size={13} strokeWidth={2} />
                         {t("addShot")}
                     </motion.button>
+                </div>
+                <div className="ml-auto flex items-center gap-2 rounded-full border border-glass-border bg-glass px-2 py-1">
+                    <label htmlFor="storyboard-compute-budget" className="font-mono text-[11px] text-text-secondary">
+                        {t("computeBudgetLabel")}
+                    </label>
+                    <input
+                        id="storyboard-compute-budget"
+                        aria-label={t("computeBudgetLabel")}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={computeBudgetDraft}
+                        onChange={event => setComputeBudgetDraft(event.target.value)}
+                        placeholder={t("computeBudgetUnset")}
+                        className="w-24 bg-transparent px-1 py-0.5 text-right font-mono text-xs text-foreground outline-none"
+                    />
+                    <span className="font-mono text-[11px] text-text-muted">¥</span>
+                    <button
+                        type="button"
+                        onClick={() => void saveComputeBudget()}
+                        disabled={computeBudgetSaving}
+                        className="rounded-full bg-primary px-2.5 py-1 font-mono text-[11px] font-semibold text-on-accent disabled:opacity-50"
+                    >
+                        {computeBudgetSaving ? t("computeBudgetSaving") : t("computeBudgetSave")}
+                    </button>
                 </div>
                 {shots.length > 1 ? (
                     <div className="ml-auto flex items-center gap-2">
