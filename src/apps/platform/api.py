@@ -74,7 +74,7 @@ class SubmissionReviewIn(BaseModel): approved: bool; score: float | None = None;
 class CreditEstimateIn(BaseModel): provider: str; model: str; prompt_tokens: int = Field(ge=0); completion_tokens: int = Field(ge=0)
 class MediaCreditEstimateIn(BaseModel): provider: str; model: str; media_kind: str; units: int = Field(gt=0)
 class CreditGrantIn(BaseModel): user_id: str; amount_credits: int = Field(gt=0); reason: str = Field(min_length=1, max_length=200); idempotency_key: str = Field(min_length=8, max_length=200)
-class CreditReservationIn(BaseModel): estimated_credits: int = Field(gt=0); generation_id: str = Field(min_length=1, max_length=200); pricing_version: str = Field(min_length=1, max_length=100); idempotency_key: str = Field(min_length=8, max_length=200)
+class CreditReservationIn(BaseModel): estimated_credits: int = Field(gt=0); generation_id: str = Field(min_length=1, max_length=200); pricing_version: str = Field(min_length=1, max_length=100); idempotency_key: str = Field(min_length=8, max_length=200); product: str | None = Field(default=None, pattern=r"^(studio|atelier)$"); project_id: str | None = Field(default=None, min_length=1, max_length=128)
 class CreditSettleIn(BaseModel): actual_credits: int = Field(ge=0)
 class CredentialIn(BaseModel): provider: str = Field(min_length=1, max_length=50); label: str = Field(min_length=1, max_length=80); api_key: str = Field(min_length=16, max_length=500)
 class ProjectBindingIn(BaseModel):
@@ -311,7 +311,7 @@ def credit_ledger(limit: int = 100, user=Depends(current_user), svc: PlatformSer
 def credit_grant(body: CreditGrantIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.grant_credits(user, body.user_id, body.amount_credits, body.reason, body.idempotency_key))
 
 @router.post("/credits/reservations")
-def credit_reserve(body: CreditReservationIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.reserve_credits(user, body.estimated_credits, body.generation_id, body.pricing_version, body.idempotency_key))
+def credit_reserve(body: CreditReservationIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.reserve_credits(user, body.estimated_credits, body.generation_id, body.pricing_version, body.idempotency_key, product=body.product, project_id=body.project_id))
 
 @router.post("/credits/reservations/{reservation_id}/settle")
 def credit_settle(reservation_id: str, body: CreditSettleIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.settle_credits(user, reservation_id, body.actual_credits))

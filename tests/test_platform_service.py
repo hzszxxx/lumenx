@@ -124,6 +124,38 @@ def test_media_credit_reservation_uses_pricing_version_and_is_idempotent(tmp_pat
     assert settled["actual_credits"] == 8
 
 
+def test_project_scoped_reservation_requires_active_binding_and_preserves_scope(tmp_path):
+    svc = service(tmp_path)
+    admin = svc.register("admin", "a" * 12, role="admin")
+    creator = svc.register("scoped-user", "b" * 12)
+    svc.grant_credits(admin, creator["id"], 100, "trial", "scoped-grant-1")
+    with pytest.raises(PlatformError, match="active platform project binding") as exc_info:
+        svc.reserve_credits(creator, 10, "generation-scoped-1", "pricing-v1", "scoped-reserve-1", product="studio", project_id="studio-1")
+    assert exc_info.value.code == "project_binding_required"
+
+    svc.bind_project(admin, user_id=creator["id"], product="studio", project_id="studio-1")
+    reservation = svc.reserve_credits(creator, 10, "generation-scoped-1", "pricing-v1", "scoped-reserve-1", product="studio", project_id="studio-1")
+    assert reservation["product"] == "studio"
+    assert reservation["project_id"] == "studio-1"
+    with connect(svc.path) as connection:
+        metadata = json.loads(connection.execute("SELECT metadata_json FROM credit_ledger WHERE reference_id=?", (reservation["reservation_id"],)).fetchone()[0])
+    assert metadata == {"pricing_version": "pricing-v1", "product": "studio", "project_id": "studio-1"}
+    released = svc.release_credits(creator, reservation["reservation_id"])
+    assert released["released_credits"] == 10
+
+
+def test_project_scope_is_part_of_reservation_idempotency_contract(tmp_path):
+    svc = service(tmp_path)
+    admin = svc.register("admin", "a" * 12, role="admin")
+    creator = svc.register("scope-replay-user", "b" * 12)
+    svc.grant_credits(admin, creator["id"], 100, "trial", "scope-replay-grant-1")
+    svc.bind_project(admin, user_id=creator["id"], product="studio", project_id="studio-2")
+    svc.reserve_credits(creator, 10, "generation-scope-replay", "pricing-v1", "scope-replay-1", product="studio", project_id="studio-2")
+    with pytest.raises(PlatformError, match="different project scope") as exc_info:
+        svc.reserve_credits(creator, 10, "generation-scope-replay", "pricing-v1", "scope-replay-1")
+    assert exc_info.value.code == "idempotency_key_reused"
+
+
 def _skill_manifest(name="story-scout", version="1.0.0", title="Story Scout"):
     import hashlib
     import json

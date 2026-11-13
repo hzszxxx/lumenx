@@ -943,11 +943,13 @@ class PlatformService:
                 "pricing_version": row[0], "credits_per_unit": row[1], "estimated_credits": row[1] * units}
 
     def reserve_media_credits(self, actor: dict[str, Any], provider: str, model: str, media_kind: str,
-                              units: int, generation_id: str, idempotency_key: str) -> dict[str, Any]:
+                              units: int, generation_id: str, idempotency_key: str, *,
+                              product: str | None = None, project_id: str | None = None) -> dict[str, Any]:
         """Create an idempotent reservation using the frozen media price version."""
         estimate = self.estimate_media_credits(provider, model, media_kind, units)
         return {**self.reserve_credits(actor, estimate["estimated_credits"], generation_id,
-                                        estimate["pricing_version"], idempotency_key), **estimate}
+                                        estimate["pricing_version"], idempotency_key,
+                                        product=product, project_id=project_id), **estimate}
 
     def settle_media_credits(self, actor: dict[str, Any], reservation_id: str,
                              actual_units: int, *, provider: str, model: str,
@@ -992,21 +994,40 @@ class PlatformService:
             self._audit(c, issuer["id"], "credits.granted", "user", user_id, {"amount_credits": amount, "reason": reason})
         return {"id": entry_id, "user_id": user_id, "amount_credits": amount, "status": "credited", "idempotent_replay": False}
 
-    def reserve_credits(self, actor: dict[str, Any], estimated_credits: int, generation_id: str, pricing_version: str, idempotency_key: str) -> dict[str, Any]:
+    @staticmethod
+    def _credit_scope_metadata(product: str | None, project_id: str | None) -> dict[str, str]:
+        return {key: value for key, value in (("product", product), ("project_id", project_id)) if value is not None}
+
+    def _validate_credit_project_scope(self, c: sqlite3.Connection, actor: dict[str, Any], *, product: str | None, project_id: str | None) -> None:
+        if (product is None) != (project_id is None):
+            raise PlatformError("invalid_credit_project_scope", "product and project_id must be provided together", 422)
+        if product is None:
+            return
+        if product not in {"studio", "atelier"} or not project_id or not c.execute(
+            "SELECT 1 FROM platform_project_bindings WHERE user_id=? AND product=? AND project_id=? AND status='active'",
+            (actor["id"], product, project_id),
+        ).fetchone():
+            raise PlatformError("project_binding_required", "an active platform project binding is required", 403)
+
+    def reserve_credits(self, actor: dict[str, Any], estimated_credits: int, generation_id: str, pricing_version: str, idempotency_key: str, *, product: str | None = None, project_id: str | None = None) -> dict[str, Any]:
         if estimated_credits <= 0: raise PlatformError("invalid_credit_amount", "reservation must be positive")
         with connect(self.path) as c:
-            old = c.execute("SELECT id,estimated_credits,status FROM credit_reservations WHERE idempotency_key=? AND user_id=?", (idempotency_key, actor["id"])).fetchone()
-            if old: return {"reservation_id": old[0], "estimated_credits": old[1], "status": old[2], "idempotent_replay": True}
+            self._validate_credit_project_scope(c, actor, product=product, project_id=project_id)
+            old = c.execute("SELECT id,estimated_credits,status,product,project_id FROM credit_reservations WHERE idempotency_key=? AND user_id=?", (idempotency_key, actor["id"])).fetchone()
+            if old:
+                if (old[3], old[4]) != (product, project_id):
+                    raise PlatformError("idempotency_key_reused", "Idempotency-Key was already used with a different project scope", 409)
+                return {"reservation_id": old[0], "estimated_credits": old[1], "status": old[2], "product": old[3], "project_id": old[4], "idempotent_replay": True}
             balance = c.execute("SELECT COALESCE(SUM(CASE WHEN direction IN ('credit','release','refund') THEN amount_credits ELSE -amount_credits END),0) FROM credit_ledger WHERE user_id=?", (actor["id"],)).fetchone()[0]
             if balance < estimated_credits: raise PlatformError("insufficient_credits", "insufficient platform credits", 402)
             reservation_id = uid(); timestamp = now()
-            c.execute("INSERT INTO credit_reservations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (reservation_id, actor["id"], generation_id, estimated_credits, 0, 0, pricing_version, "reserved", idempotency_key, timestamp, timestamp))
-            c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], estimated_credits, "debit", "reservation", reservation_id, f"{idempotency_key}:reserve", "{}", timestamp))
-        return {"reservation_id": reservation_id, "estimated_credits": estimated_credits, "status": "reserved", "idempotent_replay": False}
+            c.execute("INSERT INTO credit_reservations (id,user_id,generation_id,estimated_credits,settled_credits,released_credits,pricing_version,status,idempotency_key,created_at,updated_at,product,project_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (reservation_id, actor["id"], generation_id, estimated_credits, 0, 0, pricing_version, "reserved", idempotency_key, timestamp, timestamp, product, project_id))
+            c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], estimated_credits, "debit", "reservation", reservation_id, f"{idempotency_key}:reserve", json.dumps({"pricing_version": pricing_version, **self._credit_scope_metadata(product, project_id)}, ensure_ascii=False), timestamp))
+        return {"reservation_id": reservation_id, "estimated_credits": estimated_credits, "status": "reserved", "product": product, "project_id": project_id, "idempotent_replay": False}
 
-    def reserve_for_usage(self, actor: dict[str, Any], provider: str, model: str, prompt_tokens: int, completion_tokens: int, generation_id: str, idempotency_key: str) -> dict[str, Any]:
+    def reserve_for_usage(self, actor: dict[str, Any], provider: str, model: str, prompt_tokens: int, completion_tokens: int, generation_id: str, idempotency_key: str, *, product: str | None = None, project_id: str | None = None) -> dict[str, Any]:
         estimate = self.estimate_credits(provider, model, prompt_tokens, completion_tokens)
-        return {**self.reserve_credits(actor, estimate["estimated_credits"], generation_id, estimate["pricing_version"], idempotency_key), "pricing_version": estimate["pricing_version"], "estimated_credits": estimate["estimated_credits"]}
+        return {**self.reserve_credits(actor, estimate["estimated_credits"], generation_id, estimate["pricing_version"], idempotency_key, product=product, project_id=project_id), "pricing_version": estimate["pricing_version"], "estimated_credits": estimate["estimated_credits"]}
 
     def settle_for_usage(self, actor: dict[str, Any], reservation_id: str, provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> dict[str, Any]:
         estimate = self.estimate_credits(provider, model, prompt_tokens, completion_tokens)
@@ -1015,25 +1036,25 @@ class PlatformService:
     def settle_credits(self, actor: dict[str, Any], reservation_id: str, actual_credits: int) -> dict[str, Any]:
         if actual_credits < 0: raise PlatformError("invalid_credit_amount", "actual credits cannot be negative")
         with connect(self.path) as c:
-            row = c.execute("SELECT user_id,estimated_credits,status FROM credit_reservations WHERE id=?", (reservation_id,)).fetchone()
+            row = c.execute("SELECT user_id,estimated_credits,status,product,project_id FROM credit_reservations WHERE id=?", (reservation_id,)).fetchone()
             if not row or row[0] != actor["id"]: raise PlatformError("reservation_not_found", "credit reservation not found", 404)
             if row[2] != "reserved": return {"reservation_id": reservation_id, "status": row[2], "actual_credits": actual_credits, "idempotent_replay": True}
             extra = max(0, actual_credits - row[1]); release = max(0, row[1] - actual_credits)
             if extra:
                 balance = c.execute("SELECT COALESCE(SUM(CASE WHEN direction IN ('credit','release','refund') THEN amount_credits ELSE -amount_credits END),0) FROM credit_ledger WHERE user_id=?", (actor["id"],)).fetchone()[0]
                 if balance < extra: raise PlatformError("insufficient_credits", "additional settlement credits are unavailable", 402)
-                c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], extra, "debit", "settlement", reservation_id, f"{reservation_id}:extra", "{}", now()))
+                c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], extra, "debit", "settlement", reservation_id, f"{reservation_id}:extra", json.dumps(self._credit_scope_metadata(row[3], row[4]), ensure_ascii=False), now()))
             if release:
-                c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], release, "release", "settlement", reservation_id, f"{reservation_id}:release", "{}", now()))
+                c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], release, "release", "settlement", reservation_id, f"{reservation_id}:release", json.dumps(self._credit_scope_metadata(row[3], row[4]), ensure_ascii=False), now()))
             c.execute("UPDATE credit_reservations SET settled_credits=?,released_credits=?,status='settled',updated_at=? WHERE id=?", (actual_credits, release, now(), reservation_id))
         return {"reservation_id": reservation_id, "status": "settled", "actual_credits": actual_credits, "released_credits": release, "additional_credits": extra, "idempotent_replay": False}
 
     def release_credits(self, actor: dict[str, Any], reservation_id: str) -> dict[str, Any]:
         with connect(self.path) as c:
-            row = c.execute("SELECT user_id,estimated_credits,status FROM credit_reservations WHERE id=?", (reservation_id,)).fetchone()
+            row = c.execute("SELECT user_id,estimated_credits,status,product,project_id FROM credit_reservations WHERE id=?", (reservation_id,)).fetchone()
             if not row or row[0] != actor["id"]: raise PlatformError("reservation_not_found", "credit reservation not found", 404)
             if row[2] != "reserved": return {"reservation_id": reservation_id, "status": row[2], "idempotent_replay": True}
-            c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], row[1], "release", "reservation", reservation_id, f"{reservation_id}:release", "{}", now()))
+            c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], row[1], "release", "reservation", reservation_id, f"{reservation_id}:release", json.dumps(self._credit_scope_metadata(row[3], row[4]), ensure_ascii=False), now()))
             c.execute("UPDATE credit_reservations SET released_credits=?,status='released',updated_at=? WHERE id=?", (row[1], now(), reservation_id))
         return {"reservation_id": reservation_id, "status": "released", "released_credits": row[1], "idempotent_replay": False}
 
