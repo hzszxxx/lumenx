@@ -156,6 +156,9 @@ export interface Prop {
 export interface StoryboardFrame {
     id: string;
     scene_id: string;
+    shot_type?: "consistency_long" | "action_hard" | "emotion_closeup" | "dialogue_av" | "hero_cover" | "filler";
+    urgency?: "high" | "low";
+    stage?: "draft" | "final" | "post";
     image_url?: string;
     image_asset?: ImageAsset;
     rendered_image_url?: string;
