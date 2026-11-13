@@ -8,6 +8,7 @@
 | 邀请码注册与消费 | `registration_invites`; `/api/platform/auth/register`; `/api/platform/auth/invites` | `tests/test_platform_service.py::test_registration_requires_single_use_invite_when_enabled`; `tests/test_platform_skill_api.py::test_registration_api_accepts_and_consumes_invite` | 生产默认强制邀请码；一次性消费、过期/次数限制和管理员生成已通过 |
 | 测试会话首次注册免重复邀请码 | `platform_test_access_bindings`; AppAccess cookie → `/api/platform/auth/register` | `tests/test_platform_service.py::test_test_access_binding_bypasses_invite_once`; `tests/test_app_access_boundary.py::test_remote_test_code_exchanges_once_for_cookie_session` | 仅短码兑换会话可用；短码哈希与平台用户一对一持久化绑定，普通长令牌/匿名请求仍需邀请码 |
 | artifact 不可变快照 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_artifact_snapshot_is_immutable_and_rejects_client_url_only_evidence` | Gate 0 合同通过 |
+| Core artifact resolver 查找/解析合同 | `src/core/artifact_resolver.py` | `tests/test_artifact_resolver_contract.py`；`tests/test_core_dependency_boundaries.py` | S1 中性合同通过；Studio/Atelier adapter 与平台接线仍待完成 |
 | 幂等上下文与整数分账本字段 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_idempotency_and_ledger_contracts_reject_invalid_values` | Gate 0 合同通过 |
 | SQLite 迁移与恢复 | `src/apps/platform/db.py` | `tests/test_platform_db.py` | Sprint 1 第一切片通过 |
 | 账户会话、撤销、角色授权 | `src/apps/platform/service.py` + `api.py` | `tests/test_platform_service.py::test_auth_session_revocation_and_password_policy` | Sprint 1 通过 |
