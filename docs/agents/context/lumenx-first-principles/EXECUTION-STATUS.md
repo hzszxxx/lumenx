@@ -372,3 +372,11 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 分支/提交：`feature/skill-runtime-production` / `a254ec3`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_project_bindings.py tests/test_platform_contracts.py tests/test_platform_service.py tests/test_platform_admin_api.py tests/test_core_dependency_boundaries.py -q`（56 passed）。
 - 证据边界：绑定只是平台授权事实，尚未证明对应 Studio/Atelier 项目实际存在；resolver ownership callback、真实媒体 probe 和平台提交接线仍待完成。
+
+## 2026-11-13 Core product resolver dispatch 切片
+
+新增 `ProductArtifactResolver`，按显式 `ArtifactProduct` 将 lookup 分发到 Studio 或 Atelier adapter。该组合器不导入产品实现、不修改平台提交行为，后续由应用组合根注入带项目绑定和媒体证明的实例。
+
+- 分支/提交：`feature/skill-runtime-production` / `405f1b2`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_platform_project_bindings.py tests/test_core_dependency_boundaries.py -q`（39 passed）。
+- 证据边界：尚未把组合 resolver 注入 PlatformService；平台提交和任务交付仍接受旧快照字段。

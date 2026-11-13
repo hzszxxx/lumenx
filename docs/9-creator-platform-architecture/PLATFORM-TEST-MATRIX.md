@@ -9,6 +9,7 @@
 | 测试会话首次注册免重复邀请码 | `platform_test_access_bindings`; AppAccess cookie → `/api/platform/auth/register` | `tests/test_platform_service.py::test_test_access_binding_bypasses_invite_once`; `tests/test_app_access_boundary.py::test_remote_test_code_exchanges_once_for_cookie_session` | 仅短码兑换会话可用；短码哈希与平台用户一对一持久化绑定，普通长令牌/匿名请求仍需邀请码 |
 | artifact 不可变快照 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_artifact_snapshot_is_immutable_and_rejects_client_url_only_evidence` | Gate 0 合同通过 |
 | Core artifact resolver 查找/解析合同 | `src/core/artifact_resolver.py` | `tests/test_artifact_resolver_contract.py`；`tests/test_core_dependency_boundaries.py` | S1 中性合同通过；Studio/Atelier adapter 与平台接线仍待完成 |
+| Core product resolver dispatch | `src/core/artifact_resolver.py::ProductArtifactResolver` | `tests/test_artifact_resolver_contract.py::test_product_resolver_dispatches_by_explicit_product` | 按显式 product 分发通过；平台服务注入和提交接线仍待完成 |
 | Studio/Atelier artifact resolver adapters | `src/apps/comic_gen/artifact_resolver.py`；`src/apps/atelier/artifact_resolver.py` | `tests/test_artifact_resolver_adapters.py` | 只读 adapter 合同通过；所有权映射、真实媒体 probe 和平台接线仍待完成 |
 | 显式平台项目绑定 | `platform_project_bindings`; `/api/platform/admin/project-bindings` | `tests/test_platform_project_bindings.py` | 管理员创建/撤销、用户隔离、storage_id 约束和 API 管理边界通过；尚未接入 resolver ownership callback |
 | 幂等上下文与整数分账本字段 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_idempotency_and_ledger_contracts_reject_invalid_values` | Gate 0 合同通过 |

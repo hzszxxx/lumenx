@@ -4,6 +4,7 @@ from src.core.artifact_resolver import (
     ArtifactLookup,
     ArtifactProduct,
     ArtifactResolutionError,
+    ProductArtifactResolver,
     ResolvedArtifact,
 )
 
@@ -67,4 +68,28 @@ def test_resolution_error_requires_stable_code_and_safe_message():
 
     assert error.code == "artifact_not_found"
     assert str(error) == "artifact was not found"
+
+
+def test_product_resolver_dispatches_by_explicit_product():
+    class Stub:
+        def __init__(self, product):
+            self.product = product
+
+        def resolve(self, actor_id, lookup):
+            assert lookup.product is self.product
+            return {"actor_id": actor_id, "product": lookup.product.value}
+
+    resolver = ProductArtifactResolver(
+        studio=Stub(ArtifactProduct.STUDIO),
+        atelier=Stub(ArtifactProduct.ATELIER),
+    )
+    lookup = ArtifactLookup(
+        product=ArtifactProduct.ATELIER,
+        project_id="project-1",
+        artifact_id="export-1",
+        artifact_version="v1",
+        sha256="a" * 64,
+    )
+
+    assert resolver.resolve("user-1", lookup) == {"actor_id": "user-1", "product": "atelier"}
 

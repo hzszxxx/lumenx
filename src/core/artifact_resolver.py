@@ -69,3 +69,19 @@ class ArtifactResolver(Protocol):
     def resolve(self, actor_id: str, lookup: ArtifactLookup) -> ResolvedArtifact:
         """Resolve and ownership-check one artifact without mutating state."""
 
+
+class ProductArtifactResolver:
+    """Dispatch artifact lookups to product-owned read-only adapters."""
+
+    def __init__(self, *, studio: ArtifactResolver, atelier: ArtifactResolver) -> None:
+        self._adapters = {
+            ArtifactProduct.STUDIO: studio,
+            ArtifactProduct.ATELIER: atelier,
+        }
+
+    def resolve(self, actor_id: str, lookup: ArtifactLookup) -> ResolvedArtifact:
+        adapter = self._adapters.get(lookup.product)
+        if adapter is None:
+            raise ArtifactResolutionError("artifact_product_unavailable", "No resolver is registered for this product")
+        return adapter.resolve(actor_id, lookup)
+
