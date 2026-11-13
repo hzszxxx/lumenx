@@ -336,7 +336,7 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 同时收紧 Product Skill 合同：manifest 必须包含 Atelier runtime 所需的描述、分类、提示模板和受控工具集合；system/workspace Skill 的创建和绑定仅限管理员；前端 Skill 编辑器生成完整 manifest，仙宫云界面失败重绑定会清空旧 slot，刷新按钮会实际读取状态 API。
 
 - 责任文件：`src/apps/platform/migrations/012_xiangongyun_bindings.sql`、`src/apps/platform/migrations/013_idempotency_and_xiangongyun_cleanup.sql`、`src/apps/platform/service.py`、`src/apps/platform/api.py`、`frontend/src/lib/platformApi.ts`、`frontend/src/components/platform/SkillSettings.tsx`、`frontend/src/components/platform/XiangongyunSettings.tsx`、`.env.example`、平台回归测试。
-- 分支/提交：`feature/skill-runtime-production` / `633f51d`。
+- 分支/提交：`feature/skill-runtime-production` / `acef40d`。
 - 验证：隔离 runner 执行平台合同、数据库、service、admin 和 Skill API 测试（27 passed）；`npm --prefix frontend run typecheck` 通过；`git diff --check` 通过。
 - 证据边界：未执行真实仙宫云 Token、真实 Provider、生产 HTTPS、云端 Secret/KMS、集中式生产数据库或真实多用户部署；实例生命周期和 H3 生成接入仍是 deferred 能力。
 
