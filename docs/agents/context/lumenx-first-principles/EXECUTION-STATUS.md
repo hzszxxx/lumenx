@@ -361,6 +361,6 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 
 将未跟踪的算力选型资料纳入版本控制：`docs/Dockerfile.csv` 更名为 `docs/storyboard_template.csv`，并与 `docs/算力分析.md`、`docs/SELECTION_TABLE.md`、`docs/routing.yaml` 一起提交。随后新增中性 Core artifact resolver 合同：`ArtifactLookup` 不接受客户端 URL、路径、标题或媒体类型；`ResolvedArtifact` 保存不可变的服务端成果身份、归属、受管媒体引用和合同版本。Core 不导入 Studio、Atelier 或平台代码。
 
-- 分支/提交：`feature/skill-runtime-production` / `dafdb2a`（文档整理）；S1 合同提交为 `ae26f39`。
-- 验证：文档结构检查及回归通过；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_artifact_resolver_contract.py tests/test_core_dependency_boundaries.py -q`（34 passed）。
-- 证据边界：尚未实现 Studio/Atelier resolver adapter，平台赛事提交和任务交付仍保存客户端快照；没有改变真实生成、支付或生产部署行为。
+- 分支/提交：`feature/skill-runtime-production` / `dafdb2a`（文档整理）；S1 Core 合同为 `a6bde25`，产品只读 adapter 为 `9e4f5b4`。
+- 验证：文档结构检查及回归通过；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（36 passed）。
+- 证据边界：Studio/Atelier adapter 仅在注入所有权检查和媒体证明时解析成果；当前没有平台用户到项目的现有归属映射，未接入平台赛事提交和任务交付；没有改变真实生成、支付或生产部署行为。

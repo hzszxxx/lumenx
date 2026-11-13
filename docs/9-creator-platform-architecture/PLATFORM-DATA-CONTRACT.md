@@ -44,7 +44,7 @@ project_id, project_title_snapshot, resolved_at
 
 解析失败、归属不符、版本不存在、媒体类型不允许或哈希变化都拒绝提交；平台不得从客户端 URL 推断权限或重新抓取任意远程地址。
 
-当前 S1 合同切片已在 `src/core/artifact_resolver.py` 固化：`ArtifactLookup` 只接受产品、项目、成果身份、版本和哈希，不接受 URL、路径、标题或媒体类型；`ResolvedArtifact` 是不可变的服务端成果快照，包含归属用户、受管媒体引用、媒体类型、标题、来源类型和合同版本。该切片只定义中性 Core 合同与错误类型，尚未接入 Studio/Atelier 解析器或平台提交行为。
+当前 S1 合同切片已在 `src/core/artifact_resolver.py` 固化：`ArtifactLookup` 只接受产品、项目、成果身份、版本和哈希，不接受 URL、路径、标题或媒体类型；`ResolvedArtifact` 是不可变的服务端成果快照，包含归属用户、受管媒体引用、媒体类型、标题、来源类型和合同版本。Studio/Atelier 已有只读 adapter，但它们要求组合根显式注入用户归属检查和媒体证明；当前尚未接入平台提交行为。
 
 ## 5. 任务状态机
 
