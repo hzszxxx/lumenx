@@ -389,3 +389,12 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 责任文件：`src/apps/platform/service.py`、`src/apps/platform/api.py`、`src/apps/platform/migrations/018_artifact_resolution_snapshots.sql`、`tests/test_platform_service.py`、`tests/test_platform_db.py`、`docs/9-creator-platform-architecture/PLATFORM-DATA-CONTRACT.md`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_service.py tests/test_platform_contracts.py tests/test_platform_project_bindings.py tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（62 passed）；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_db.py tests/test_platform_service.py tests/test_platform_project_bindings.py tests/test_platform_admin_api.py tests/test_platform_skill_api.py -q`（34 passed）；`python3 docs/agents/tools/check_lumenx_refactor_docs.py` 通过。
 - 证据边界：这是 PlatformService 的可注入服务边界，不是生产组合根完成证明；真实 Studio/Atelier ownership callback、媒体 probe、存储身份和应用启动装配仍待下一切片。没有改变真实生成、支付或云端部署状态。
+
+## 2026-11-13 应用组合根装配产品成果 resolver
+
+在 `comic_gen/api.py` 的运行时配置阶段装配 `ProductArtifactResolver`：Studio 使用受管 pipeline 媒体锁、路径约束和哈希验证，Atelier 使用 `AtelierStorage` 的媒体写入 scope 与 publication proof；两者的 ownership callback 都只查询平台 active project binding，并使用当前输出根的 `storage_id` 约束。应用状态保存 resolver 实例，关闭时清理运行时引用。
+
+- 分支/提交：`feature/skill-runtime-production` / `2582376`。
+- 责任文件：`src/apps/comic_gen/api.py`、`tests/test_platform_artifact_resolver_app.py`、`docs/9-creator-platform-architecture/PLATFORM-DATA-CONTRACT.md`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_app_lifecycle.py tests/test_atelier_app_lifecycle.py tests/test_studio_storage_safety.py tests/test_media_access_boundary.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（100 passed）；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_artifact_resolver_app.py tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（38 passed）。
+- 证据边界：已证明本地应用组合根可以装配 resolver，尚未证明真实平台用户已为每个 Studio/Atelier 项目建立绑定，也未做真实 HTTP 提交、远端对象存储、生产多副本或云端故障演练；No-Go 云端部署状态不变。
