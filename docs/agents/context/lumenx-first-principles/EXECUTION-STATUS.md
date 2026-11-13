@@ -443,3 +443,12 @@ Studio 分镜卡现在可以直接编辑并保存 `stage`、`shot_type`、`urgen
 - 责任文件：`docs/routing.yaml`、`docs/SELECTION_TABLE.md`、`src/core/compute_routing.py`、`src/apps/comic_gen/api.py`、`tests/test_compute_routing.py`、`tests/test_studio_ordered_provider_entry.py`。
 - 验证：隔离 runner 执行路由与 ordered Provider admission 回归；随后执行 Provider 入口回归、前端 typecheck/全量测试、文档结构检查和 `git diff --check`。
 - 证据边界：仅 Wan3 ordered-media 已完成 canonical route 到现有生成合同的映射；Seedance、可灵、H3 等路由尚未接入同一 Provider admission。未建立真实供应商结算价、平台积分 reservation 或云端部署证明；不携带 `compute_route` 的历史请求保持兼容。
+
+## 2026-11-13 Studio Wan3 正片生成按钮接入 route admission
+
+Studio `stage=final` 且选择 Wan3 ordered-media 时，生成按钮在 Provider task 提交前先请求 route preview 和 admission；服务端重新核对分镜标签、runtime model、resolution、时长、媒体标记与批次预估。通过后把 `compute_route` 一并写入本地 pending request，未知回执重试复用同一 admission payload。草稿层、旧 Wan2.x 与未完成 runtime 映射的模型保持兼容路径。
+
+- 分支/提交：`feature/skill-runtime-production` / `5311f96`。
+- 责任文件：`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/__tests__/StoryboardR2VSubmit.spec.tsx`、`src/apps/comic_gen/api.py`、`tests/test_studio_ordered_provider_entry.py`。
+- 验证：后端 30 passed；Storyboard UI 48 passed；前端 `test:all`（标准 142 files / 2120 tests，UI 107 files / 1852 tests）、typecheck、文档检查与 `git diff --check`。
+- 证据边界：当前 `budget_cny` 是该批次的服务端估算总额，用于防止客户端路由/价格漂移，不是用户可编辑的项目预算上限；真实项目预算设置、平台积分 reservation、供应商结算和云端部署仍未完成。
