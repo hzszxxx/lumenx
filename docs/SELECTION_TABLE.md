@@ -92,4 +92,4 @@
 
 Studio 分镜生成行提供“路由预估”入口：它按当前分镜的 `stage`、`shot_type`、`urgency` 和时长请求同一预览接口，并展示渠道、模型、分辨率与人民币估算。该卡片是只读决策辅助，不改变现有生成按钮的模型参数，也不代表供应商已接单或已扣费。
 
-Studio 项目可通过 `GET/PUT /projects/{script_id}/compute_budget` 读取或设置项目级人民币预算上限；写入使用项目 `revision` 做 CAS，正片 admission 与 Wan3 ordered-media 提交都会在服务端重新执行该上限。预算上限只约束路由估算，不等于平台积分余额或 Provider 结算；积分 reservation 仍需独立计费接线。
+Studio 故事板工具栏提供项目预算输入框，也可通过 `GET/PUT /projects/{script_id}/compute_budget` 读取或设置项目级人民币预算上限；写入使用项目 `revision` 做 CAS，正片 admission 与 Wan3 ordered-media 提交都会在服务端重新执行该上限。预算上限只约束路由估算，不等于平台积分余额或 Provider 结算；积分 reservation 仍需独立计费接线。

@@ -461,3 +461,12 @@ Studio `Script` 新增可选 `compute_budget_cny`，通过 `GET/PUT /projects/{s
 - 责任文件：`src/apps/comic_gen/models.py`、`src/apps/comic_gen/pipeline.py`、`src/apps/comic_gen/api.py`、`frontend/src/lib/api.ts`、`frontend/src/store/projectStore.ts`、`tests/test_studio_ordered_provider_entry.py`、`frontend/src/__tests__/compute-route-preview-api.test.ts`。
 - 验证：Studio 路由/存储/Provider 回归 106 passed；前端标准测试 142 files / 2121 tests、预算 API 3 tests、typecheck、文档检查与 `git diff --check` 通过。
 - 证据边界：这是 Studio 项目级人民币估算护栏，不是平台积分余额、积分 reservation、供应商结算或累计已消费金额；当前没有把项目 cap 自动换算为积分，也未接入真实商业生成全入口。
+
+## 2026-11-13 Studio 项目预算可见编辑入口切片
+
+故事板工具栏现在显示项目预算输入框，支持设置人民币上限或留空表示不限；保存沿用项目 `revision` CAS，成功后必须通过项目 GET 读回确认，失败会恢复上一次已确认值。该控件只编辑 Studio 项目预算，不改变路由规则或计费来源。
+
+- 分支/提交：`feature/skill-runtime-production` / `0be1011`。
+- 责任文件：`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/__tests__/StoryboardR2VSubmit.spec.tsx`、`frontend/messages/{zh,en}.json`。
+- 验证：Storyboard UI 49 passed；前端标准测试 142 files / 2121 tests；typecheck 与 JSON 文案解析通过。
+- 证据边界：已完成可见编辑、服务端保存和读回闭环；平台积分 reservation、项目累计消费、其他产品入口和云端发布仍未接线。
