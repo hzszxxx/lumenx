@@ -7,6 +7,7 @@ from unittest.mock import patch
 from src.apps.platform.config import PlatformConfig
 from src.apps.platform.db import connect
 from src.apps.platform.service import PlatformError, PlatformService
+from src.core.artifact_resolver import ArtifactProduct, ResolvedArtifact
 
 
 def service(tmp_path):
@@ -343,6 +344,79 @@ def test_certified_creator_claims_delivers_and_review_creates_simulated_ledger(t
     result = svc.review_task(admin, task["id"], True, "accepted")
     assert result["status"] == "settled"
     assert svc.wallet(creator)["simulated_balance_cents"] == 1200
+
+
+def test_platform_submission_persists_injected_resolver_snapshot(tmp_path):
+    class Resolver:
+        def resolve(self, actor_id, lookup):
+            assert actor_id == creator["id"]
+            assert lookup.product is ArtifactProduct.ATELIER
+            assert lookup.project_id == "client-project"
+            assert lookup.artifact_id == "claimed-export"
+            return ResolvedArtifact(
+                product=ArtifactProduct.ATELIER,
+                project_id="client-project",
+                artifact_id="claimed-export",
+                artifact_version="snapshot:server",
+                sha256="b" * 64,
+                media_type="video/mp4",
+                media_ref="managed://atelier/server-export.mp4",
+                title="Server title",
+                owner_id=actor_id,
+                source_kind="sequence_export",
+                contract_version="artifact.v1",
+            )
+
+    svc = PlatformService(
+        PlatformConfig(enabled=True, database_url=f"sqlite:///{tmp_path / 'platform.db'}"),
+        artifact_resolver=Resolver(),
+    )
+    admin = svc.register("admin", "a" * 12, role="admin")
+    creator = svc.register("creator", "b" * 12)
+    competition = svc.create_competition(admin, {"title": "C", "slug": "c", "status": "ongoing", "whitelist_required": False})
+    result = svc.submit_artifact(
+        creator,
+        "competition",
+        competition["id"],
+        {
+            "product": "atelier",
+            "artifact_id": "claimed-export",
+            "artifact_version": "client-version",
+            "sha256": "a" * 64,
+            "media_type": "text/plain",
+            "project_id": "client-project",
+            "project_title_snapshot": "Client title",
+            "title": "Client title",
+        },
+    )
+    assert result["artifact_id"] == "claimed-export"
+    assert result["artifact_version"] == "snapshot:server"
+    assert result["sha256"] == "b" * 64
+    assert result["project_id"] == "client-project"
+    assert result["project_title_snapshot"] == "Server title"
+    with connect(svc.path) as connection:
+        row = connection.execute(
+            "SELECT product,resolved_media_ref,source_kind,contract_version FROM platform_submissions WHERE id=?",
+            (result["id"],),
+        ).fetchone()
+    assert row == ("atelier", "managed://atelier/server-export.mp4", "sequence_export", "artifact.v1")
+
+
+def test_injected_resolver_requires_product_locator(tmp_path):
+    class Resolver:
+        def resolve(self, actor_id, lookup):
+            raise AssertionError("resolver must not receive an incomplete locator")
+
+    svc = PlatformService(
+        PlatformConfig(enabled=True, database_url=f"sqlite:///{tmp_path / 'platform.db'}"),
+        artifact_resolver=Resolver(),
+    )
+    admin = svc.register("admin", "a" * 12, role="admin")
+    creator = svc.register("creator", "b" * 12)
+    competition = svc.create_competition(admin, {"title": "C", "slug": "c", "status": "ongoing", "whitelist_required": False})
+    with pytest.raises(PlatformError) as error:
+        svc.submit_artifact(creator, "competition", competition["id"], artifact())
+    assert error.value.code == "artifact_invalid"
 
 
 def test_claim_is_idempotent_and_competition_whitelist_is_enforced(tmp_path):

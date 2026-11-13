@@ -1,7 +1,8 @@
 """Business services for the creator platform.
 
-The service owns platform tables only. Core/Studio artifacts are accepted as
-immutable snapshots supplied by a future read-only resolver.
+The service owns platform tables only. When the application composition root
+injects a Core artifact resolver, submissions and deliveries persist the
+resolver's authoritative snapshot instead of trusting client metadata.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -17,7 +18,9 @@ import base64
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from pydantic import ValidationError
 
+from ...core.artifact_resolver import ArtifactLookup, ArtifactProduct, ArtifactResolutionError, ArtifactResolver
 from .config import PlatformConfig
 from .contracts import TaskStatus, can_transition
 from .db import connect, migrate
@@ -44,10 +47,66 @@ def verify_password(password: str, digest_hex: str, salt_hex: str) -> bool:
 
 
 class PlatformService:
-    def __init__(self, config: PlatformConfig | None = None):
+    def __init__(self, config: PlatformConfig | None = None, *, artifact_resolver: ArtifactResolver | None = None):
         self.config = config or PlatformConfig.from_env()
         self.path = self.config.sqlite_path()
+        self.artifact_resolver = artifact_resolver
         migrate(self.path)
+
+    def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
+        """Attach the composition-root resolver after product services start."""
+
+        self.artifact_resolver = resolver
+
+    def _resolve_artifact_payload(self, actor: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        """Replace client artifact metadata with a verified product snapshot.
+
+        The optional resolver keeps existing local-only platform tests and
+        legacy data readable while the application composition root is being
+        upgraded. Once injected, every artifact write must name a product and
+        pass the product-owned resolver.
+        """
+
+        if self.artifact_resolver is None:
+            required = ("artifact_id", "artifact_version", "sha256", "media_type", "project_id", "project_title_snapshot", "title")
+            if any(not payload.get(field) for field in required):
+                raise PlatformError("artifact_invalid", "legacy artifact snapshot is incomplete", 422)
+            return dict(payload)
+        try:
+            product = ArtifactProduct(payload["product"])
+            lookup = ArtifactLookup(
+                product=product,
+                project_id=payload["project_id"],
+                artifact_id=payload["artifact_id"],
+                artifact_version=payload["artifact_version"],
+                sha256=payload["sha256"],
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise PlatformError("artifact_invalid", "artifact resolver input is invalid", 422) from exc
+        try:
+            resolved = self.artifact_resolver.resolve(actor["id"], lookup)
+        except ArtifactResolutionError as exc:
+            status = 403 if exc.code in {"artifact_forbidden", "owner_mismatch"} else 422
+            raise PlatformError(exc.code, str(exc), status) from exc
+        if resolved.owner_id != actor["id"]:
+            raise PlatformError("artifact_forbidden", "resolved artifact belongs to another user", 403)
+        if resolved.product != lookup.product or resolved.project_id != lookup.project_id or resolved.artifact_id != lookup.artifact_id:
+            raise PlatformError("artifact_resolution_mismatch", "resolver returned a different artifact identity", 422)
+        return {
+            **payload,
+            "product": resolved.product.value,
+            "artifact_id": resolved.artifact_id,
+            "artifact_version": resolved.artifact_version,
+            "sha256": resolved.sha256,
+            "media_type": resolved.media_type,
+            "project_id": resolved.project_id,
+            "project_title_snapshot": resolved.title,
+            "title": resolved.title,
+            "resolved_media_ref": resolved.media_ref,
+            "source_kind": resolved.source_kind,
+            "contract_version": resolved.contract_version,
+            "resolved_at": now(),
+        }
 
     def _idem(self, c: sqlite3.Connection, actor: str, key: str, request_hash: str | None = None) -> dict[str, Any] | None:
         row = c.execute("SELECT response_json,request_hash FROM idempotency_records WHERE actor_id=? AND key=?", (actor, key)).fetchone()
@@ -1031,9 +1090,10 @@ class PlatformService:
             if not competition: raise PlatformError("not_found", "competition not found", 404)
             if competition[0] not in {"ongoing", "judging"}: raise PlatformError("competition_closed", "competition is not accepting submissions")
             if competition[1] and datetime.fromisoformat(competition[1]) < datetime.now(timezone.utc): raise PlatformError("submission_closed", "submission deadline has passed")
-        sid = uid(); item = {"id": sid, "target_type": target_type, "target_id": target_id, "user_id": actor["id"], **{k: payload[k] for k in ("artifact_id","artifact_version","sha256","media_type","project_id","project_title_snapshot","title")}, "description": payload.get("description", ""), "status": "submitted", "created_at": now()}
+        payload = self._resolve_artifact_payload(actor, payload)
+        sid = uid(); item = {"id": sid, "target_type": target_type, "target_id": target_id, "user_id": actor["id"], **{"product": payload.get("product"), **{k: payload[k] for k in ("artifact_id","artifact_version","sha256","media_type","project_id","project_title_snapshot","title")}}, "description": payload.get("description", ""), "resolved_media_ref": payload.get("resolved_media_ref"), "source_kind": payload.get("source_kind"), "contract_version": payload.get("contract_version"), "resolved_at": payload.get("resolved_at"), "status": "submitted", "created_at": now()}
         with connect(self.path) as c:
-            c.execute("INSERT INTO platform_submissions (id,target_type,target_id,user_id,artifact_id,artifact_version,sha256,media_type,project_id,project_title_snapshot,title,description,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", tuple(item.values()))
+            c.execute("INSERT INTO platform_submissions (id,target_type,target_id,user_id,product,artifact_id,artifact_version,sha256,media_type,project_id,project_title_snapshot,title,description,resolved_media_ref,source_kind,contract_version,resolved_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", tuple(item.values()))
         return item
 
     def review_submission(self, actor: dict[str, Any], submission_id: str, approved: bool, score: float | None, award_title: str | None = None) -> dict[str, Any]:
@@ -1089,8 +1149,14 @@ class PlatformService:
             if not row or row[1] != actor["id"]: raise PlatformError("forbidden", "task is not assigned to this creator", 403)
             current = TaskStatus(row[0]); target = TaskStatus.DELIVERED if current in {TaskStatus.CLAIMED,TaskStatus.IN_PROGRESS} else TaskStatus.RESUBMITTED
             if not can_transition(current, target): raise PlatformError("invalid_transition", "task cannot accept delivery")
+        payload = self._resolve_artifact_payload(actor, payload)
+        with connect(self.path) as c:
+            row = c.execute("SELECT status,claimed_by FROM commercial_tasks WHERE id=?", (task_id,)).fetchone()
+            if not row or row[1] != actor["id"]: raise PlatformError("forbidden", "task is not assigned to this creator", 403)
+            current = TaskStatus(row[0]); target = TaskStatus.DELIVERED if current in {TaskStatus.CLAIMED,TaskStatus.IN_PROGRESS} else TaskStatus.RESUBMITTED
+            if not can_transition(current, target): raise PlatformError("invalid_transition", "task cannot accept delivery")
             n = c.execute("SELECT COALESCE(MAX(version_num),0)+1 FROM task_deliveries WHERE task_id=?", (task_id,)).fetchone()[0]; did=uid(); timestamp=now()
-            c.execute("INSERT INTO task_deliveries VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (did,task_id,actor["id"],payload["artifact_id"],payload["artifact_version"],payload["sha256"],payload["media_type"],payload["project_id"],payload["project_title_snapshot"],n,payload.get("delivery_note",""),"pending","",timestamp))
+            c.execute("INSERT INTO task_deliveries (id,task_id,creator_id,product,artifact_id,artifact_version,sha256,media_type,project_id,project_title_snapshot,resolved_media_ref,source_kind,contract_version,resolved_at,version_num,delivery_note,review_status,review_feedback,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (did,task_id,actor["id"],payload.get("product"),payload["artifact_id"],payload["artifact_version"],payload["sha256"],payload["media_type"],payload["project_id"],payload["project_title_snapshot"],payload.get("resolved_media_ref"),payload.get("source_kind"),payload.get("contract_version"),payload.get("resolved_at"),n,payload.get("delivery_note",""),"pending","",timestamp))
             c.execute("UPDATE commercial_tasks SET status=?,version=version+1 WHERE id=?", (target.value,task_id)); return {"id":did,"task_id":task_id,"version_num":n,"status":target.value}
 
     def review_task(self, actor: dict[str, Any], task_id: str, approved: bool, feedback: str = "") -> dict[str, Any]:

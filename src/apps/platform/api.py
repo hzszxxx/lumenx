@@ -59,7 +59,8 @@ class CompetitionIn(BaseModel):
     title: str; slug: str; description: str = ""; rules_markdown: str = ""; whitelist_required: bool = True; allocated_credits: int = Field(default=0, ge=0); status: str = "draft"; enroll_deadline: str | None = None; submit_deadline: str | None = None
 class WhitelistIn(BaseModel): user_id: str; invite_code: str | None = None
 class ArtifactIn(BaseModel):
-    artifact_id: str; artifact_version: str; sha256: str = Field(pattern=r"^[0-9a-f]{64}$"); media_type: str; project_id: str; project_title_snapshot: str; title: str; description: str = ""
+    product: str | None = Field(default=None, pattern=r"^(studio|atelier)$")
+    artifact_id: str; artifact_version: str; sha256: str = Field(pattern=r"^[0-9a-f]{64}$"); media_type: str | None = None; project_id: str; project_title_snapshot: str | None = None; title: str | None = None; description: str = ""
 class TaskIn(BaseModel): title: str; category: str; brief_markdown: str; bounty_cents: int = Field(ge=0); deadline: str; required_level: str = "standard"; status: str = "draft"
 class DeliveryIn(ArtifactIn): delivery_note: str = ""
 class ReviewIn(BaseModel): approved: bool; feedback: str = ""
