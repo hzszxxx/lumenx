@@ -422,6 +422,6 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 Studio 分镜卡现在可以直接编辑并保存 `stage`、`shot_type`、`urgency` 三个算力路由标签；`frames/update` 与 pipeline 的 CAS 更新链路会校验枚举并持久化标签，路由预估使用保存后的标签。默认值仍保持 `draft / consistency_long / low`，不会改变旧快照或生成提交的模型参数。
 
 - 分支/提交：`feature/skill-runtime-production` / 待提交。
-- 责任文件：`src/apps/comic_gen/api.py`、`src/apps/comic_gen/pipeline.py`、`frontend/src/lib/api.ts`、`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/storyboard-r2v/FieldTagChip.tsx`、`frontend/src/components/modules/storyboard-r2v/ShotCard.tsx`、`frontend/messages/{zh,en}.json`、`tests/test_frame_visual_edits.py`。
+- 责任文件：`src/apps/comic_gen/api.py`、`src/apps/comic_gen/pipeline.py`、`frontend/src/lib/api.ts`、`frontend/src/store/projectStore.ts`、`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/storyboard-r2v/FieldTagChip.tsx`、`frontend/src/components/modules/storyboard-r2v/ShotCard.tsx`、`frontend/messages/{zh,en}.json`、`tests/test_frame_visual_edits.py`。
 - 验证：后端 `tests/test_frame_visual_edits.py` 与路由回归；前端 `npm --prefix frontend run typecheck`、`npm --prefix frontend run test`；文档结构检查和 `git diff --check`。
 - 证据边界：标签编辑仅证明本地/隔离存储的持久化契约；尚未接入 Provider admission、预算上限、真实价格或项目级 preset 冻结，云端 P10 No-Go 状态不变。
