@@ -336,7 +336,7 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 同时收紧 Product Skill 合同：manifest 必须包含 Atelier runtime 所需的描述、分类、提示模板和受控工具集合；system/workspace Skill 的创建和绑定仅限管理员；前端 Skill 编辑器生成完整 manifest，仙宫云界面失败重绑定会清空旧 slot，刷新按钮会实际读取状态 API。
 
 - 责任文件：`src/apps/platform/migrations/012_xiangongyun_bindings.sql`、`src/apps/platform/migrations/013_idempotency_and_xiangongyun_cleanup.sql`、`src/apps/platform/service.py`、`src/apps/platform/api.py`、`frontend/src/lib/platformApi.ts`、`frontend/src/components/platform/SkillSettings.tsx`、`frontend/src/components/platform/XiangongyunSettings.tsx`、`.env.example`、平台回归测试。
-- 分支/提交：`feature/skill-runtime-production` / 待提交。
+- 分支/提交：`feature/skill-runtime-production` / `633f51d`。
 - 验证：隔离 runner 执行平台合同、数据库、service、admin 和 Skill API 测试（27 passed）；`npm --prefix frontend run typecheck` 通过；`git diff --check` 通过。
 - 证据边界：未执行真实仙宫云 Token、真实 Provider、生产 HTTPS、云端 Secret/KMS、集中式生产数据库或真实多用户部署；实例生命周期和 H3 生成接入仍是 deferred 能力。
 
@@ -416,3 +416,12 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 - 责任文件：`src/core/compute_routing.py`、`src/apps/comic_gen/api.py`、`src/apps/comic_gen/models.py`、`src/apps/atelier/models.py`、`frontend/src/lib/api.ts`、`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/storyboard-r2v/ShotCard.tsx`、`frontend/src/components/modules/storyboard-r2v/shotNodeHelpers.ts`、`frontend/messages/{zh,en}.json`、`tests/test_compute_routing.py`、`frontend/src/__tests__/compute-route-preview-api.test.ts`、`frontend/src/__tests__/compute-route-shot-node.test.ts`、`docs/SELECTION_TABLE.md`。
 - 验证：后端隔离 runner（192 passed）；前端新增路由 API/帧标签测试通过；`npm --prefix frontend run typecheck`、`npm --prefix frontend run test`、`python3 docs/agents/tools/check_lumenx_refactor_docs.py` 和 `git diff --check` 通过。
 - 证据边界：Studio 现在可按分镜标签请求只读路由与单镜成本预览，预览不会自动替换生成提交模型、不会预扣积分；仍未接入 Provider admission、真实厂商结算价、预算上限或 UI 中的标签编辑/项目 preset 冻结，草稿/正片/后期规则仍需在真实项目中横评后冻结 preset。
+
+## 2026-11-13 Studio 分镜算力标签可编辑切片
+
+Studio 分镜卡现在可以直接编辑并保存 `stage`、`shot_type`、`urgency` 三个算力路由标签；`frames/update` 与 pipeline 的 CAS 更新链路会校验枚举并持久化标签，路由预估使用保存后的标签。默认值仍保持 `draft / consistency_long / low`，不会改变旧快照或生成提交的模型参数。
+
+- 分支/提交：`feature/skill-runtime-production` / 待提交。
+- 责任文件：`src/apps/comic_gen/api.py`、`src/apps/comic_gen/pipeline.py`、`frontend/src/lib/api.ts`、`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/storyboard-r2v/FieldTagChip.tsx`、`frontend/src/components/modules/storyboard-r2v/ShotCard.tsx`、`frontend/messages/{zh,en}.json`、`tests/test_frame_visual_edits.py`。
+- 验证：后端 `tests/test_frame_visual_edits.py` 与路由回归；前端 `npm --prefix frontend run typecheck`、`npm --prefix frontend run test`；文档结构检查和 `git diff --check`。
+- 证据边界：标签编辑仅证明本地/隔离存储的持久化契约；尚未接入 Provider admission、预算上限、真实价格或项目级 preset 冻结，云端 P10 No-Go 状态不变。

@@ -851,6 +851,28 @@ export default function ShotCard({
                                 }
                                 onChange={(v) => onUpdateField("duration", v)}
                             />
+                            <FieldTagChip
+                                field="stage"
+                                value={shot.stage ?? "draft"}
+                                editorConfig={{ type: "preset", presets: ["draft", "final", "post"], allowCustom: false }}
+                                onChange={(v) => onUpdateField("stage", v)}
+                            />
+                            <FieldTagChip
+                                field="shot_type"
+                                value={shot.shot_type ?? "consistency_long"}
+                                editorConfig={{
+                                    type: "preset",
+                                    presets: ["consistency_long", "action_hard", "emotion_closeup", "dialogue_av", "hero_cover", "filler"],
+                                    allowCustom: false,
+                                }}
+                                onChange={(v) => onUpdateField("shot_type", v)}
+                            />
+                            <FieldTagChip
+                                field="urgency"
+                                value={shot.urgency ?? "low"}
+                                editorConfig={{ type: "preset", presets: ["low", "high"], allowCustom: false }}
+                                onChange={(v) => onUpdateField("urgency", v)}
+                            />
                             {/* Shot size: visible when has value */}
                             {shot.shotSize !== undefined && shot.shotSize !== null && (
                                 <FieldTagChip

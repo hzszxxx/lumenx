@@ -984,6 +984,9 @@ function StoryboardR2VSession() {
                 };
             }
             if (field === "transitionHint") return { ...s, transitionHint: typeof value === "string" ? value : null };
+            if (field === "shot_type") return { ...s, shot_type: typeof value === "string" ? value as ShotNode["shot_type"] : undefined };
+            if (field === "urgency") return { ...s, urgency: typeof value === "string" ? value as ShotNode["urgency"] : undefined };
+            if (field === "stage") return { ...s, stage: typeof value === "string" ? value as ShotNode["stage"] : undefined };
             return s;
         }));
         // Debounce 3s persist to backend
@@ -998,6 +1001,9 @@ function StoryboardR2VSession() {
         if (field === "cameraAngle") backendField.camera_angle = typeof value === "string" ? value : undefined;
         if (field === "cameraMovement") backendField.camera_movement_description = typeof value === "string" ? value : undefined;
         if (field === "transitionHint") backendField.transition_hint = typeof value === "string" ? value : undefined;
+        if (field === "shot_type") backendField.shot_type = typeof value === "string" ? value as NonNullable<typeof backendField.shot_type> : undefined;
+        if (field === "urgency") backendField.urgency = typeof value === "string" ? value as NonNullable<typeof backendField.urgency> : undefined;
+        if (field === "stage") backendField.stage = typeof value === "string" ? value as NonNullable<typeof backendField.stage> : undefined;
         // This endpoint currently ignores omitted/null structured fields. Keep
         // the local clear visible as unsaved instead of accepting a no-op ACK
         // and then allowing a structural snapshot to erase the draft.

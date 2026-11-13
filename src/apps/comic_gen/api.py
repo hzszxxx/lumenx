@@ -5152,6 +5152,11 @@ class UpdateFrameRequest(BaseModel):
     shot_size: Optional[str] = None
     camera_movement_description: Optional[str] = None
     transition_hint: Optional[str] = None
+    shot_type: Optional[Literal[
+        "consistency_long", "action_hard", "emotion_closeup", "dialogue_av", "hero_cover", "filler"
+    ]] = None
+    urgency: Optional[Literal["high", "low"]] = None
+    stage: Optional[Literal["draft", "final", "post"]] = None
 
 @router.post("/projects/{script_id}/frames/update", response_model=Script)
 def update_frame(script_id: str, request: UpdateFrameRequest,
@@ -5174,6 +5179,9 @@ def update_frame(script_id: str, request: UpdateFrameRequest,
             shot_size=request.shot_size,
             camera_movement_description=request.camera_movement_description,
             transition_hint=request.transition_hint,
+            shot_type=request.shot_type,
+            urgency=request.urgency,
+            stage=request.stage,
         )
         return signed_response(updated_script, runtime=pipeline)
     except ValueError as e:

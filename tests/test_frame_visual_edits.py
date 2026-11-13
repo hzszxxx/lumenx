@@ -84,6 +84,28 @@ def test_invalid_visual_is_rejected_before_other_fields_change(runtime):
         runtime.assert_storage_available()
 
 
+def test_compute_route_tags_are_editable_and_persisted(runtime):
+    app = api.create_app(data_dir=runtime.data_dir, load_config=False, pipeline_instance=runtime)
+    with TestClient(app) as client:
+        response = client.post("/projects/p/frames/update", json={
+            "frame_id": "f",
+            "expected_revision": runtime.read_committed_script("p").revision,
+            "shot_type": "hero_cover",
+            "urgency": "high",
+            "stage": "final",
+        })
+        assert response.status_code == 200, response.text
+        frame = response.json()["frames"][0]
+        assert (frame["shot_type"], frame["urgency"], frame["stage"]) == ("hero_cover", "high", "final")
+
+    restored = module.ComicGenPipeline(data_dir=runtime.data_dir, script_processor=Mock())
+    try:
+        frame = restored.get_script("p").frames[0]
+        assert (frame.shot_type, frame.urgency, frame.stage) == ("hero_cover", "high", "final")
+    finally:
+        restored.close()
+
+
 def test_visual_save_failure_reports_unavailable_and_restores_committed_fields(runtime, monkeypatch):
     before = (runtime.data_dir / "projects.json").read_bytes()
     monkeypatch.setattr(runtime._storage, "commit", Mock(side_effect=StorageError("disk full")))

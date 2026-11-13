@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Pencil, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-export type FieldType = "duration" | "shotSize" | "cameraAngle" | "cameraMovement" | "transitionHint";
+export type FieldType = "duration" | "shotSize" | "cameraAngle" | "cameraMovement" | "transitionHint" | "shot_type" | "urgency" | "stage";
 
 interface DurationEditorConfig {
     type: "duration";
@@ -53,6 +53,24 @@ const FIELD_COLORS: Record<FieldType, { bg: string; border: string; text: string
         text: "text-purple-200",
         hoverBorder: "hover:border-purple-400/50",
     },
+    shot_type: {
+        bg: "bg-fuchsia-500/10",
+        border: "border-fuchsia-500/25",
+        text: "text-fuchsia-200",
+        hoverBorder: "hover:border-fuchsia-400/50",
+    },
+    urgency: {
+        bg: "bg-amber-500/10",
+        border: "border-amber-500/25",
+        text: "text-amber-200",
+        hoverBorder: "hover:border-amber-400/50",
+    },
+    stage: {
+        bg: "bg-indigo-500/10",
+        border: "border-indigo-500/25",
+        text: "text-indigo-200",
+        hoverBorder: "hover:border-indigo-400/50",
+    },
 };
 
 const FIELD_LABEL_KEYS: Record<FieldType, string> = {
@@ -61,6 +79,9 @@ const FIELD_LABEL_KEYS: Record<FieldType, string> = {
     cameraAngle: "fieldCameraAngle",
     cameraMovement: "fieldCameraMovement",
     transitionHint: "fieldTransition",
+    shot_type: "fieldShotType",
+    urgency: "fieldUrgency",
+    stage: "fieldStage",
 };
 
 interface FieldTagChipProps {

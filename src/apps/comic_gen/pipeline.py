@@ -3272,7 +3272,7 @@ class ComicGenPipeline:
 
             fields = (
                 "image_prompt", "action_description", "visual_description", "dialogue", "camera_angle", "scene_id",
-                "character_ids", "duration", "shot_size", "transition_hint",
+                "character_ids", "duration", "shot_size", "transition_hint", "shot_type", "urgency", "stage",
             )
             patch = {key: kwargs[key] for key in fields if kwargs.get(key) is not None}
             if "dialogue" in patch and frame.dialogue_structured is not None:

@@ -1055,6 +1055,9 @@ export const api = {
         shot_size?: string;
         camera_movement_description?: string;
         transition_hint?: string;
+        shot_type?: ComputeShotType;
+        urgency?: ComputeUrgency;
+        stage?: ComputeStage;
     }, expectedRevision: number) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/update`, {
             frame_id: frameId,
