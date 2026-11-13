@@ -1108,6 +1108,23 @@ export const api = {
         return res.data as ComputeRouteAdmissionDecision;
     },
 
+    getComputeBudget: async (scriptId: string): Promise<{ project_id: string; budget_cny: number | null; revision: number }> => {
+        const res = await axios.get(`${API_URL}/projects/${scriptId}/compute_budget`);
+        return res.data;
+    },
+
+    updateComputeBudget: async (
+        scriptId: string,
+        budgetCny: number | null,
+        expectedRevision: number,
+    ) => {
+        const res = await axios.put(`${API_URL}/projects/${scriptId}/compute_budget`, {
+            budget_cny: budgetCny,
+            expected_revision: expectedRevision,
+        });
+        return res.data;
+    },
+
     updateProjectStyle: async (scriptId: string, stylePreset: string, stylePrompt?: string) => {
         const res = await axios.patch(`${API_URL}/projects/${scriptId}/style`, {
             style_preset: stylePreset,

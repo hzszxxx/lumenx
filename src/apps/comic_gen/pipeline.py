@@ -6979,6 +6979,26 @@ class ComicGenPipeline:
             self._save_data()
             return self.read_committed_script(script_id)
 
+    def update_compute_budget(
+        self, script_id: str, budget_cny: float | None, *, expected_revision: int,
+    ) -> Script:
+        """Persist the optional project route-admission budget with CAS."""
+
+        if budget_cny is not None and (not isinstance(budget_cny, (int, float)) or isinstance(budget_cny, bool)):
+            raise ValueError("Compute budget must be a number or null")
+        if budget_cny is not None and budget_cny < 0:
+            raise ValueError("Compute budget cannot be negative")
+        with self._save_lock:
+            self.assert_storage_available()
+            script = self.scripts.get(script_id)
+            if script is None:
+                raise ValueError("Script not found")
+            if script.revision != expected_revision:
+                raise StorageConflictError("Project changed; reload before saving the compute budget")
+            script.compute_budget_cny = float(budget_cny) if budget_cny is not None else None
+            self._save_data()
+            return self.read_committed_script(script_id)
+
     def toggle_variant_favorite(self, script_id: str, asset_id: str, asset_type: str, variant_id: str, is_favorited: bool, generation_type: str = None) -> Script:
         return self._change_asset_variant(
             script_id, asset_id, asset_type, variant_id, "favorite", generation_type, is_favorited,

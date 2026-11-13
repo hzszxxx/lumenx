@@ -122,6 +122,46 @@ def test_ordered_http_route_admission_binds_frame_tags_runtime_model_and_budget(
     assert len(response.json()['task_ids']) == len(scheduled) == 2
 
 
+def test_project_compute_budget_is_persisted_with_revision_guard(entry):
+    runtime, client, _, _, _ = entry
+    initial = client.get('/projects/p/compute_budget')
+    assert initial.status_code == 200
+    assert initial.json() == {'project_id': 'p', 'budget_cny': None, 'revision': 0}
+
+    saved = client.put('/projects/p/compute_budget', json={'budget_cny': 5, 'expected_revision': 0})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()['compute_budget_cny'] == 5
+    current = client.get('/projects/p/compute_budget').json()
+    assert current == {'project_id': 'p', 'budget_cny': 5, 'revision': 1}
+
+    stale = client.put('/projects/p/compute_budget', json={'budget_cny': 10, 'expected_revision': 0})
+    assert stale.status_code == 409
+    assert 'changed' in stale.json()['detail']
+    assert runtime.read_committed_script('p').compute_budget_cny == 5
+
+
+def test_ordered_http_route_admission_rejects_project_budget_cap(entry):
+    runtime, client, scheduled, _, _ = entry
+    runtime.scripts['p'].frames[0].stage = 'final'
+    runtime._commit_storage('projects.json')
+    revision = runtime.read_committed_script('p').revision
+    budget = client.put('/projects/p/compute_budget', json={'budget_cny': 5, 'expected_revision': revision})
+    assert budget.status_code == 200, budget.text
+    response = client.post(URL, json=payload(
+        duration=6,
+        resolution='720P',
+        compute_route={
+            'routing': {'stage': 'final', 'shot_type': 'consistency_long', 'urgency': 'low', 'duration_sec': 6},
+            'batch_size': 1,
+            'budget_cny': 20,
+        },
+    ))
+    assert response.status_code == 422
+    assert response.json()['code'] == 'project_budget_exceeded'
+    assert runtime.read_committed_script('p').video_tasks == []
+    assert scheduled == []
+
+
 @pytest.mark.parametrize('compute_route,expected_code', [
     ({
         'routing': {'stage': 'final', 'shot_type': 'consistency_long', 'urgency': 'low', 'duration_sec': 6},

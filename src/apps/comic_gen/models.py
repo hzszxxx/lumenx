@@ -900,6 +900,14 @@ class Script(BaseModel):
     # Model Settings for each generation stage
     model_settings: ModelSettings = Field(default_factory=ModelSettings, description="Model selection for T2I/I2I/I2V")
 
+    # Optional project-level ceiling for route admission estimates.  Omit the
+    # field from legacy snapshots when unset so older project JSON remains
+    # byte/shape compatible; an explicit value is persisted and enforced by
+    # the Studio admission endpoint.
+    compute_budget_cny: Optional[float] = Field(
+        None, ge=0, description="Optional project-level compute admission budget in CNY",
+    )
+
     # Custom prompt configuration for polish stages
     prompt_config: PromptConfig = Field(default_factory=PromptConfig, description="Custom system prompts for polish stages")
 
@@ -933,6 +941,13 @@ class Script(BaseModel):
     # Series association
     series_id: Optional[str] = Field(None, description="ID of the parent Series, None for standalone projects")
     episode_number: Optional[int] = Field(None, description="Episode number within the Series")
+
+    @model_serializer(mode="wrap")
+    def _serialize_optional_compute_budget(self, handler):
+        data = handler(self)
+        if self.compute_budget_cny is None:
+            data.pop("compute_budget_cny", None)
+        return data
 
     # R2V v2 Phase 3 — "Previously on..." panel cache.
     # Generated AI summary of the PREVIOUS episode's script (qwen3.6-plus),

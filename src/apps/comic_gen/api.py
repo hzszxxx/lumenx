@@ -3671,6 +3671,52 @@ def preview_compute_route(
     return default_compute_route_resolver().resolve(request)
 
 
+class UpdateComputeBudgetRequest(BaseModel):
+    """Set or clear the persisted Studio project route-admission ceiling."""
+
+    budget_cny: Optional[float] = Field(default=None, ge=0)
+    expected_revision: StrictInt = Field(..., ge=0)
+
+
+@router.get("/projects/{script_id}/compute_budget")
+def get_compute_budget(
+    script_id: str,
+    pipeline: Any = Depends(get_pipeline),
+):
+    try:
+        script = pipeline.read_committed_script(script_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Script not found") from exc
+    return {
+        "project_id": script_id,
+        "budget_cny": getattr(script, "compute_budget_cny", None),
+        "revision": script.revision,
+    }
+
+
+@router.put("/projects/{script_id}/compute_budget", response_model=Script)
+def update_compute_budget(
+    script_id: str,
+    request: UpdateComputeBudgetRequest,
+    pipeline: Any = Depends(get_pipeline),
+):
+    try:
+        updated_script = pipeline.update_compute_budget(
+            script_id,
+            request.budget_cny,
+            expected_revision=request.expected_revision,
+        )
+        return signed_response(updated_script, runtime=pipeline)
+    except ValueError as exc:
+        if str(exc) == "Script not found":
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except StorageConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except StorageError:
+        raise
+
+
 @router.post(
     "/projects/{script_id}/frames/{frame_id}/compute_route/admission",
     response_model=RouteAdmissionDecision,
@@ -3690,7 +3736,14 @@ def admit_compute_route(
     if not any(frame.id == frame_id for frame in script.frames):
         raise HTTPException(status_code=404, detail="Storyboard frame not found")
     try:
-        return default_compute_route_resolver().admit(request)
+        decision = default_compute_route_resolver().admit(request)
+        project_budget = getattr(script, "compute_budget_cny", None)
+        if project_budget is not None and decision.estimated_total_cny > project_budget:
+            raise RouteResolutionError(
+                "project_budget_exceeded",
+                f"estimated_total_cny={decision.estimated_total_cny:.2f} exceeds project_budget_cny={project_budget:.2f}",
+            )
+        return decision
     except RouteResolutionError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
 
@@ -4067,6 +4120,12 @@ def _validate_provider_route_admission(
         raise RouteResolutionError("provider_model_required", "Provider model is required")
     request_with_runtime = admission.model_copy(update={"requested_runtime_model": runtime_model})
     decision = default_compute_route_resolver().admit(request_with_runtime)
+    project_budget = getattr(script, "compute_budget_cny", None)
+    if project_budget is not None and decision.estimated_total_cny > project_budget:
+        raise RouteResolutionError(
+            "project_budget_exceeded",
+            f"estimated_total_cny={decision.estimated_total_cny:.2f} exceeds project_budget_cny={project_budget:.2f}",
+        )
     request_resolution = raw.get("resolution")
     route_resolution = decision.route.resolution
     if request_resolution is not None and route_resolution is not None:

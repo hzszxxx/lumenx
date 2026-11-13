@@ -305,6 +305,8 @@ export interface Project {
     style_preset?: string;
     art_direction?: ArtDirection;
     model_settings?: ModelSettings;
+    /** Optional server-enforced route-admission ceiling in CNY. */
+    compute_budget_cny?: number | null;
     prompt_config?: PromptConfig;
     workflow_mode?: "i2v_legacy" | "r2v";
     /** PR-3e — Inherited from series; used by StoryboardR2V addShot to
