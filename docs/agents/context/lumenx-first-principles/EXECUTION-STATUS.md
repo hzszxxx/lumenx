@@ -425,3 +425,12 @@ Studio 分镜卡现在可以直接编辑并保存 `stage`、`shot_type`、`urgen
 - 责任文件：`src/apps/comic_gen/api.py`、`src/apps/comic_gen/pipeline.py`、`frontend/src/lib/api.ts`、`frontend/src/store/projectStore.ts`、`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/storyboard-r2v/FieldTagChip.tsx`、`frontend/src/components/modules/storyboard-r2v/ShotCard.tsx`、`frontend/messages/{zh,en}.json`、`tests/test_frame_visual_edits.py`。
 - 验证：后端 `tests/test_frame_visual_edits.py` 与路由回归；前端 `npm --prefix frontend run typecheck`、`npm --prefix frontend run test`；文档结构检查和 `git diff --check`。
 - 证据边界：标签编辑仅证明本地/隔离存储的持久化契约；尚未接入 Provider admission、预算上限、真实价格或项目级 preset 冻结，云端 P10 No-Go 状态不变。
+
+## 2026-11-13 路由 admission 与预算预检切片
+
+新增 Core `RouteAdmissionRequest`/`RouteAdmissionDecision`：服务端重新解析分镜路由，校验可选的 provider/model/resolution 请求是否与当前路由一致，并按批次检查 `budget_cny`。Studio 暴露只读 `/compute_route/admission` 预检接口；超预算或路由不一致返回明确错误，不提交 Provider、不预扣积分，也不改变既有生成入口。
+
+- 分支/提交：`feature/skill-runtime-production` / 待提交。
+- 责任文件：`src/core/compute_routing.py`、`src/apps/comic_gen/api.py`、`frontend/src/lib/api.ts`、`tests/test_compute_routing.py`、`frontend/src/__tests__/compute-route-preview-api.test.ts`。
+- 验证：后端路由/预算回归；前端路由 API 回归；Typecheck、全量前端测试、文档检查与 `git diff --check`。
+- 证据边界：这是生成前只读 admission 预检，不替换现有 Provider admission，不建立真实平台积分 reservation，也不证明供应商价格或云端部署已可用。

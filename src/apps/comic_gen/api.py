@@ -53,7 +53,14 @@ from .models import (
     StoryboardFrame,
     VideoTask,
 )
-from ...core.compute_routing import RouteDecision, ShotRoutingRequest, default_compute_route_resolver
+from ...core.compute_routing import (
+    RouteAdmissionDecision,
+    RouteAdmissionRequest,
+    RouteDecision,
+    RouteResolutionError,
+    ShotRoutingRequest,
+    default_compute_route_resolver,
+)
 from fastapi.responses import JSONResponse, Response
 from ...utils.json_storage import (
     StorageConflictError, StorageError, serialize_json,
@@ -3662,6 +3669,30 @@ def preview_compute_route(
     if not any(frame.id == frame_id for frame in script.frames):
         raise HTTPException(status_code=404, detail="Storyboard frame not found")
     return default_compute_route_resolver().resolve(request)
+
+
+@router.post(
+    "/projects/{script_id}/frames/{frame_id}/compute_route/admission",
+    response_model=RouteAdmissionDecision,
+)
+def admit_compute_route(
+    script_id: str,
+    frame_id: str,
+    request: RouteAdmissionRequest,
+    pipeline: Any = Depends(get_pipeline),
+):
+    """Run a read-only route/model/budget preflight before generation."""
+
+    try:
+        script = pipeline.read_committed_script(script_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Script not found") from exc
+    if not any(frame.id == frame_id for frame in script.frames):
+        raise HTTPException(status_code=404, detail="Storyboard frame not found")
+    try:
+        return default_compute_route_resolver().admit(request)
+    except RouteResolutionError as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
 
 
 @router.post("/projects/{script_id}/storyboard/refine_batch")

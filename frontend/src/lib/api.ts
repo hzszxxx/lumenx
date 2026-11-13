@@ -53,6 +53,23 @@ export interface ComputeRoutePreview {
     cost_note: string;
 }
 
+export interface ComputeRouteAdmissionRequest {
+    routing: ComputeRoutePreviewRequest;
+    batch_size: number;
+    budget_cny: number;
+    requested_provider?: string;
+    requested_model?: string;
+    requested_resolution?: string;
+}
+
+export interface ComputeRouteAdmissionDecision {
+    route: ComputeRoutePreview;
+    batch_size: number;
+    budget_cny: number;
+    estimated_total_cny: number;
+    remaining_cny: number;
+}
+
 export interface SeriesImportEpisodePreview {
     episode_number: number;
     title: string;
@@ -1077,6 +1094,18 @@ export const api = {
             request,
         );
         return res.data as ComputeRoutePreview;
+    },
+
+    admitComputeRoute: async (
+        scriptId: string,
+        frameId: string,
+        request: ComputeRouteAdmissionRequest,
+    ): Promise<ComputeRouteAdmissionDecision> => {
+        const res = await axios.post(
+            `${API_URL}/projects/${scriptId}/frames/${frameId}/compute_route/admission`,
+            request,
+        );
+        return res.data as ComputeRouteAdmissionDecision;
     },
 
     updateProjectStyle: async (scriptId: string, stylePreset: string, stylePrompt?: string) => {

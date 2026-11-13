@@ -101,6 +101,31 @@ class RouteDecision(BaseModel):
     cost_note: str = Field(min_length=1, max_length=240)
 
 
+class RouteAdmissionRequest(BaseModel):
+    """Generation-time preflight inputs layered over a resolved route."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    routing: ShotRoutingRequest
+    batch_size: int = Field(gt=0, le=6)
+    budget_cny: float = Field(ge=0)
+    requested_provider: str | None = Field(default=None, min_length=1, max_length=64)
+    requested_model: str | None = Field(default=None, min_length=1, max_length=128)
+    requested_resolution: str | None = Field(default=None, min_length=1, max_length=32)
+
+
+class RouteAdmissionDecision(BaseModel):
+    """A successful, non-mutating route and budget admission preflight."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    route: RouteDecision
+    batch_size: int = Field(gt=0, le=6)
+    budget_cny: float = Field(ge=0)
+    estimated_total_cny: float = Field(ge=0)
+    remaining_cny: float = Field(ge=0)
+
+
 class RouteResolutionError(ValueError):
     """Raised when the reviewed routing document cannot satisfy a request."""
 
@@ -138,6 +163,34 @@ class ComputeRouteResolver:
         else:
             route = self._resolve_post(request)
         return self._decision(request, **route)
+
+    def admit(self, request: RouteAdmissionRequest) -> RouteAdmissionDecision:
+        """Validate a route choice and batch budget without submitting work."""
+
+        decision = self.resolve(request.routing)
+        mismatches = []
+        for field, requested, expected in (
+            ("provider", request.requested_provider, decision.provider),
+            ("model", request.requested_model, decision.model),
+            ("resolution", request.requested_resolution, decision.resolution),
+        ):
+            if requested is not None and requested != expected:
+                mismatches.append(f"{field}={requested!r} expected {expected!r}")
+        if mismatches:
+            raise RouteResolutionError("route_request_mismatch", "; ".join(mismatches))
+        estimated_total = round(decision.est_cost_cny * request.batch_size, 2)
+        if estimated_total > request.budget_cny:
+            raise RouteResolutionError(
+                "route_budget_exceeded",
+                f"estimated_total_cny={estimated_total:.2f} exceeds budget_cny={request.budget_cny:.2f}",
+            )
+        return RouteAdmissionDecision(
+            route=decision,
+            batch_size=request.batch_size,
+            budget_cny=request.budget_cny,
+            estimated_total_cny=estimated_total,
+            remaining_cny=round(request.budget_cny - estimated_total, 2),
+        )
 
     def _resolve_draft(self, request: ShotRoutingRequest) -> dict[str, Any]:
         draft = self._config["stage_rules"]["draft"]
@@ -291,6 +344,8 @@ __all__ = [
     "DEFAULT_ROUTING_PATH",
     "PostOperation",
     "RouteDecision",
+    "RouteAdmissionDecision",
+    "RouteAdmissionRequest",
     "RouteResolutionError",
     "ShotRoutingRequest",
     "ShotType",
