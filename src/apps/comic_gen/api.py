@@ -681,6 +681,7 @@ def _configure_runtime(
         atelier_store = target_app.state.atelier_storage
         generation_credentials = target_app.state.provider_credential_store
         atelier_storage_identity = str(initialize_storage_identity(output_dir, writer_lock=atelier_store._writer_lock)["storage_id"])
+        _configure_platform_artifact_resolver(target_app, runtime_pipeline, atelier_store, atelier_storage_identity)
 
         generation_runtime_for_scope = provider_runtime_for_scope
 
@@ -928,6 +929,7 @@ def _cleanup_runtime(target_app: FastAPI) -> None:
         "atelier_generation_dispatcher",
         "atelier_generation_selection",
         "atelier_candidate_branch",
+        "platform_artifact_resolver",
         "provider_recovery_runtime",
         "runtime_environment",
         "mulerun_login_session",
@@ -972,6 +974,100 @@ def _build_export_history_external_guard(target_app: FastAPI):
                 yield not has_reference
 
     return guard
+
+
+def _configure_platform_artifact_resolver(target_app: FastAPI, runtime_pipeline: Any, atelier_storage: Any, storage_id: str) -> None:
+    """Inject product-owned artifact resolvers once both stores are live."""
+
+    platform = getattr(target_app.state, "platform_service", None)
+    if platform is None:
+        return
+    from ...core.artifact_resolver import ArtifactProduct, ProductArtifactResolver
+    from ...utils.media_versions import managed_media_file_exists, verify_managed_media_file
+    from ..atelier.artifact_resolver import AtelierArtifactResolver
+    from .artifact_resolver import StudioArtifactResolver
+
+    max_bytes = 200 * 1024 * 1024
+
+    def owns(actor_id: str, product: ArtifactProduct, project_id: str) -> bool:
+        return platform.is_project_bound(
+            user_id=actor_id,
+            product=product.value,
+            project_id=project_id,
+            storage_id=storage_id,
+        )
+
+    def atelier_media_verifier(relative_path: str, expected_sha256: str, expected_size: int) -> None:
+        scope = atelier_storage._media_write_scope()
+        verify_managed_media_file(
+            relative_path,
+            output_root=scope.data_dir,
+            writer_lock=scope.writer_lock,
+            storage_guard=scope.storage_guard,
+            expected_sha256=expected_sha256,
+            expected_size=expected_size,
+            max_bytes=max_bytes,
+            media_kind="video",
+        )
+
+    def read_studio_project(project_id: str):
+        try:
+            return runtime_pipeline.read_committed_script(project_id)
+        except Exception:
+            return None
+
+    def studio_media_probe(media_ref: str) -> tuple[str, int]:
+        guard = getattr(runtime_pipeline, "_provider_media_storage_guard", None)
+        writer_lock = getattr(runtime_pipeline, "_writer_lock", None)
+        output_root = getattr(runtime_pipeline, "data_dir", None)
+        output_path = getattr(runtime_pipeline, "_output_ref_path", None)
+        if guard is None or writer_lock is None or output_root is None or output_path is None:
+            raise ValueError("Studio managed media verifier is unavailable")
+        with guard():
+            if not managed_media_file_exists(
+                media_ref,
+                output_root=output_root,
+                writer_lock=writer_lock,
+                storage_guard=guard,
+                media_kind="video",
+            ):
+                raise ValueError("Studio managed media is missing")
+            path = Path(output_path(media_ref))
+            digest = hashlib.sha256()
+            size = 0
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise ValueError("Studio managed media exceeds max size")
+                    digest.update(chunk)
+            sha256 = digest.hexdigest()
+            verify_managed_media_file(
+                media_ref,
+                output_root=output_root,
+                writer_lock=writer_lock,
+                storage_guard=guard,
+                expected_sha256=sha256,
+                expected_size=size,
+                max_bytes=max_bytes,
+                media_kind="video",
+            )
+            return sha256, size
+
+    resolver = ProductArtifactResolver(
+        studio=StudioArtifactResolver(
+            read_studio_project,
+            ownership_check=lambda actor_id, project_id: owns(actor_id, ArtifactProduct.STUDIO, project_id),
+            media_probe=studio_media_probe,
+        ),
+        atelier=AtelierArtifactResolver(
+            atelier_storage,
+            ownership_check=lambda actor_id, project_id: owns(actor_id, ArtifactProduct.ATELIER, project_id),
+            media_verifier=atelier_media_verifier,
+        ),
+    )
+    platform.set_artifact_resolver(resolver)
+    target_app.state.platform_artifact_resolver = resolver
 
 
 def _export_ref_in_studio_payloads(pipeline: Any, target_ref: str) -> bool:

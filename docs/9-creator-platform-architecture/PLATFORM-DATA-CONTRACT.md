@@ -46,7 +46,7 @@ project_id, project_title_snapshot, resolved_at
 
 当前 S1 合同切片已在 `src/core/artifact_resolver.py` 固化：`ArtifactLookup` 只接受产品、项目、成果身份、版本和哈希，不接受 URL、路径、标题或媒体类型；`ResolvedArtifact` 是不可变的服务端成果快照，包含归属用户、受管媒体引用、媒体类型、标题、来源类型和合同版本。Studio/Atelier 已有只读 adapter，但它们要求组合根显式注入用户归属检查和媒体证明。
 
-`PlatformService` 已支持由组合根注入 `ArtifactResolver`。resolver 存在时，赛事提交、认证申请和任务交付都必须携带 `product`，平台只把 resolver 返回的身份、版本、哈希、媒体类型、项目标题、受管媒体引用、来源类型、合同版本和解析时间写入快照；客户端的标题、媒体类型、项目标题和哈希不能覆盖服务端结果。迁移 `018_artifact_resolution_snapshots.sql` 为旧记录保留可空的解析字段，以便逐步迁移既有本地数据。当前应用组合根尚未为真实 Studio/Atelier 存储装配 ownership callback 和 media probe，因此未宣称生产提交链路已完成；未注入 resolver 的旧本地测试路径仅用于兼容历史数据和迁移。
+`PlatformService` 已支持由组合根注入 `ArtifactResolver`，应用启动时已为真实 Studio/Atelier 存储装配该 resolver。resolver 存在时，赛事提交、认证申请和任务交付都必须携带 `product`，平台只把 resolver 返回的身份、版本、哈希、媒体类型、项目标题、受管媒体引用、来源类型、合同版本和解析时间写入快照；客户端的标题、媒体类型、项目标题和哈希不能覆盖服务端结果。Studio/Atelier ownership callback 只读取 active project binding，媒体 probe 使用各产品的受管存储锁和哈希验证。迁移 `018_artifact_resolution_snapshots.sql` 为旧记录保留可空的解析字段，以便逐步迁移既有本地数据。当前测试证明的是本地组合根装配和服务边界，不等于真实用户绑定、远端媒体和生产发布已验收；未注入 resolver 的旧本地测试路径仅用于兼容历史数据和迁移。
 
 平台项目归属使用 `platform_project_bindings` 显式记录。只有管理员可创建或撤销绑定；resolver 的 ownership check 只能读取 active binding，并可额外约束 `storage_id`。用户不能通过提交 `project_id`、URL 或成果哈希自行创建归属关系。项目绑定和 resolver 注入是两个独立门槛，绑定存在不等于对应产品项目和媒体已经通过真实读取验证。
 

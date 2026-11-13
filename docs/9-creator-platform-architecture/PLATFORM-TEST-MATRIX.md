@@ -10,17 +10,17 @@
 | artifact 不可变快照 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_artifact_snapshot_is_immutable_and_rejects_client_url_only_evidence` | Gate 0 合同通过 |
 | Core artifact resolver 查找/解析合同 | `src/core/artifact_resolver.py` | `tests/test_artifact_resolver_contract.py`；`tests/test_core_dependency_boundaries.py` | S1 中性合同通过；产品 adapter 和平台服务注入边界已覆盖，真实组合根接线仍待完成 |
 | Core product resolver dispatch | `src/core/artifact_resolver.py::ProductArtifactResolver` | `tests/test_artifact_resolver_contract.py::test_product_resolver_dispatches_by_explicit_product` | 按显式 product 分发通过；可注入 `PlatformService`，真实组合根接线仍待完成 |
-| Studio/Atelier artifact resolver adapters | `src/apps/comic_gen/artifact_resolver.py`；`src/apps/atelier/artifact_resolver.py` | `tests/test_artifact_resolver_adapters.py` | 只读 adapter 合同通过；所有权映射、真实媒体 probe 和平台接线仍待完成 |
-| 显式平台项目绑定 | `platform_project_bindings`; `/api/platform/admin/project-bindings` | `tests/test_platform_project_bindings.py` | 管理员创建/撤销、用户隔离、storage_id 约束和 API 管理边界通过；resolver 可读取该事实，但真实 ownership callback 尚未由组合根装配 |
+| Studio/Atelier artifact resolver adapters | `src/apps/comic_gen/artifact_resolver.py`；`src/apps/atelier/artifact_resolver.py` | `tests/test_artifact_resolver_adapters.py`; `tests/test_platform_artifact_resolver_app.py` | 只读 adapter 合同、组合根装配和受管媒体验证闭包已通过；真实用户绑定与生产媒体现场仍待验收 |
+| 显式平台项目绑定 | `platform_project_bindings`; `/api/platform/admin/project-bindings` | `tests/test_platform_project_bindings.py`; `tests/test_platform_artifact_resolver_app.py` | 管理员创建/撤销、用户隔离、storage_id 约束和 API 管理边界通过；组合根 ownership callback 已装配为 active binding 查询 |
 | 幂等上下文与整数分账本字段 | `src/apps/platform/contracts.py` | `tests/test_platform_contracts.py::test_idempotency_and_ledger_contracts_reject_invalid_values` | Gate 0 合同通过 |
 | SQLite 迁移与恢复 | `src/apps/platform/db.py` | `tests/test_platform_db.py` | Sprint 1 第一切片通过 |
 | 账户会话、撤销、角色授权 | `src/apps/platform/service.py` + `api.py` | `tests/test_platform_service.py::test_auth_session_revocation_and_password_policy` | Sprint 1 通过 |
-| artifact 快照提交 | `PlatformService.submit_artifact` / `migrations/018_artifact_resolution_snapshots.sql` | `tests/test_platform_service.py::test_platform_submission_persists_injected_resolver_snapshot`; `test_injected_resolver_requires_product_locator` | 注入 resolver 时只持久化服务端快照；未注入时保留旧数据兼容路径，真实产品组合根接线仍待完成 |
+| artifact 快照提交 | `PlatformService.submit_artifact` / `migrations/018_artifact_resolution_snapshots.sql` | `tests/test_platform_service.py::test_platform_submission_persists_injected_resolver_snapshot`; `test_injected_resolver_requires_product_locator` | 注入 resolver 时只持久化服务端快照；应用启动已装配产品 resolver，未注入路径仅保留旧数据兼容，真实平台用户绑定与生产发布仍待验收 |
 | 赛事白名单与报名幂等 | `PlatformService.enroll` | `tests/test_platform_service.py::test_claim_is_idempotent_and_competition_whitelist_is_enforced` | 已通过 |
 | 认证考核与创作者晋级 | `PlatformService.apply_certification` / `review_certification` | `tests/test_platform_service.py::test_certified_creator_claims_delivers_and_review_creates_simulated_ledger` | 已通过 |
 | 赛事详情、榜单与评审 | `PlatformService.competition` / `leaderboard` / `review_submission` | service coverage pending | 已实现 |
 | 课程、模板 Fork | `PlatformService.add_course` / `fork_template` | API/service smoke coverage pending | 已实现 |
-| 任务原子认领、交付、评审 | `PlatformService.claim_task` / `deliver_task` / `review_task` | `tests/test_platform_service.py::test_certified_creator_claims_delivers_and_review_creates_simulated_ledger`；resolver 注入共用 `submit_artifact` 解析边界 | 旧流程已通过；交付在 resolver 注入后也写入服务端解析字段，真实组合根接线仍待完成 |
+| 任务原子认领、交付、评审 | `PlatformService.claim_task` / `deliver_task` / `review_task` | `tests/test_platform_service.py::test_certified_creator_claims_delivers_and_review_creates_simulated_ledger`；resolver 注入共用 `submit_artifact` 解析边界 | 旧流程已通过；交付在 resolver 注入后也写入服务端解析字段，真实平台用户绑定与生产发布仍待验收 |
 | 模拟账本与余额重建 | `PlatformService.wallet` | `tests/test_platform_service.py::test_certified_creator_claims_delivers_and_review_creates_simulated_ledger` | 已通过 |
 | 截止时间释放与账单查询 | `PlatformService.release_expired_tasks` / `transactions` | service coverage pending | 已实现 |
 | 系统 Skill 默认加载与目录快照 | `src/apps/atelier/product_skills.py` | `tests/test_atelier_product_skills.py` | 已通过；仅静态系统 Skill |
