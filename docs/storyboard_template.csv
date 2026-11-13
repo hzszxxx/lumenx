@@ -1,0 +1,9 @@
+shot_id,duration_sec,shot_type,urgency,stage,has_dialogue,aspect_ratio,target_resolution,project_preset,primary_route,fallback,est_cost_cny_single_pass,notes
+E01-示例,8,consistency_long,low,draft,no,9:16,768p,animal_anthropomorphic,仙宫云 Wan2.2 I2V FP8+LightX2V,LibTV 0积分队列,0.00,示例行:草稿阶段不按秒计费;锁定seed/构图后复制一行改stage=final
+E02-示例,12,consistency_long,low,final,no,9:16,720p,animal_anthropomorphic,百炼 Wan3.0 720p,火山 Seedance2.5 720p,8.40,示例行:成本=(时长+2s)x0.60;urgency=low时也可走LibTV活动价
+E03-示例,10,action_hard,high,final,no,9:16,720p,realistic_ceremony,火山 Seedance2.5 720p,可灵3.0 720p,18.12,示例行:成本=(时长+2s)x1.51;high禁用LibTV
+E04-示例,6,dialogue_av,high,final,yes,9:16,768p,dialogue_drama,MiniMax H3托管 768p,火山 Seedance2.5 720p,4.58,示例行:成本=(时长+2s)x$0.08x7.15;定稿对白禁用仙宫云自部署版
+E05-示例,5,emotion_closeup,high,final,no,9:16,720p,dialogue_drama,可灵3.0 720p有声,火山 Seedance2.5 720p,6.30,示例行:成本=(时长+2s)x0.90
+E06-示例,4,hero_cover,high,final,no,9:16,1080p,product_ad,火山 Seedance2.5 1080p,百炼 Wan3.0 1080p,22.44,示例行:成本=(时长+2s)x3.74;hero永远走直调
+E07-示例,5,filler,low,final,no,16:9,720p,dialogue_drama,LibTV Seedance2.0 Fast/Mini(活动0积分),百炼 Wan3.0 480p,0.00,示例行:活动结束兜底=(时长+2s)x0.30
+,,,,,,,,,,,,"使用说明:删掉E01-E07示例行后填自己的分镜;shot_type六选一(consistency_long/action_hard/emotion_closeup/dialogue_av/hero_cover/filler);urgency填high或low;stage填draft或final;est_cost为单遍估算,项目预算再x1.5返工系数"

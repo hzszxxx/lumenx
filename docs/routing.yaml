@@ -1,0 +1,248 @@
+version: "1.0"
+updated: "2026-11-05"
+purpose: "全云端视频算力选型路由：分镜打标签后自动决定每镜走哪个模型/渠道"
+price_as_of: "2026-11-05"
+price_note: "单价为当日核查值，活动价（尤其 LibTV 双11）变化快；下单前以各平台结算页为准。本表只改价格字段，不改路由结构。"
+fx_usd_cny: 7.15  # 仅用于把美元计价模型折算成人民币做成本估算，可按实际汇率改
+
+# ============================================================
+# 1. 渠道（付费入口只留 4 个主渠道 + 2 个辅助渠道）
+# ============================================================
+providers:
+  xiangong:
+    name: "仙宫云"
+    type: "gpu_rental"            # 按小时租赁的私有 GPU 云
+    billing: "hourly"
+    hourly_cny_approx:            # 约值，以仙宫云后台为准
+      rtx4090: 2.37
+      rtx4090d: 1.59
+    role: ["draft", "post"]       # 草稿层 + 后期层，不进正片关键路径
+    critical_path: false
+  bailian:
+    name: "阿里云百炼"
+    type: "vendor_api"
+    billing: "per_second"
+    role: ["final"]
+    critical_path: true
+    note: "Wan 3.0 正片主力；同一账号顺带 Qwen 图模型（首帧/设定图）"
+  volcengine_ark:
+    name: "火山方舟"
+    type: "vendor_api"
+    billing: "per_token_billed_as_per_second"
+    role: ["final"]
+    critical_path: true
+    note: "Seedance 专用，只买关键镜"
+  minimax:
+    name: "MiniMax 开放平台"
+    type: "vendor_api"
+    billing: "per_second"
+    role: ["final"]
+    critical_path: true
+    note: "H3 托管版专用（自部署版没有 Context-IR 和 Regenerate-2K）"
+  kling:
+    name: "可灵开放平台"
+    type: "vendor_api"
+    billing: "per_second"
+    role: ["final"]
+    critical_path: true
+    note: "月用量稳定超过约 200 秒再开直调；之前先走 libtv/fal 跑量"
+  libtv:
+    name: "LibTV"
+    type: "aggregator_subscription"
+    billing: "subscription_credits"
+    role: ["draft", "promo_overflow"]
+    critical_path: false          # 队列不可控，永远不进交付关键路径
+    note: "只开最便宜年付档；无通用 REST API，只有 Skill/MCP 会话接口，模型与参数不可逐镜锁定"
+  fal:
+    name: "fal.ai"
+    type: "aggregator_payg"
+    billing: "per_second_usd"
+    role: ["sporadic"]            # Veo 等海外模型偶发调用，不单独养厂商账号
+    critical_path: false
+
+# ============================================================
+# 2. 模型目录（main_channel 唯一，杜绝一个模型多处充值）
+# ============================================================
+models:
+  wan3:
+    name: "Wan 3.0"
+    main_provider: "bailian"
+    strengths: ["multi_reference", "consistency", "long_take"]
+    max_duration_sec: 30
+    max_references: 20
+    native_audio: true
+    price_cny_per_sec: { "480p": 0.30, "720p": 0.60, "1080p": 1.20 }
+  seedance25:
+    name: "Seedance 2.5"
+    main_provider: "volcengine_ark"
+    strengths: ["complex_motion", "limb_stability", "camera_moves"]
+    max_duration_sec: 30
+    native_audio: true
+    price_cny_per_sec: { "480p": 0.67, "720p": 1.51, "1080p": 3.74 }
+    promo_alternative:            # 同模型促销渠道，仅作溢出，不作主渠道
+      provider: "libtv"
+      price_cny_per_sec: { "720p": 0.16 }
+      condition: "双11活动期内且 urgency=low"
+  kling3:
+    name: "Kling 3.0"
+    main_provider: "kling"
+    strengths: ["emotion_closeup", "cinematic_camera"]
+    max_duration_sec: 15
+    price_cny_per_sec:
+      silent: { "720p": 0.60, "1080p": 0.80 }
+      with_audio: { "720p": 0.90, "1080p": 1.20 }
+  minimax_h3_hosted:
+    name: "MiniMax H3（托管版）"
+    main_provider: "minimax"
+    strengths: ["dialogue", "lip_sync", "native_stereo_audio", "native_2k"]
+    max_duration_sec: 15
+    price_usd_per_sec: { "768p": 0.08, "2k": 0.13 }
+    note: "含 H3-Context-IR 提示词系统 + H3-Regenerate-2K，仙宫云自部署版没有这两件"
+  minimax_h3_selfhost:
+    name: "MiniMax H3（仙宫云自部署·量化版）"
+    main_provider: "xiangong"
+    variant: "pruned_int8_convrot + nvfp4_text_encoder"
+    strengths: ["dialogue_timing_draft", "audio_visual_draft"]
+    native_resolution: "768p"
+    marginal_cost: "near_zero_when_instance_on"
+    limits: ["no_context_ir", "no_regenerate_2k", "not_for_final_dialogue"]
+  wan22_selfhost:
+    name: "Wan 2.2（仙宫云自部署）"
+    main_provider: "xiangong"
+    variant: "i2v_a14b_fp8 + lightx2v_4step_lora_for_draft"
+    strengths: ["motion_draft", "composition_draft", "seed_hunting", "lora_custom_workflows"]
+    native_audio: false
+    marginal_cost: "near_zero_when_instance_on"
+    note: "开源 Wan 只到 2.2；Wan 3.0 无公开权重，只能走百炼 API"
+  seedance2_fast_mini:
+    name: "Seedance 2.0 Fast / Mini"
+    main_provider: "libtv"
+    strengths: ["filler", "bulk_variants"]
+    note: "双11期在 LibTV 为 0 积分档；活动结束则改走百炼 Wan3 480p 兜底"
+  veo31_fast:
+    name: "Veo 3.1 Fast"
+    main_provider: "fal"
+    strengths: ["physics", "overseas_look"]
+    max_duration_sec: 8
+    price_usd_per_sec: { "720p": 0.10, "1080p": 0.12 }
+    note: "偶发特殊镜才用，不进任何项目预设的默认路由"
+
+# ============================================================
+# 3. 镜头标签枚举（分镜表里每镜必填 shot_type + urgency）
+# ============================================================
+shot_types:
+  consistency_long: "一致性长镜头/多参考：主角团、长镜头、角色不能漂移"
+  action_hard: "复杂动作/易崩：直立行走、仪仗、打斗、快速运镜、肢体接触"
+  emotion_closeup: "人物情绪特写：表情、眼神、电影感运镜，无台词或台词不靠口型"
+  dialogue_av: "对白音画一体：有台词、要口型、要同步立体声"
+  hero_cover: "封面/高潮镜：全片最重要的 1-3 镜，不计成本上限"
+  filler: "填充镜：空镜、转场、环境建立，不值得占旗舰额度"
+urgency_levels:
+  high: "交付窗口 < 24h 或在关键路径上：只走厂商直调，禁用 libtv"
+  low: "不急：可走 libtv 活动价/0积分溢出渠道"
+
+# ============================================================
+# 4. 路由规则（按顺序匹配，先中先行）
+# ============================================================
+stage_rules:
+  draft:
+    # 草稿阶段与 shot_type 无关，一律走边际成本≈0 的云
+    default:
+      provider: "xiangong"
+      model_by_content:
+        with_dialogue_or_audio: "minimax_h3_selfhost"
+        silent: "wan22_selfhost"
+      resolution: "480p-768p"
+      reroll_limit: null          # 草稿不限抽卡次数，这是这一层的意义
+    parallel_queue:
+      provider: "libtv"
+      models: ["wan3", "kling3", "minimax_h3_hosted", "seedance2_fast_mini"]
+      condition: "活动 0 积分有效期内；只跑 urgency=low 的镜头"
+    exit_gate: "草稿锁定 seed/构图/运动/台词时长后才允许进 final；未锁定禁止烧 API"
+  final:
+    routes:
+      - shot_type: "consistency_long"
+        use: { provider: "bailian", model: "wan3", resolution: "720p", upgrade_to_1080p_if: "hero_or_final_delivery_requires" }
+        fallback: ["minimax_h3_hosted (ref2va)", "seedance25"]
+      - shot_type: "action_hard"
+        use: { provider: "volcengine_ark", model: "seedance25", resolution: "720p" }
+        fallback: ["kling3", "wan3"]
+      - shot_type: "hero_cover"
+        use: { provider: "volcengine_ark", model: "seedance25", resolution: "1080p" }
+        fallback: ["wan3@1080p"]
+        rule: "urgency 无论高低都走直调，禁止 libtv"
+      - shot_type: "emotion_closeup"
+        use: { provider: "kling", model: "kling3", resolution: "720p", audio: true }
+        fallback: ["seedance25", "minimax_h3_hosted"]
+      - shot_type: "dialogue_av"
+        use: { provider: "minimax", model: "minimax_h3_hosted", resolution: "768p", upgrade_to_2k_if: "closeup_or_hero" }
+        fallback: ["seedance25", "kling3"]
+        rule: "定稿对白禁止用仙宫云自部署版（缺 Context-IR 与 2K 再生成）"
+      - shot_type: "filler"
+        use: { provider: "libtv", model: "seedance2_fast_mini", resolution: "720p" }
+        fallback: ["wan3@480p via bailian"]
+    urgency_modifier:
+      low:
+        eligible_for_libtv_promo: ["consistency_long", "action_hard", "filler"]
+        libtv_promo_model_price: { model: "seedance25", resolution: "720p", price_cny_per_sec: 0.16 }
+        max_share_of_final_shots: 0.30   # 活动价最多承接三成正片，防队列拖死交付
+      high:
+        eligible_for_libtv_promo: []
+  post:
+    upscale:
+      provider: "xiangong"
+      tool: "SeedVR2 (7B Sharp)"
+      rule: "自部署草稿若抽帧质检意外通过，可超分到 1080p 直接交付，省一次 API 重跑；整片不得以此为默认路径"
+    frame_interpolation: "RIFE（仙宫云本地跑）"
+    assembly: "本地/工作流合成，不占生成额度；上屏文字一律后期叠加，不让模型生成文字"
+
+# ============================================================
+# 5. 全局护栏
+# ============================================================
+guardrails:
+  one_model_one_main_channel: true
+  generate_duration_padding_sec: 2        # 视频时长控制不精确，下单时长 = 镜头时长 + 2s，后期裁
+  final_reroll_factor_budget: 1.5         # 草稿层吃掉大部分返工后，正片按 1.5 倍预留预算
+  draft_reroll_factor_assumption: 3.0     # 草稿层按 3 倍抽卡设计（边际成本≈0，不设上限）
+  freeze_model_versions_per_project: true # 一个项目期内不换模型版本，防风格漂移
+  seedance_1080p_only_for: ["hero_cover", "action_hard_key_moments"]
+  benchmark_before_project: "新项目开工前，用 1 个代表镜在候选 2-3 个模型各跑一遍，胜者写入该项目 preset 的 override"
+
+# ============================================================
+# 6. 项目预设（mix 为正片时长占比）
+# ============================================================
+presets:
+  animal_anthropomorphic:
+    name: "萌宠/拟人动物（猫片类）"
+    final_mix: { wan3: 0.60, seedance25: 0.30, minimax_h3_hosted: 0.10 }
+    default_shot_type: "consistency_long"
+    hard_shots_to_seedance: ["bipedal_walking", "picking/holding_objects", "cooking_actions"]
+    known_risks: ["俯身/弯腰动作易触发四足化，提示词用屈膝下蹲替代", "持刀具类画面多平台拒绝，改备菜摆盘"]
+  dialogue_drama:
+    name: "对白短剧/微动漫"
+    final_mix: { minimax_h3_hosted: 0.40, kling3: 0.30, seedance25: 0.20, wan3: 0.10 }
+    default_shot_type: "dialogue_av"
+  realistic_ceremony:
+    name: "写实仪式类（升旗类）"
+    final_mix: { seedance25: 0.70, wan3: 0.30 }
+    default_shot_type: "action_hard"
+    qc_extra: ["国旗/制服等敏感细节逐帧核对，星数/徽记错位直接重跑，不修补"]
+  product_ad:
+    name: "产品/广告"
+    final_mix: { seedance25: 0.50, kling3: 0.30, wan3: 0.20 }
+    default_shot_type: "hero_cover"
+
+# ============================================================
+# 7. 成本估算（公式 + 已算好的 60 秒示例）
+# ============================================================
+cost_estimation:
+  formula: "正片成本 = Σ(每镜时长+2s padding) × 对应单价 × 1.5 返工系数；草稿成本 ≈ 仙宫云开机小时 × 小时价"
+  example_60s_dialogue_drama_single_pass:
+    breakdown:
+      - { model: "wan3@720p", sec: 30, cost_cny: 18.00 }
+      - { model: "seedance25@720p", sec: 15, cost_cny: 22.65 }
+      - { model: "minimax_h3_hosted@768p", sec: 10, cost_cny: 5.72 }
+      - { model: "kling3@720p_audio", sec: 5, cost_cny: 4.50 }
+    total_single_pass_cny: 50.87
+    with_final_reroll_1_5x_cny: 76.31
+    comparison_all_seedance25_1080p_single_pass_cny: 224.40
