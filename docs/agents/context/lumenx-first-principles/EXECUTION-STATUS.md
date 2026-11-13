@@ -361,7 +361,7 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 
 将未跟踪的算力选型资料纳入版本控制：`docs/Dockerfile.csv` 更名为 `docs/storyboard_template.csv`，并与 `docs/算力分析.md`、`docs/SELECTION_TABLE.md`、`docs/routing.yaml` 一起提交。随后新增中性 Core artifact resolver 合同：`ArtifactLookup` 不接受客户端 URL、路径、标题或媒体类型；`ResolvedArtifact` 保存不可变的服务端成果身份、归属、受管媒体引用和合同版本。Core 不导入 Studio、Atelier 或平台代码。
 
-- 分支/提交：`feature/skill-runtime-production` / `dafdb2a`（文档整理）；S1 Core 合同为 `a6bde25`，产品只读 adapter 为 `9e4f5b4`。
+- 分支/提交：`feature/skill-runtime-production` / `dafdb2a`（文档整理）；S1 Core 合同为 `a6bde25`，产品只读 adapter 为 `5efe39c`。
 - 验证：文档结构检查及回归通过；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（36 passed）。
 - 证据边界：Studio/Atelier adapter 仅在注入所有权检查和媒体证明时解析成果；当前没有平台用户到项目的现有归属映射，未接入平台赛事提交和任务交付；没有改变真实生成、支付或生产部署行为。
 
@@ -369,7 +369,7 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 
 新增 `017_project_bindings.sql` 和管理员项目绑定 API。平台现在可以按用户、产品、项目和可选 `storage_id` 保存 active/revoked 归属记录；创建/撤销写入审计事件，重复创建同一 active binding 返回幂等回执，resolver 可通过 `is_project_bound` 只读查询。该切片不允许普通用户自助认领项目，也未把 binding 自动接入提交接口。
 
-- 分支/提交：`feature/skill-runtime-production` / `a254ec3`。
+- 分支/提交：`feature/skill-runtime-production` / `8331449`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_project_bindings.py tests/test_platform_contracts.py tests/test_platform_service.py tests/test_platform_admin_api.py tests/test_core_dependency_boundaries.py -q`（56 passed）。
 - 证据边界：绑定只是平台授权事实，尚未证明对应 Studio/Atelier 项目实际存在；resolver ownership callback、真实媒体 probe 和平台提交接线仍待完成。
 
@@ -377,6 +377,15 @@ Redis Streams claim 先用 `XAUTOCLAIM` 接管超过 idle threshold 的 pending 
 
 新增 `ProductArtifactResolver`，按显式 `ArtifactProduct` 将 lookup 分发到 Studio 或 Atelier adapter。该组合器不导入产品实现、不修改平台提交行为，后续由应用组合根注入带项目绑定和媒体证明的实例。
 
-- 分支/提交：`feature/skill-runtime-production` / `405f1b2`。
+- 分支/提交：`feature/skill-runtime-production` / `2287cbf`。
 - 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_platform_project_bindings.py tests/test_core_dependency_boundaries.py -q`（39 passed）。
 - 证据边界：尚未把组合 resolver 注入 PlatformService；平台提交和任务交付仍接受旧快照字段。
+
+## 2026-11-13 平台成果 resolver 快照接线切片
+
+`PlatformService` 现在支持由应用组合根注入 Core `ArtifactResolver`。resolver 存在时，赛事提交、认证申请和任务交付必须携带显式 `product`，服务端根据产品 adapter 返回的 `ResolvedArtifact` 覆盖客户端版本、哈希、媒体类型、项目标题和标题，并在平台表中保存受管媒体引用、来源类型、合同版本和解析时间。新增迁移 `018_artifact_resolution_snapshots.sql`，旧本地数据的解析字段保持可空；未注入 resolver 的路径仅保留旧数据兼容与迁移用途。
+
+- 分支/提交：`feature/skill-runtime-production` / `e24a065`。
+- 责任文件：`src/apps/platform/service.py`、`src/apps/platform/api.py`、`src/apps/platform/migrations/018_artifact_resolution_snapshots.sql`、`tests/test_platform_service.py`、`tests/test_platform_db.py`、`docs/9-creator-platform-architecture/PLATFORM-DATA-CONTRACT.md`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
+- 验证：`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_service.py tests/test_platform_contracts.py tests/test_platform_project_bindings.py tests/test_artifact_resolver_contract.py tests/test_artifact_resolver_adapters.py tests/test_core_dependency_boundaries.py -q`（62 passed）；`.venv/bin/python -S scripts/run_tests_isolated.py -- tests/test_platform_db.py tests/test_platform_service.py tests/test_platform_project_bindings.py tests/test_platform_admin_api.py tests/test_platform_skill_api.py -q`（34 passed）；`python3 docs/agents/tools/check_lumenx_refactor_docs.py` 通过。
+- 证据边界：这是 PlatformService 的可注入服务边界，不是生产组合根完成证明；真实 Studio/Atelier ownership callback、媒体 probe、存储身份和应用启动装配仍待下一切片。没有改变真实生成、支付或云端部署状态。
