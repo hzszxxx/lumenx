@@ -470,3 +470,12 @@ Studio `Script` 新增可选 `compute_budget_cny`，通过 `GET/PUT /projects/{s
 - 责任文件：`frontend/src/components/modules/StoryboardR2V.tsx`、`frontend/src/components/modules/__tests__/StoryboardR2VSubmit.spec.tsx`、`frontend/messages/{zh,en}.json`。
 - 验证：Storyboard UI 49 passed；前端标准测试 142 files / 2121 tests；typecheck 与 JSON 文案解析通过。
 - 证据边界：已完成可见编辑、服务端保存和读回闭环；平台积分 reservation、项目累计消费、其他产品入口和云端发布仍未接线。
+
+## 2026-11-13 项目级平台积分 reservation 身份切片
+
+平台积分 reservation 现在可以携带 `product + project_id`。服务端要求该项目已由管理员建立 active `platform_project_bindings`，并将项目身份及冻结的 `pricing_version` 写入 reservation 和相关账本元数据；同一幂等键重放必须保持项目 scope，改用另一 scope 返回 `idempotency_key_reused`。未携带项目身份的旧 reservation 继续兼容，人民币 `compute_budget_cny` 不会自动换算为积分。
+
+- 分支/提交：`feature/skill-runtime-production` / 待提交（本切片代码与文档将拆分为两个原子提交）。
+- 责任文件：`src/apps/platform/migrations/019_credit_reservation_scope.sql`、`src/apps/platform/service.py`、`src/apps/platform/api.py`、`tests/test_platform_db.py`、`tests/test_platform_service.py`、`docs/9-creator-platform-architecture/PLATFORM-DATA-CONTRACT.md`、`docs/9-creator-platform-architecture/PLATFORM-TEST-MATRIX.md`。
+- 验证：隔离 runner 执行平台数据库、服务、项目绑定与 Paid Admission 回归（35 passed）；`python -m compileall`、`git diff --check` 通过。
+- 证据边界：已建立项目身份与 reservation 的服务端合同，但 Studio/Atelier 图片、视频、音频真实商业生成入口仍未全部传递项目 scope；供应商真实结算、余额充值和云端发布仍未验收。
