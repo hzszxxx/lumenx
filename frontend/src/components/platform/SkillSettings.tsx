@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { platformApi, type PlatformSkillVersion } from "@/lib/platformApi";
-import { Sparkles, CheckCircle2, ShieldCheck, Layers, PauseCircle, Power, PowerOff, Loader2, X, Plus } from "lucide-react";
+import { Sparkles, CheckCircle2, ShieldCheck, Layers, PauseCircle, Power, PowerOff, Loader2, X, Plus, Trash2 } from "lucide-react";
 
 async function hashManifest(manifest: Omit<Parameters<typeof platformApi.createSkillVersion>[0]["manifest"], "content_hash">): Promise<string> {
   const canonical = JSON.stringify(Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b))));
@@ -106,6 +106,30 @@ export default function SkillSettings() {
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "操作失败");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteSkill = async (item: PlatformSkillVersion) => {
+    const isSystem = item.scope === "system" || item.scope === "workspace";
+    if (isSystem) {
+      setMessage("系统内置 Skill 不允许删除，仅支持开启或关闭");
+      return;
+    }
+    const preset = PRESET_SKILL_TITLES[item.name];
+    const displayTitle = preset?.title || item.name;
+    if (typeof window !== "undefined" && !window.confirm(`确定要彻底删除自定义 Skill「${displayTitle}」吗？此操作不可恢复。`)) {
+      return;
+    }
+    setMessage(null);
+    setBusyId(item.id);
+    try {
+      await platformApi.deleteSkillVersion(item.id);
+      await refresh();
+      setMessage(`【${displayTitle}】已成功删除`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "删除失败");
     } finally {
       setBusyId(null);
     }
@@ -293,7 +317,8 @@ export default function SkillSettings() {
               const preset = PRESET_SKILL_TITLES[item.name];
               const displayTitle = preset?.title || item.name;
               const displayDesc = preset?.desc || "自定义创作扩展技能";
-              const displayCat = preset?.category || item.scope;
+              const displayCat = preset?.category || (item.scope === "system" ? "系统" : "自定义");
+              const isSystem = item.scope === "system" || item.scope === "workspace";
 
               return (
                 <div
@@ -309,9 +334,13 @@ export default function SkillSettings() {
                       <span className="rounded-md bg-surface-inset border border-glass-border text-text-muted px-2 py-0.5 text-xs">
                         {displayCat}
                       </span>
-                      {item.scope === "system" && (
+                      {isSystem ? (
                         <span className="rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-xs flex items-center gap-1">
                           <ShieldCheck size={12} /> 系统内置
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-purple-500/10 border border-purple-500/30 text-purple-300 px-2 py-0.5 text-xs flex items-center gap-1">
+                          <Sparkles size={12} /> 自定义
                         </span>
                       )}
                     </div>
@@ -354,6 +383,20 @@ export default function SkillSettings() {
                           开启激活
                         </button>
                       </>
+                    )}
+
+                    {/* 只有自定义 Skill 才允许删除；系统 Skill 仅支持关闭，不提供删除操作 */}
+                    {!isSystem && (
+                      <button
+                        type="button"
+                        disabled={busyId === item.id}
+                        onClick={() => void deleteSkill(item)}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-red-500/20 text-text-muted hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/40 transition-all font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        title="删除此自定义 Skill"
+                      >
+                        {busyId === item.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                        删除
+                      </button>
                     )}
                   </div>
                 </div>

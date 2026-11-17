@@ -883,6 +883,22 @@ class PlatformService:
             raise PlatformError("skill_rollback_unavailable", "No previous Skill binding is available", 409)
         return self.bind_skill_version(actor, previous[0], active=True)
 
+    def delete_skill_version(self, actor: dict[str, Any], skill_version_id: str) -> dict[str, Any]:
+        with connect(self.path) as c:
+            row = c.execute("SELECT id,name,scope,owner_id FROM platform_skill_versions WHERE id=?", (skill_version_id,)).fetchone()
+            if not row:
+                raise PlatformError("skill_version_not_found", "Skill version not found", 404)
+            skill_id, name, scope, owner_id = row
+            if scope in {"system", "workspace"}:
+                raise PlatformError("skill_system_cannot_delete", "系统内置 Skill 仅支持开启/关闭，不允许删除", 403)
+            if owner_id != actor.get("id") and actor.get("role") != "admin":
+                raise PlatformError("skill_forbidden", "只能删除自己创建的自定义 Skill", 403)
+            c.execute("DELETE FROM platform_skill_bindings WHERE skill_version_id=?", (skill_version_id,))
+            c.execute("DELETE FROM platform_skill_binding_history WHERE skill_version_id=?", (skill_version_id,))
+            c.execute("DELETE FROM platform_skill_versions WHERE id=?", (skill_version_id,))
+            self._audit(c, actor.get("id"), "skill.version.deleted", "skill_version", skill_version_id, {"name": name, "scope": scope})
+        return {"id": skill_version_id, "deleted": True, "name": name}
+
     def resolve_skill_version(self, actor: dict[str, Any], name: str, *, project_id: str | None = None) -> dict[str, Any] | None:
         order = [("project", actor.get("id"), project_id), ("user", actor.get("id"), None), ("workspace", None, None), ("system", None, None)]
         with connect(self.path) as c:

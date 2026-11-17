@@ -180,6 +180,21 @@ def test_skill_versions_are_user_isolated_and_resolve_project_then_user(tmp_path
     assert svc.resolve_skill_version(alice, "story-scout", project_id="p1")["version"] == "1.2.0"
     assert svc.resolve_skill_version(bob, "story-scout")["version"] == "1.0.0"
 
+    # 系统的 skill 不能删除
+    with pytest.raises(PlatformError) as exc_info:
+        svc.delete_skill_version(admin, system["id"])
+    assert exc_info.value.code == "skill_system_cannot_delete"
+
+    # 他人自定义 skill 不能删除
+    with pytest.raises(PlatformError) as exc_info:
+        svc.delete_skill_version(bob, user["id"])
+    assert exc_info.value.code == "skill_forbidden"
+
+    # 自定义 skill 可以被创建者成功删除
+    del_res = svc.delete_skill_version(alice, user["id"])
+    assert del_res["deleted"] is True
+    assert svc.resolve_skill_version(alice, "story-scout")["version"] == "1.0.0"
+
 
 def test_skill_manifest_rejects_executable_fields_and_bad_hash(tmp_path):
     svc = service(tmp_path)

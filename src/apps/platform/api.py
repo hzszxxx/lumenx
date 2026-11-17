@@ -340,6 +340,9 @@ def clone_skill_version_as_draft(skill_version_id: str, body: SkillDraftIn, user
 @router.post("/skills/versions/{skill_version_id}/rollback")
 def rollback_skill_binding(skill_version_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)):
     return handle(lambda: svc.rollback_skill_binding(user, skill_version_id))
+@router.delete("/skills/versions/{skill_version_id}")
+def delete_skill_version(skill_version_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.delete_skill_version(user, skill_version_id))
 @router.get("/skills/versions/{skill_version_id}/diff")
 def compare_skill_versions(skill_version_id: str, against_version_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)):
     return handle(lambda: svc.compare_skill_versions(user, skill_version_id, against_version_id))

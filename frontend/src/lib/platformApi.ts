@@ -149,6 +149,7 @@ export const platformApi = {
   revokeCredential: (credentialId: string) => request(`/credentials/${credentialId}/revoke`, { method: "POST" }),
   skills: (name?: string, projectId?: string) => request<PlatformSkillVersion[]>(`/skills${name || projectId ? `?${new URLSearchParams({ ...(name ? { name } : {}), ...(projectId ? { project_id: projectId } : {}) }).toString()}` : ""}`),
   createSkillVersion: (payload: { manifest: PlatformSkillManifest; scope?: string; project_id?: string; parent_version?: string }) => request<PlatformSkillVersion>("/skills/versions", { method: "POST", body: JSON.stringify(payload) }),
+  deleteSkillVersion: (skillVersionId: string) => request<{ id: string; deleted: boolean; name: string }>(`/skills/versions/${skillVersionId}`, { method: "DELETE" }),
   bindSkillVersion: (skillVersionId: string, active = true) => request(`/skills/versions/${skillVersionId}/bind?active=${active ? "true" : "false"}`, { method: "POST" }),
   resolveSkill: (name: string, projectId?: string) => request<Record<string, unknown>>(`/skills/${encodeURIComponent(name)}/resolve${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`),
   adminOverview: () => request<AdminOverview>("/admin/overview"),
