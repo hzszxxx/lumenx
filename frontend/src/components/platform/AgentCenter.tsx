@@ -6,12 +6,14 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Coins,
   Copy,
   Edit2,
   FileSpreadsheet,
   GraduationCap,
   KeyRound,
   Package,
+  Percent,
   Plus,
   RefreshCw,
   Search,
@@ -20,6 +22,7 @@ import {
   Tag,
   UserCheck,
   Users,
+  Wallet,
 } from "lucide-react";
 import {
   platformApi,
@@ -27,6 +30,7 @@ import {
   type AgentInviteBatch,
   type AgentInvite,
   type AgentStudent,
+  type AgentCommission,
 } from "@/lib/platformApi";
 import { usePlatformStore } from "@/store/platformStore";
 
@@ -36,13 +40,14 @@ export default function AgentCenter() {
   const [batches, setBatches] = useState<AgentInviteBatch[]>([]);
   const [invites, setInvites] = useState<AgentInvite[]>([]);
   const [students, setStudents] = useState<AgentStudent[]>([]);
+  const [commissions, setCommissions] = useState<AgentCommission[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"invites" | "students" | "batches" | "purchase" | "profile">("invites");
+  const [activeTab, setActiveTab] = useState<"invites" | "students" | "commissions" | "batches" | "purchase" | "profile">("invites");
 
   // Filter & Search
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
@@ -73,16 +78,18 @@ export default function AgentCenter() {
     setRefreshing(true);
     setError(null);
     try {
-      const [prof, batchList, inviteList, studentList] = await Promise.all([
+      const [prof, batchList, inviteList, studentList, commissionList] = await Promise.all([
         platformApi.agentProfile(),
         platformApi.agentBatches(),
         platformApi.agentInvites(),
         platformApi.agentStudents(),
+        platformApi.agentCommissions(),
       ]);
       setProfile(prof);
       setBatches(batchList);
       setInvites(inviteList);
       setStudents(studentList);
+      setCommissions(commissionList);
 
       setAgencyType(prof.agency_type || "institution");
       setInstitutionName(prof.institution_name || "");
@@ -251,6 +258,10 @@ export default function AgentCenter() {
                     专属 {(profile.discount_rate * 10).toFixed(1)} 折
                   </span>
                 )}
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-status-success-bg text-status-success-fg border border-status-success-fg/30">
+                  <Percent size={12} />
+                  终身消费返佣 {((profile?.commission_rate ?? 0.01) * 100).toFixed(1)}%
+                </span>
               </div>
               <p className="text-sm text-text-secondary mt-1">
                 负责人：{profile?.contact_name || user?.username || "—"} · 电话：{profile?.contact_phone || "未设置"} · 批量采购注册码与学员归属统一管理
@@ -278,8 +289,21 @@ export default function AgentCenter() {
           </div>
         </div>
 
-        {/* 4 Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        {/* 5 Metric Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+          <div className="bg-surface/50 border border-glass-border p-4 rounded-xl">
+            <div className="flex items-center justify-between text-text-muted text-xs">
+              <span>累计返佣收益</span>
+              <Coins size={16} className="text-status-success-fg" />
+            </div>
+            <p className="text-2xl font-mono font-bold mt-2 text-status-success-fg">
+              ¥{((profile?.metrics.total_commissions_cents ?? 0) / 100).toFixed(2)}
+            </p>
+            <span className="text-[11px] text-text-secondary mt-0.5 block">
+              1级分销终身返佣 ({((profile?.commission_rate ?? 0.01) * 100).toFixed(1)}%)
+            </span>
+          </div>
+
           <div className="bg-surface/50 border border-glass-border p-4 rounded-xl">
             <div className="flex items-center justify-between text-text-muted text-xs">
               <span>总批采注册码</span>
@@ -294,12 +318,12 @@ export default function AgentCenter() {
           <div className="bg-surface/50 border border-glass-border p-4 rounded-xl">
             <div className="flex items-center justify-between text-text-muted text-xs">
               <span>已激活学员</span>
-              <UserCheck size={16} className="text-status-success-fg" />
+              <UserCheck size={16} className="text-primary" />
             </div>
-            <p className="text-2xl font-mono font-bold mt-2 text-status-success-fg">
+            <p className="text-2xl font-mono font-bold mt-2 text-foreground">
               {profile?.metrics.total_students ?? 0}
             </p>
-            <span className="text-[11px] text-text-secondary mt-0.5 block">已绑定注册并核销</span>
+            <span className="text-[11px] text-text-secondary mt-0.5 block">已绑定分销归属</span>
           </div>
 
           <div className="bg-surface/50 border border-glass-border p-4 rounded-xl">
@@ -370,6 +394,17 @@ export default function AgentCenter() {
           }`}
         >
           学员花名册 ({students.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("commissions")}
+          className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
+            activeTab === "commissions"
+              ? "bg-primary text-foreground font-semibold shadow-sm"
+              : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
+          }`}
+        >
+          消费返佣明细 ({commissions.length})
         </button>
         <button
           type="button"
@@ -658,6 +693,98 @@ export default function AgentCenter() {
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {/* TAB: COMMISSIONS */}
+      {activeTab === "commissions" && (
+        <section className="glass-panel p-6 border-glass-border space-y-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-glass-border">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Coins size={18} className="text-primary" />
+                1级分销 · 学员终身消费返佣明细
+              </h3>
+              <p className="text-xs text-text-secondary mt-1">
+                凡是通过您的专属邀请码/注册码注册的学员，在平台的每一笔消费（算力结算、充值及订单），系统均终身自动向您的账户返还佣金。
+              </p>
+            </div>
+            <div className="flex items-center gap-4 bg-surface/50 border border-glass-border px-4 py-2.5 rounded-xl">
+              <div className="text-right">
+                <div className="text-[11px] text-text-muted">当前返佣比例</div>
+                <div className="text-base font-mono font-bold text-primary">
+                  {((profile?.commission_rate ?? 0.01) * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div className="h-7 w-px bg-glass-border" />
+              <div className="text-right">
+                <div className="text-[11px] text-text-muted">累计返佣收益</div>
+                <div className="text-base font-mono font-bold text-status-success-fg">
+                  ¥{((profile?.metrics.total_commissions_cents ?? 0) / 100).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {commissions.length === 0 ? (
+            <div className="py-12 text-center text-text-muted text-sm space-y-2">
+              <Coins size={32} className="mx-auto text-text-muted/50 mb-2" />
+              <p>暂无返佣流水记录。</p>
+              <p className="text-xs text-text-secondary">
+                当通过您的邀请码注册的学员在平台进行算力使用或付费结算时，佣金将自动按 {((profile?.commission_rate ?? 0.01) * 100).toFixed(1)}% 比例实时到账并在此展示。
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-glass-border">
+              <table className="w-full text-xs">
+                <thead className="bg-surface/70 text-text-muted border-b border-glass-border">
+                  <tr>
+                    <th className="py-3 px-4 text-left">流水单号</th>
+                    <th className="py-3 px-4 text-left">消费学员</th>
+                    <th className="py-3 px-4 text-left">消费业务 / 详情</th>
+                    <th className="py-3 px-4 text-left">学员消费金额</th>
+                    <th className="py-3 px-4 text-left">返佣比例</th>
+                    <th className="py-3 px-4 text-left">获得佣金</th>
+                    <th className="py-3 px-4 text-left">入账状态</th>
+                    <th className="py-3 px-4 text-left">结算时间</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-glass-border">
+                  {commissions.map((item) => (
+                    <tr key={item.id} className="hover:bg-hover-bg transition">
+                      <td className="py-3 px-4 font-mono text-text-muted">{item.id.slice(0, 8)}...</td>
+                      <td className="py-3 px-4 font-semibold text-foreground">
+                        {item.student_username || item.student_user_id.slice(0, 8)}
+                      </td>
+                      <td className="py-3 px-4 text-text-secondary">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-primary/10 text-primary mr-1.5">
+                          {item.source_type}
+                        </span>
+                        {item.description || "平台算力 / 消费结算"}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-foreground">
+                        ¥{(item.amount_cents / 100).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-primary font-semibold">
+                        {(item.commission_rate * 100).toFixed(1)}%
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-status-success-fg text-sm">
+                        +¥{(item.commission_cents / 100).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-status-success-bg text-status-success-fg border border-status-success-fg/30">
+                          {item.status === "settled" ? "已入账" : item.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-text-muted font-mono">
+                        {new Date(item.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 

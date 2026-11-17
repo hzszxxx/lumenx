@@ -136,12 +136,15 @@ class PlatformService:
         if len(password) < self.config.password_min_length: raise PlatformError("weak_password", "password is too short")
         if role not in {"user", "creator", "reviewer", "client", "admin", "agent"}: raise PlatformError("invalid_role", "unsupported role")
         digest, salt = hash_password(password); user_id = uid(); timestamp = now()
+        registered_invite_code = None
+        registration_source = "open"
+        inviter_user_id = None
         try:
             with connect(self.path) as c:
                 invite_row = None
                 normalized = (invite_code or "").strip().upper()
                 if not test_access_code_hash:
-                    if not normalized and self.config.registration_invite_required:
+                    if not normalized and self.is_registration_invite_required():
                         raise PlatformError("invite_required", "a valid invitation code is required", 422)
                     if normalized:
                         invite_row = c.execute(
@@ -154,12 +157,38 @@ class PlatformService:
                         )
                         if claimed.rowcount != 1:
                             raise PlatformError("invalid_invite", "invitation code is invalid, expired, or already used", 422)
+                        registered_invite_code = normalized
+                        if invite_row and invite_row[1]:
+                            inviter_user_id = invite_row[1]
+                            agent_profile = c.execute("SELECT user_id FROM agent_profiles WHERE user_id=?", (inviter_user_id,)).fetchone()
+                            is_agent_user = c.execute("SELECT 1 FROM platform_users WHERE id=? AND role='agent'", (inviter_user_id,)).fetchone()
+                            if agent_profile or is_agent_user:
+                                registration_source = "agent"
+                            else:
+                                registration_source = "admin"
+                else:
+                    registration_source = "test_access"
+
                 if test_access_code_hash and c.execute(
                     "SELECT 1 FROM platform_test_access_bindings WHERE access_code_hash=?",
                     (test_access_code_hash,),
                 ).fetchone():
                     raise PlatformError("test_access_already_registered", "this test access code is already bound to an account", 409)
-                c.execute("INSERT INTO platform_users VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, username, email, None, digest, salt, username, role, 1, timestamp, timestamp))
+
+                c.execute(
+                    """
+                    INSERT INTO platform_users (
+                        id, username, email, phone, password_hash, password_salt,
+                        nickname, role, is_active, created_at, updated_at,
+                        registered_invite_code, registration_source, inviter_user_id
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        user_id, username, email, None, digest, salt,
+                        username, role, 1, timestamp, timestamp,
+                        registered_invite_code, registration_source, inviter_user_id,
+                    ),
+                )
                 if test_access_code_hash:
                     c.execute(
                         "INSERT INTO platform_test_access_bindings(access_code_hash,user_id,created_at) VALUES (?,?,?)",
@@ -169,18 +198,20 @@ class PlatformService:
                 if role == "agent":
                     c.execute(
                         "INSERT INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                        (user_id, "individual", username, username, None, 1.0, 0.0, "active", None, timestamp, timestamp),
+                        (user_id, "individual", username, username, None, 1.0, 0.01, "active", None, timestamp, timestamp),
                     )
-                if invite_row and invite_row[1]:
+                if invite_row and invite_row[1] and registration_source == "agent":
                     agent_id, invite_id, batch_id = invite_row[1], invite_row[0], invite_row[2]
-                    agent_profile = c.execute("SELECT user_id FROM agent_profiles WHERE user_id=?", (agent_id,)).fetchone()
-                    is_agent_user = c.execute("SELECT 1 FROM platform_users WHERE id=? AND role='agent'", (agent_id,)).fetchone()
-                    if agent_profile or is_agent_user:
-                        c.execute(
-                            "INSERT OR IGNORE INTO agent_students(id, agent_id, student_user_id, invite_id, invite_code, batch_id, notes, registered_at) VALUES (?,?,?,?,?,?,?,?)",
-                            (uid(), agent_id, user_id, invite_id, normalized, batch_id, None, timestamp),
-                        )
-                self._audit(c, user_id, "user.registered", "user", user_id, {"role": role})
+                    c.execute(
+                        "INSERT OR IGNORE INTO agent_students(id, agent_id, student_user_id, invite_id, invite_code, batch_id, notes, registered_at) VALUES (?,?,?,?,?,?,?,?)",
+                        (uid(), agent_id, user_id, invite_id, normalized, batch_id, None, timestamp),
+                    )
+                self._audit(c, user_id, "user.registered", "user", user_id, {
+                    "role": role,
+                    "registration_source": registration_source,
+                    "registered_invite_code": registered_invite_code,
+                    "inviter_user_id": inviter_user_id,
+                })
         except sqlite3.IntegrityError as exc: raise PlatformError("user_exists", "username or email already exists", 409) from exc
         return {"id": user_id, "username": username, "email": email, "role": role}
 
@@ -214,6 +245,32 @@ class PlatformService:
                 rows = c.execute("SELECT id,code,max_uses,used_count,expires_at,created_at,last_used_at,batch_id,student_note FROM registration_invites WHERE created_by=? ORDER BY created_at DESC", (actor["id"],)).fetchall()
         keys = ("id", "code", "max_uses", "used_count", "expires_at", "created_at", "last_used_at", "batch_id", "student_note")
         return [dict(zip(keys, row)) for row in rows]
+
+    def is_registration_invite_required(self) -> bool:
+        with connect(self.path) as c:
+            try:
+                row = c.execute("SELECT value FROM platform_system_settings WHERE key='registration_invite_required'").fetchone()
+                if row:
+                    return row[0].lower() in ("true", "1", "yes")
+            except sqlite3.OperationalError:
+                pass
+        return bool(self.config.registration_invite_required)
+
+    def set_registration_invite_required(self, actor: dict[str, Any], required: bool) -> bool:
+        self._require_admin(actor)
+        timestamp = now()
+        val_str = "true" if required else "false"
+        with connect(self.path) as c:
+            c.execute(
+                """
+                INSERT INTO platform_system_settings (key, value, description, updated_at)
+                VALUES ('registration_invite_required', ?, 'Whether invite code is mandatory for registration', ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+                """,
+                (val_str, timestamp),
+            )
+            self._audit(c, actor.get("id"), "settings.registration_invite_required_updated", "system_settings", "registration_invite_required", {"required": required})
+        return bool(required)
 
     def login(self, username: str, password: str) -> dict[str, Any]:
         with connect(self.path) as c:
@@ -257,17 +314,35 @@ class PlatformService:
         limit = max(1, min(limit, 100)); offset = max(0, offset)
         clauses: list[str] = []; params: list[Any] = []
         if query.strip():
-            like = f"%{query.strip()}%"; clauses.append("(username LIKE ? OR COALESCE(email,'') LIKE ? OR COALESCE(nickname,'') LIKE ?)"); params.extend([like, like, like])
+            like = f"%{query.strip()}%"
+            clauses.append("(u.username LIKE ? OR COALESCE(u.email,'') LIKE ? OR COALESCE(u.nickname,'') LIKE ? OR COALESCE(u.registered_invite_code,'') LIKE ?)")
+            params.extend([like, like, like, like])
         if role:
-            clauses.append("role=?"); params.append(role)
+            clauses.append("u.role=?"); params.append(role)
         if active is not None:
-            clauses.append("is_active=?"); params.append(1 if active else 0)
+            clauses.append("u.is_active=?"); params.append(1 if active else 0)
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         with connect(self.path) as c:
-            total = c.execute(f"SELECT COUNT(*) FROM platform_users{where}", params).fetchone()[0]
-            rows = c.execute(f"SELECT id,username,email,nickname,role,is_active,created_at,updated_at FROM platform_users{where} ORDER BY created_at DESC LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()
-        keys = ("id", "username", "email", "nickname", "role", "is_active", "created_at", "updated_at")
+            total = c.execute(f"SELECT COUNT(*) FROM platform_users u{where}", params).fetchone()[0]
+            sql = f"""
+                SELECT u.id, u.username, u.email, u.nickname, u.role, u.is_active, u.created_at, u.updated_at,
+                       u.registered_invite_code, u.registration_source, u.inviter_user_id,
+                       p.institution_name as inviter_name,
+                       inv.username as inviter_username
+                FROM platform_users u
+                LEFT JOIN platform_users inv ON inv.id = u.inviter_user_id
+                LEFT JOIN agent_profiles p ON p.user_id = u.inviter_user_id
+                {where}
+                ORDER BY u.created_at DESC
+                LIMIT ? OFFSET ?
+            """
+            rows = c.execute(sql, [*params, limit, offset]).fetchall()
+        keys = (
+            "id", "username", "email", "nickname", "role", "is_active", "created_at", "updated_at",
+            "registered_invite_code", "registration_source", "inviter_user_id", "inviter_name", "inviter_username",
+        )
         return {"items": [dict(zip(keys, row)) for row in rows], "total": total, "limit": limit, "offset": offset}
+
 
     def admin_update_user(self, actor: dict[str, Any], user_id: str, *, role: str | None = None, is_active: bool | None = None) -> dict[str, Any]:
         self._require_admin(actor)
@@ -288,7 +363,7 @@ class PlatformService:
             if next_role == "agent":
                 c.execute(
                     "INSERT OR IGNORE INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    (user_id, "individual", row[1], row[1], None, 1.0, 0.0, "active", None, timestamp, timestamp),
+                    (user_id, "individual", row[1], row[1], None, 1.0, 0.01, "active", None, timestamp, timestamp),
                 )
             self._audit(c, actor["id"], "admin.user_updated", "user", user_id, {"before": before, "after": {"role": next_role, "is_active": bool(next_active)}})
             updated = c.execute("SELECT id,username,email,nickname,role,is_active,created_at,updated_at FROM platform_users WHERE id=?", (user_id,)).fetchone()
@@ -1079,6 +1154,15 @@ class PlatformService:
             if release:
                 c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], release, "release", "settlement", reservation_id, f"{reservation_id}:release", json.dumps(self._credit_scope_metadata(row[3], row[4]), ensure_ascii=False), now()))
             c.execute("UPDATE credit_reservations SET settled_credits=?,released_credits=?,status='settled',updated_at=? WHERE id=?", (actual_credits, release, now(), reservation_id))
+            if actual_credits > 0:
+                self._process_agent_commission(
+                    c,
+                    student_user_id=row[0],
+                    amount_cents=actual_credits,
+                    source_type="credit_settlement",
+                    source_id=reservation_id,
+                    description=f"算力消费结算 ({actual_credits} 算力)",
+                )
         return {"reservation_id": reservation_id, "status": "settled", "actual_credits": actual_credits, "released_credits": release, "additional_credits": extra, "idempotent_replay": False}
 
     def release_credits(self, actor: dict[str, Any], reservation_id: str) -> dict[str, Any]:
@@ -1327,9 +1411,9 @@ class PlatformService:
                 timestamp = now()
                 c.execute(
                     "INSERT OR IGNORE INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    (user_id, "individual", user_row[1], user_row[1], None, 1.0, 0.0, default_status, None, timestamp, timestamp),
+                    (user_id, "individual", user_row[1], user_row[1], None, 1.0, 0.01, default_status, None, timestamp, timestamp),
                 )
-                profile = (user_id, "individual", user_row[1], user_row[1], None, 1.0, 0.0, default_status, None, timestamp, timestamp)
+                profile = (user_id, "individual", user_row[1], user_row[1], None, 1.0, 0.01, default_status, None, timestamp, timestamp)
 
             total_batches = c.execute("SELECT COUNT(*) FROM agent_invite_batches WHERE agent_id=?", (user_id,)).fetchone()[0]
             purchased_invites = c.execute("SELECT COALESCE(SUM(quantity), 0) FROM agent_invite_batches WHERE agent_id=? AND status='completed'", (user_id,)).fetchone()[0]
@@ -1341,6 +1425,7 @@ class PlatformService:
             used_invites = invites_stats[1]
             remaining_invites = max(0, total_invites - used_invites)
             total_students = c.execute("SELECT COUNT(*) FROM agent_students WHERE agent_id=?", (user_id,)).fetchone()[0]
+            total_commissions_cents = c.execute("SELECT COALESCE(SUM(commission_cents), 0) FROM agent_commissions WHERE agent_id=? AND status='settled'", (user_id,)).fetchone()[0]
 
             return {
                 "user_id": profile[0],
@@ -1352,7 +1437,7 @@ class PlatformService:
                 "contact_name": profile[3],
                 "contact_phone": profile[4],
                 "discount_rate": profile[5],
-                "commission_rate": profile[6],
+                "commission_rate": profile[6] if profile[6] is not None else 0.01,
                 "status": profile[7],
                 "notes": profile[8],
                 "created_at": profile[9],
@@ -1364,6 +1449,7 @@ class PlatformService:
                     "used_invites": used_invites,
                     "remaining_invites": remaining_invites,
                     "total_students": total_students,
+                    "total_commissions_cents": total_commissions_cents,
                 },
             }
 
@@ -1391,7 +1477,7 @@ class PlatformService:
         with connect(self.path) as c:
             existing = c.execute("SELECT user_id, discount_rate, commission_rate, status FROM agent_profiles WHERE user_id=?", (target_id,)).fetchone()
             current_discount = existing[1] if existing else 1.0
-            current_commission = existing[2] if existing else 0.0
+            current_commission = existing[2] if (existing and existing[2] is not None) else 0.01
             current_status = existing[3] if existing else ("active" if is_admin else "pending")
 
             next_discount = float(discount_rate) if (discount_rate is not None and is_admin) else current_discount
@@ -1606,7 +1692,8 @@ class PlatformService:
                        (SELECT COALESCE(SUM(quantity), 0) FROM agent_invite_batches b WHERE b.agent_id = u.id) as total_purchased,
                        (SELECT COUNT(*) FROM registration_invites r WHERE r.created_by = u.id) as total_invites,
                        (SELECT COALESCE(SUM(used_count), 0) FROM registration_invites r WHERE r.created_by = u.id) as used_invites,
-                       (SELECT COUNT(*) FROM agent_students s WHERE s.agent_id = u.id) as total_students
+                       (SELECT COUNT(*) FROM agent_students s WHERE s.agent_id = u.id) as total_students,
+                       (SELECT COALESCE(SUM(commission_cents), 0) FROM agent_commissions ac WHERE ac.agent_id = u.id AND ac.status='settled') as total_commissions_cents
                 FROM platform_users u
                 JOIN agent_profiles p ON p.user_id = u.id
                 ORDER BY u.created_at DESC
@@ -1616,6 +1703,121 @@ class PlatformService:
         keys = (
             "id", "username", "email", "role", "is_active", "created_at",
             "agency_type", "institution_name", "contact_name", "contact_phone", "discount_rate", "commission_rate", "status", "notes",
-            "total_batches", "total_purchased", "total_invites", "used_invites", "total_students",
+            "total_batches", "total_purchased", "total_invites", "used_invites", "total_students", "total_commissions_cents",
         )
+        return [dict(zip(keys, row)) for row in rows]
+
+    def _process_agent_commission(
+        self,
+        c: sqlite3.Connection,
+        student_user_id: str,
+        amount_cents: int,
+        source_type: str,
+        source_id: str | None = None,
+        description: str = "",
+    ) -> dict[str, Any] | None:
+        if amount_cents <= 0:
+            return None
+        binding = c.execute(
+            "SELECT agent_id FROM agent_students WHERE student_user_id=?",
+            (student_user_id,),
+        ).fetchone()
+        if not binding:
+            return None
+        agent_id = binding[0]
+        prof = c.execute(
+            "SELECT commission_rate, status FROM agent_profiles WHERE user_id=?",
+            (agent_id,),
+        ).fetchone()
+        if not prof or prof[1] != "active":
+            return None
+        commission_rate = float(prof[0]) if (prof[0] is not None and prof[0] > 0) else 0.01
+        commission_cents = int(round(amount_cents * commission_rate))
+        if commission_cents < 1:
+            commission_cents = 1 if (amount_cents * commission_rate >= 0.5) else 0
+        if commission_cents <= 0:
+            return None
+
+        commission_id = uid()
+        timestamp = now()
+        c.execute(
+            """
+            INSERT INTO agent_commissions(id, agent_id, student_user_id, source_type, source_id, amount_cents, commission_rate, commission_cents, status, description, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'settled', ?, ?)
+            """,
+            (commission_id, agent_id, student_user_id, source_type, source_id, amount_cents, commission_rate, commission_cents, description, timestamp),
+        )
+
+        acc = c.execute("SELECT id FROM ledger_accounts WHERE user_id=?", (agent_id,)).fetchone()
+        if not acc:
+            acc_id = uid()
+            c.execute("INSERT INTO ledger_accounts(id, user_id, created_at) VALUES (?, ?, ?)", (acc_id, agent_id, timestamp))
+        else:
+            acc_id = acc[0]
+
+        c.execute(
+            "INSERT INTO ledger_entries(id, transaction_id, account_id, amount_cents, direction, reference_type, reference_id, idempotency_key, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (uid(), uid(), acc_id, commission_cents, "credit", "agent_commission", commission_id, f"commission:{commission_id}", timestamp),
+        )
+
+        self._audit(
+            c,
+            student_user_id,
+            "agent.commission_settled",
+            "agent_commission",
+            commission_id,
+            {
+                "agent_id": agent_id,
+                "student_user_id": student_user_id,
+                "amount_cents": amount_cents,
+                "commission_rate": commission_rate,
+                "commission_cents": commission_cents,
+            },
+        )
+        return {
+            "id": commission_id,
+            "agent_id": agent_id,
+            "student_user_id": student_user_id,
+            "amount_cents": amount_cents,
+            "commission_rate": commission_rate,
+            "commission_cents": commission_cents,
+            "created_at": timestamp,
+        }
+
+    def record_user_consumption(
+        self,
+        student_user_id: str,
+        amount_cents: int,
+        source_type: str = "order",
+        source_id: str | None = None,
+        description: str = "",
+    ) -> dict[str, Any] | None:
+        if amount_cents <= 0:
+            raise PlatformError("invalid_amount", "consumption amount must be positive", 422)
+        with connect(self.path) as c:
+            return self._process_agent_commission(c, student_user_id, amount_cents, source_type, source_id, description)
+
+    def list_agent_commissions(self, actor: dict[str, Any], target_user_id: str | None = None) -> list[dict[str, Any]]:
+        is_admin = actor.get("role") == "admin"
+        agent_id = target_user_id if (target_user_id and is_admin) else actor.get("id")
+        clauses = []
+        params: list[Any] = []
+        if not (is_admin and not target_user_id):
+            clauses.append("ac.agent_id=?")
+            params.append(agent_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        with connect(self.path) as c:
+            sql = f"""
+                SELECT ac.id, ac.agent_id, ac.student_user_id, ac.source_type, ac.source_id,
+                       ac.amount_cents, ac.commission_rate, ac.commission_cents, ac.status,
+                       ac.description, ac.created_at, u.username as student_username
+                FROM agent_commissions ac
+                JOIN platform_users u ON u.id = ac.student_user_id
+                {where}
+                ORDER BY ac.created_at DESC
+            """
+            rows = c.execute(sql, params).fetchall()
+
+        keys = ("id", "agent_id", "student_user_id", "source_type", "source_id", "amount_cents", "commission_rate", "commission_cents", "status", "description", "created_at", "student_username")
         return [dict(zip(keys, row)) for row in rows]

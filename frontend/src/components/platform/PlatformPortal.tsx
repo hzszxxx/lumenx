@@ -39,12 +39,19 @@ export default function PlatformPortal() {
   const [inviteCode, setInviteCode] = useState("");
   const [registerMode, setRegisterMode] = useState(false);
   const [appAccessUnlocked, setAppAccessUnlocked] = useState(false);
+  const [inviteRequired, setInviteRequired] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ competitions: number; tasks: number; courses: number } | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{ prompt_tokens: number; completion_tokens: number; total_tokens: number } | null>(null);
   const { user, walletCents, loading, error, initialize, login, register, logout } = usePlatformStore();
 
   useEffect(() => { void initialize(); }, [initialize]);
+
+  useEffect(() => {
+    platformApi.authConfig()
+      .then((cfg) => setInviteRequired(Boolean(cfg.registration_invite_required)))
+      .catch(() => setInviteRequired(true));
+  }, []);
 
   useEffect(() => { void readAppAccessSession().then(session => setAppAccessUnlocked(session.auth_required && session.authenticated)).catch(() => setAppAccessUnlocked(false)); }, []);
 
@@ -87,7 +94,7 @@ export default function PlatformPortal() {
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-foreground">
-                  {registerMode ? (appAccessUnlocked ? "创建测试账户" : "邀请码注册") : "登录创作者平台"}
+                  {registerMode ? (appAccessUnlocked ? "创建测试账户" : (inviteRequired ? "邀请码注册" : "新用户注册")) : "登录创作者平台"}
                 </h2>
                 <p className="text-xs text-text-secondary mt-0.5">
                   登录后进入 Studio / 画布 和平台业务
@@ -122,18 +129,29 @@ export default function PlatformPortal() {
                   />
                   {appAccessUnlocked ? (
                     <p className="text-xs text-text-muted">当前测试会话已解锁，注册时无需再次输入邀请码。</p>
-                  ) : (
+                  ) : inviteRequired ? (
                     <>
                       <input
                         className="glass-input w-full"
-                        placeholder="邀请码"
+                        placeholder="邀请码 (必填)"
                         value={inviteCode}
                         onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                         minLength={6}
                         maxLength={64}
                         required
                       />
-                      <p className="text-xs text-text-muted">请输入有效邀请码，注册时会自动验证并消费。</p>
+                      <p className="text-xs text-text-muted">当前平台开启了邀请码限制，请输入有效邀请码完成注册。</p>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        className="glass-input w-full"
+                        placeholder="邀请码 / 代理码（选填）"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                        maxLength={64}
+                      />
+                      <p className="text-xs text-text-muted">当前为开放注册模式。若持有导师或代理商邀请码，输入可绑定分销权益与专属折扣。</p>
                     </>
                   )}
                 </>

@@ -11,6 +11,8 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Power,
+  RefreshCw,
   Search,
   Shield,
   ShieldCheck,
@@ -51,6 +53,10 @@ export default function AdminConsole() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
+  // Registration invite requirement switch
+  const [registrationInviteRequired, setRegistrationInviteRequired] = useState(true);
+  const [updatingSetting, setUpdatingSetting] = useState(false);
+
   // Edit agent modal / state
   const [editingAgent, setEditingAgent] = useState<AdminAgentItem | null>(null);
   const [editDiscountRate, setEditDiscountRate] = useState<string>("1.0");
@@ -58,18 +64,20 @@ export default function AdminConsole() {
   const [editStatus, setEditStatus] = useState<string>("active");
 
   const refresh = async () => {
-    const [nextOverview, nextUsers, nextAgents, nextInvites, audit] = await Promise.all([
+    const [nextOverview, nextUsers, nextAgents, nextInvites, audit, settings] = await Promise.all([
       platformApi.adminOverview(),
       platformApi.adminUsers({ query }),
       platformApi.adminAgents(),
       platformApi.adminInvites(),
       platformApi.adminAuditEvents(),
+      platformApi.adminSettings().catch(() => ({ registration_invite_required: true })),
     ]);
     setOverview(nextOverview);
     setUsers(nextUsers.items);
     setAgents(nextAgents);
     setInvites(nextInvites);
     setAuditEvents(audit.items);
+    setRegistrationInviteRequired(settings.registration_invite_required);
   };
 
   useEffect(() => {
@@ -172,13 +180,32 @@ export default function AdminConsole() {
     }
   };
 
+  const toggleRegistrationInvite = async () => {
+    setUpdatingSetting(true);
+    try {
+      const res = await platformApi.adminUpdateRegistrationInvite(!registrationInviteRequired);
+      setRegistrationInviteRequired(res.registration_invite_required);
+      setMessage(
+        res.registration_invite_required
+          ? "已开启注册邀请码限制（新用户必须凭有效邀请码才能注册）"
+          : "已关闭注册邀请码限制（已切换为开放自由注册，邀请码变为选填）"
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "修改注册邀请码设置失败");
+    } finally {
+      setUpdatingSetting(false);
+    }
+  };
+
   const handleSaveAgentSettings = async (e: FormEvent) => {
     e.preventDefault();
     if (!editingAgent) return;
     try {
+      const commPct = parseFloat(editCommissionRate);
+      const commissionRate = isNaN(commPct) ? 0.01 : Math.max(0, Math.min(100, commPct)) / 100;
       await platformApi.adminUpdateAgent(editingAgent.id, {
         discount_rate: parseFloat(editDiscountRate) || 1.0,
-        commission_rate: parseFloat(editCommissionRate) || 0.0,
+        commission_rate: commissionRate,
         status: editStatus,
       });
       setMessage(`代理商 [${editingAgent.institution_name}] 配置已保存`);
@@ -300,6 +327,7 @@ export default function AdminConsole() {
                       <tr className="text-left text-text-muted border-b border-glass-border">
                         <th className="py-3">用户</th>
                         <th>角色</th>
+                        <th>注册来源 / 邀请码</th>
                         <th>状态</th>
                         <th>创建时间</th>
                         <th>操作</th>
@@ -324,6 +352,37 @@ export default function AdminConsole() {
                                 </option>
                               ))}
                             </select>
+                          </td>
+                          <td>
+                            {item.registration_source === "agent" ? (
+                              <div className="flex flex-col text-xs">
+                                <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                                  <Building2 size={12} />
+                                  {item.inviter_name || item.inviter_username || "代理邀请"}
+                                </span>
+                                {item.registered_invite_code && (
+                                  <span className="font-mono text-text-muted text-[11px] mt-0.5">
+                                    码: {item.registered_invite_code}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.registration_source === "admin" ? (
+                              <div className="flex flex-col text-xs">
+                                <span className="inline-flex items-center gap-1 text-primary font-medium">
+                                  <KeyRound size={12} />
+                                  官方邀请码
+                                </span>
+                                {item.registered_invite_code && (
+                                  <span className="font-mono text-text-muted text-[11px] mt-0.5">
+                                    码: {item.registered_invite_code}
+                                  </span>
+                                )}
+                              </div>
+                            ) : item.registration_source === "test_access" ? (
+                              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">测试体验码</span>
+                            ) : (
+                              <span className="text-xs text-text-muted">免码自由注册</span>
+                            )}
                           </td>
                           <td>
                             {Boolean(item.is_active) ? (
@@ -373,6 +432,8 @@ export default function AdminConsole() {
                         <th>代理类型</th>
                         <th>负责人 / 电话</th>
                         <th>批采折扣</th>
+                        <th>终身返佣</th>
+                        <th>累计返佣</th>
                         <th>采购批次</th>
                         <th>总出码 / 已激活</th>
                         <th>学员数</th>
@@ -383,7 +444,7 @@ export default function AdminConsole() {
                     <tbody className="divide-y divide-glass-border">
                       {agents.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-8 text-center text-text-muted">
+                          <td colSpan={11} className="py-8 text-center text-text-muted">
                             暂无代理商记录。可在「用户与权限」中将用户角色设置为 agent。
                           </td>
                         </tr>
@@ -408,6 +469,16 @@ export default function AdminConsole() {
                                 {ag.discount_rate < 1.0 ? `${(ag.discount_rate * 10).toFixed(1)} 折` : "无折扣"}
                               </span>
                             </td>
+                            <td>
+                              <span className="font-mono font-semibold text-primary">
+                                {((ag.commission_rate ?? 0.01) * 100).toFixed(1)}%
+                              </span>
+                            </td>
+                            <td>
+                              <span className="font-mono font-semibold text-status-success-fg">
+                                ¥{((ag.total_commissions_cents ?? 0) / 100).toFixed(2)}
+                              </span>
+                            </td>
                             <td className="font-mono">{ag.total_batches} 批</td>
                             <td className="font-mono">
                               {ag.total_invites} / <span className="text-status-success-fg">{ag.used_invites}</span>
@@ -426,13 +497,13 @@ export default function AdminConsole() {
                                 onClick={() => {
                                   setEditingAgent(ag);
                                   setEditDiscountRate(String(ag.discount_rate ?? 1.0));
-                                  setEditCommissionRate(String(ag.commission_rate ?? 0.0));
+                                  setEditCommissionRate(String(((ag.commission_rate ?? 0.01) * 100).toFixed(1)));
                                   setEditStatus(ag.status ?? "active");
                                 }}
                                 className="glass-button text-xs py-1 px-2.5 inline-flex items-center gap-1 text-primary"
                               >
                                 <Edit2 size={12} />
-                                设置折扣
+                                设置配置
                               </button>
                             </td>
                           </tr>
@@ -462,7 +533,7 @@ export default function AdminConsole() {
                       <form onSubmit={handleSaveAgentSettings} className="space-y-4">
                         <div>
                           <label className="text-xs text-text-secondary block mb-1">
-                            批采折扣率 (0.1 ~ 1.0，如 0.8 表示 8 折)
+                            批采折扣率 (0.1 ~ 1.0，如 0.8 表示 8 折，1.0 表示原价)
                           </label>
                           <input
                             type="number"
@@ -474,6 +545,28 @@ export default function AdminConsole() {
                             onChange={(e) => setEditDiscountRate(e.target.value)}
                             required
                           />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-text-secondary block mb-1">
+                            终身消费返佣比例 (%) (通过该代理注册的学员在平台消费返佣比例)
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              className="glass-input w-full text-sm pr-8"
+                              value={editCommissionRate}
+                              onChange={(e) => setEditCommissionRate(e.target.value)}
+                              required
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted">%</span>
+                          </div>
+                          <span className="text-[11px] text-text-muted mt-1 block">
+                            默认 1.0% (1 级分销终身返佣)。学员未来在平台产生的所有消费，系统将按此比例实时返给该代理。
+                          </span>
                         </div>
 
                         <div>
@@ -512,8 +605,8 @@ export default function AdminConsole() {
             )}
 
             {section === "invites" && (
-              <section className="glass-panel p-6">
-                <div className="flex items-center justify-between">
+              <section className="glass-panel p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="text-xl font-semibold">邀请码管理</h3>
                     <p className="text-sm text-text-secondary mt-1">创建和查看平台一次性或限次邀请码与代理码。</p>
@@ -522,7 +615,59 @@ export default function AdminConsole() {
                     <KeyRound size={16} />生成邀请码
                   </button>
                 </div>
-                <div className="overflow-x-auto mt-5">
+
+                {/* Registration Invite Control Switch Card */}
+                <div className="p-4 rounded-2xl bg-surface/60 border border-glass-border flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className={`p-3 rounded-xl border ${
+                        registrationInviteRequired
+                          ? "bg-status-success-bg/20 text-status-success-fg border-status-success-fg/30"
+                          : "bg-surface text-text-muted border-glass-border"
+                      }`}
+                    >
+                      <ShieldCheck size={22} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <h4 className="font-semibold text-foreground text-sm">注册准入控制 · 邀请码功能开关</h4>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                            registrationInviteRequired
+                              ? "bg-status-success-bg/25 text-status-success-fg border-status-success-fg/30"
+                              : "bg-primary/15 text-primary border-primary/30"
+                          }`}
+                        >
+                          {registrationInviteRequired ? "强制邀请码注册 (开启中)" : "开放自由注册 (已关闭限制)"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary mt-1">
+                        {registrationInviteRequired
+                          ? "开启状态：新用户在注册时必须填写有效邀请码方可成功建号，适合限定班级或私域定向推广。"
+                          : "关闭状态：开放自由注册，用户可直接注册账号。若填写了渠道代理码，系统仍会自动绑定分销返佣关系。"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void toggleRegistrationInvite()}
+                    disabled={updatingSetting}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 shrink-0 ${
+                      registrationInviteRequired
+                        ? "bg-surface border border-glass-border text-foreground hover:bg-hover-bg"
+                        : "bg-primary text-foreground hover:bg-primary/90 shadow-sm"
+                    }`}
+                  >
+                    {updatingSetting ? (
+                      <RefreshCw size={14} className="animate-spin" />
+                    ) : (
+                      <Power size={14} />
+                    )}
+                    {registrationInviteRequired ? "关闭邀请码限制 (开放自由注册)" : "开启邀请码限制 (必须凭码注册)"}
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto mt-2">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-text-muted border-b border-glass-border">

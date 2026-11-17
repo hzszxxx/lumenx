@@ -159,9 +159,32 @@ class AgentPurchaseIn(BaseModel):
 class AgentInviteNoteIn(BaseModel):
     student_note: str = Field(max_length=200)
 
+class StudentConsumptionIn(BaseModel):
+    student_user_id: str
+    amount_cents: int = Field(gt=0)
+    source_type: str = "order"
+    source_id: str | None = None
+    description: str = ""
+
+
+class RegistrationInviteSettingIn(BaseModel):
+    required: bool
+
 
 IdempotencyKey = Header(..., alias="Idempotency-Key", min_length=8, max_length=200)
 
+
+@router.get("/auth/config")
+def get_auth_config(svc: PlatformService = Depends(service)):
+    return {"registration_invite_required": svc.is_registration_invite_required()}
+
+@router.get("/admin/settings")
+def get_admin_settings(user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return {"registration_invite_required": svc.is_registration_invite_required()}
+
+@router.post("/admin/settings/registration-invite")
+def update_registration_invite_setting(body: RegistrationInviteSettingIn, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: {"registration_invite_required": svc.set_registration_invite_required(user, body.required)})
 
 @router.post("/auth/register")
 def register(request: Request, body: RegisterIn, svc: PlatformService = Depends(service)):
@@ -210,6 +233,20 @@ def update_agent_invite_note(invite_id: str, body: AgentInviteNoteIn, user=Depen
 @router.get("/agent/students")
 def list_agent_students(user=Depends(current_user), svc: PlatformService = Depends(service)):
     return handle(lambda: svc.list_agent_students(user))
+
+@router.get("/agent/commissions")
+def list_agent_commissions(user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.list_agent_commissions(user))
+
+@router.post("/agent/consumption")
+def record_student_consumption(body: StudentConsumptionIn, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.record_user_consumption(
+        student_user_id=body.student_user_id,
+        amount_cents=body.amount_cents,
+        source_type=body.source_type,
+        source_id=body.source_id,
+        description=body.description,
+    ))
 
 @router.get("/admin/agents")
 def admin_list_agents(user=Depends(admin_user), svc: PlatformService = Depends(service)):

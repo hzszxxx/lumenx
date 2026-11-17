@@ -6,7 +6,21 @@ export type PlatformUser = { id: string; username: string; email?: string | null
 export type PlatformSession = { access_token: string; expires_at: string; user: PlatformUser };
 export type PlatformSkillManifest = { name: string; version: string; title: string; description: string; category: "story" | "shot" | "review" | "sequence"; prompt_template: string; expected_tools: string[]; content_hash: string };
 export type PlatformSkillVersion = { id: string; name: string; version: string; scope: string; owner_id?: string | null; project_id?: string | null; parent_version?: string | null; content_hash: string; status: string; created_at: string };
-export type AdminUser = { id: string; username: string; email?: string | null; nickname?: string | null; role: string; is_active: boolean | number; created_at: string; updated_at: string };
+export type AdminUser = {
+  id: string;
+  username: string;
+  email?: string | null;
+  nickname?: string | null;
+  role: string;
+  is_active: boolean | number;
+  created_at: string;
+  updated_at: string;
+  registered_invite_code?: string | null;
+  registration_source?: "open" | "agent" | "admin" | "test_access" | null;
+  inviter_user_id?: string | null;
+  inviter_name?: string | null;
+  inviter_username?: string | null;
+};
 export type AdminOverview = { users: { total: number; active: number; creators: number; admins: number }; tasks: { total: number; open: number }; competitions: { total: number; active: number }; submissions: { total: number; pending: number }; ledger_balance_cents: number };
 export type XiangongyunStatus = { provider: "xiangongyun"; verified: true; credential_id: string; account: { nickname?: string; phone?: string; uuid?: string }; balance: number | null; instances: Array<Record<string, unknown>>; checked_at: string };
 
@@ -138,6 +152,9 @@ export const platformApi = {
   bindSkillVersion: (skillVersionId: string, active = true) => request(`/skills/versions/${skillVersionId}/bind?active=${active ? "true" : "false"}`, { method: "POST" }),
   resolveSkill: (name: string, projectId?: string) => request<Record<string, unknown>>(`/skills/${encodeURIComponent(name)}/resolve${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`),
   adminOverview: () => request<AdminOverview>("/admin/overview"),
+  authConfig: () => request<{ registration_invite_required: boolean }>("/auth/config"),
+  adminSettings: () => request<{ registration_invite_required: boolean }>("/admin/settings"),
+  adminUpdateRegistrationInvite: (required: boolean) => request<{ registration_invite_required: boolean }>("/admin/settings/registration-invite", { method: "POST", body: JSON.stringify({ required }) }),
   adminUsers: (params: { query?: string; role?: string; active?: string } = {}) => request<{ items: AdminUser[]; total: number; limit: number; offset: number }>(`/admin/users?${new URLSearchParams(params).toString()}`),
   adminUpdateUser: (id: string, payload: { role?: string; is_active?: boolean }) => request<AdminUser>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   adminAuditEvents: () => request<{ items: Array<{ id: string; actor_id: string | null; event_type: string; entity_type: string; entity_id: string | null; payload_json: string; created_at: string }>; total: number }>("/admin/audit-events?limit=100"),
@@ -155,6 +172,7 @@ export const platformApi = {
   agentInvites: (batchId?: string) => request<AgentInvite[]>(`/agent/invites${batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ""}`),
   updateAgentInviteNote: (inviteId: string, student_note: string) => request<{ id: string; student_note: string }>(`/agent/invites/${inviteId}/note`, { method: "PATCH", body: JSON.stringify({ student_note }) }),
   agentStudents: () => request<AgentStudent[]>("/agent/students"),
+  agentCommissions: () => request<AgentCommission[]>("/agent/commissions"),
   adminAgents: () => request<AdminAgentItem[]>("/admin/agents"),
   adminUpdateAgent: (userId: string, payload: { agency_type?: string; institution_name?: string; contact_name?: string; contact_phone?: string; discount_rate?: number; commission_rate?: number; status?: string; notes?: string }) => request<AgentProfile>(`/admin/agents/${userId}`, { method: "PUT", body: JSON.stringify(payload) }),
 };
@@ -182,6 +200,7 @@ export type AgentProfile = {
     used_invites: number;
     remaining_invites: number;
     total_students: number;
+    total_commissions_cents: number;
   };
 };
 
@@ -236,5 +255,21 @@ export type AdminAgentItem = AgentProfile & {
   total_invites: number;
   used_invites: number;
   total_students: number;
+  total_commissions_cents: number;
+};
+
+export type AgentCommission = {
+  id: string;
+  agent_id: string;
+  student_user_id: string;
+  student_username?: string;
+  source_type: string;
+  source_id?: string | null;
+  amount_cents: number;
+  commission_rate: number;
+  commission_cents: number;
+  status: string;
+  description?: string | null;
+  created_at: string;
 };
 
