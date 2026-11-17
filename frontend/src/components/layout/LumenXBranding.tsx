@@ -31,7 +31,7 @@ export default function LumenXBranding({ size = "md" }: LumenXBrandingProps) {
       <img
         src={logoSrc}
         alt="YingBan"
-        className={`${logoSize} aspect-square rounded-2xl bg-white p-2 shadow-sm object-contain`}
+        className={`${logoSize} aspect-square object-contain drop-shadow-sm`}
       />
     </div>
   );
