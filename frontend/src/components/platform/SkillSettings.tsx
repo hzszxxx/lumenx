@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { platformApi, type PlatformSkillVersion } from "@/lib/platformApi";
-import { Sparkles, CheckCircle2, ShieldCheck, Layers, PauseCircle, Power, PowerOff, Loader2 } from "lucide-react";
+import { Sparkles, CheckCircle2, ShieldCheck, Layers, PauseCircle, Power, PowerOff, Loader2, X, Plus } from "lucide-react";
 
 async function hashManifest(manifest: Omit<Parameters<typeof platformApi.createSkillVersion>[0]["manifest"], "content_hash">): Promise<string> {
   const canonical = JSON.stringify(Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b))));
@@ -84,6 +84,7 @@ export default function SkillSettings() {
         ...(projectId ? { project_id: projectId } : {}),
       });
       await refresh();
+      setShowCustomForm(false);
       setMessage("自定义 Skill 草稿已创建");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Skill 创建失败");
@@ -152,6 +153,125 @@ export default function SkillSettings() {
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Custom Skill Creation Panel (placed above active list for easy access) */}
+      {showCustomForm && (
+        <div className="glass-panel p-6 space-y-4 border border-primary/30 shadow-xl bg-surface/80 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-start justify-between border-b border-glass-border pb-3">
+            <div>
+              <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
+                <Sparkles size={18} className="text-primary" />
+                创建自定义项目 Skill
+              </h3>
+              <p className="text-xs text-text-secondary mt-1">
+                遵循受控 Skill 规范，输入专有工作流 Prompt 模板，系统自动校验并生成防篡改指纹。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCustomForm(false)}
+              className="p-1 rounded-lg text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+              title="收起面板"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Skill 标识名（仅小写字母与连字符）</label>
+              <input
+                className="glass-input w-full"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="例如: mystery-novel-adapter"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">版本号</label>
+              <input
+                className="glass-input w-full"
+                value={version}
+                onChange={e => setVersion(e.target.value)}
+                placeholder="1.0.0"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs text-text-muted mb-1 block">显示标题</label>
+              <input
+                className="glass-input w-full"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="悬疑短剧提示词适配器"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs text-text-muted mb-1 block">功能描述</label>
+              <input
+                className="glass-input w-full"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="专门适配民国悬疑题材的镜头与台词生成"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">所属类别</label>
+              <select
+                className="glass-input w-full"
+                value={category}
+                onChange={e => setCategory(e.target.value as typeof category)}
+              >
+                <option value="story">故事 / 剧作</option>
+                <option value="shot">镜头 / 运镜</option>
+                <option value="review">审阅 / 质检</option>
+                <option value="sequence">序列 / 画布</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">工具权限（逗号分隔）</label>
+              <input
+                className="glass-input w-full"
+                value={tools}
+                onChange={e => setTools(e.target.value)}
+                placeholder="canvas.readProject, canvas.updateNodePrompt"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs text-text-muted mb-1 block">系统提示词模板（包含 {"{{input}}"} 占位符）</label>
+              <textarea
+                className="glass-input w-full min-h-[100px]"
+                value={promptTemplate}
+                onChange={e => setPromptTemplate(e.target.value)}
+                placeholder="请基于当前项目上下文完成：{{input}}"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs text-text-muted mb-1 block">绑定项目 ID（留空表示个人账户全局）</label>
+              <input
+                className="glass-input w-full"
+                value={projectId}
+                onChange={e => setProjectId(e.target.value)}
+                placeholder="项目 ID（可选）"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              className="bg-primary text-foreground rounded-lg px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+              onClick={() => void create()}
+            >
+              保存并发布 Skill 草稿
+            </button>
+            <button
+              type="button"
+              className="glass-button text-sm"
+              onClick={() => setShowCustomForm(false)}
+            >
+              取消
+            </button>
+          </div>
         </div>
       )}
 
@@ -242,103 +362,6 @@ export default function SkillSettings() {
           </div>
         )}
       </div>
-
-      {/* Optional Custom Skill Creation Panel */}
-      {showCustomForm && (
-        <div className="glass-panel p-6 space-y-4 border-primary/20">
-          <div>
-            <h3 className="font-semibold text-foreground text-base">创建自定义项目 Skill</h3>
-            <p className="text-xs text-text-secondary mt-1">
-              遵循受控 Skill 规范，输入专有工作流 Prompt 模板，系统自动校验并生成防篡改指纹。
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">Skill 标识名（仅小写字母与连字符）</label>
-              <input
-                className="glass-input w-full"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="例如: mystery-novel-adapter"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">版本号</label>
-              <input
-                className="glass-input w-full"
-                value={version}
-                onChange={e => setVersion(e.target.value)}
-                placeholder="1.0.0"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-xs text-text-muted mb-1 block">显示标题</label>
-              <input
-                className="glass-input w-full"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="悬疑短剧提示词适配器"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-xs text-text-muted mb-1 block">功能描述</label>
-              <input
-                className="glass-input w-full"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="专门适配民国悬疑题材的镜头与台词生成"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">所属类别</label>
-              <select
-                className="glass-input w-full"
-                value={category}
-                onChange={e => setCategory(e.target.value as typeof category)}
-              >
-                <option value="story">故事 / 剧作</option>
-                <option value="shot">镜头 / 运镜</option>
-                <option value="review">审阅 / 质检</option>
-                <option value="sequence">序列 / 画布</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">工具权限（逗号分隔）</label>
-              <input
-                className="glass-input w-full"
-                value={tools}
-                onChange={e => setTools(e.target.value)}
-                placeholder="canvas.readProject, canvas.updateNodePrompt"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-xs text-text-muted mb-1 block">系统提示词模板（包含 {"{{input}}"} 占位符）</label>
-              <textarea
-                className="glass-input w-full min-h-[100px]"
-                value={promptTemplate}
-                onChange={e => setPromptTemplate(e.target.value)}
-                placeholder="请基于当前项目上下文完成：{{input}}"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-xs text-text-muted mb-1 block">绑定项目 ID（留空表示个人账户全局）</label>
-              <input
-                className="glass-input w-full"
-                value={projectId}
-                onChange={e => setProjectId(e.target.value)}
-                placeholder="项目 ID（可选）"
-              />
-            </div>
-          </div>
-          <button
-            type="button"
-            className="bg-primary text-foreground rounded-lg px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
-            onClick={() => void create()}
-          >
-            保存并发布 Skill 草稿
-          </button>
-        </div>
-      )}
     </div>
   );
 }
