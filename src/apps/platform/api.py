@@ -133,6 +133,32 @@ class AdminUserUpdateIn(BaseModel):
 class XiangongyunVerifyIn(BaseModel):
     access_token: str = Field(min_length=16, max_length=500)
 
+class AgentProfileUpdateIn(BaseModel):
+    agency_type: str = Field(default="individual")
+    institution_name: str = Field(default="")
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    notes: str | None = None
+
+class AdminAgentUpdateIn(BaseModel):
+    agency_type: str | None = None
+    institution_name: str | None = None
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    discount_rate: float | None = Field(default=None, gt=0, le=1.0)
+    commission_rate: float | None = Field(default=None, ge=0, le=1.0)
+    status: str | None = None
+    notes: str | None = None
+
+class AgentPurchaseIn(BaseModel):
+    quantity: int = Field(gt=0, le=1000)
+    title: str = Field(min_length=1, max_length=120)
+    package_type: str = "standard"
+    expires_at: str | None = None
+
+class AgentInviteNoteIn(BaseModel):
+    student_note: str = Field(max_length=200)
+
 
 IdempotencyKey = Header(..., alias="Idempotency-Key", min_length=8, max_length=200)
 
@@ -149,6 +175,60 @@ def create_registration_invite(body: RegistrationInviteIn, user=Depends(current_
 @router.get("/auth/invites")
 def list_registration_invites(user=Depends(admin_user), svc: PlatformService = Depends(service)):
     return handle(lambda: svc.list_registration_invites(user))
+
+@router.get("/agent/profile")
+def get_agent_profile(user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.get_agent_profile(user))
+
+@router.put("/agent/profile")
+def update_agent_profile(body: AgentProfileUpdateIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.upsert_agent_profile(
+        user,
+        agency_type=body.agency_type,
+        institution_name=body.institution_name,
+        contact_name=body.contact_name,
+        contact_phone=body.contact_phone,
+        notes=body.notes,
+    ))
+
+@router.post("/agent/invites/purchase")
+def purchase_agent_invites(body: AgentPurchaseIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.purchase_agent_invites(user, body.quantity, body.title, body.package_type, body.expires_at))
+
+@router.get("/agent/batches")
+def list_agent_batches(user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.list_agent_batches(user))
+
+@router.get("/agent/invites")
+def list_agent_invites(batch_id: str | None = None, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.list_agent_invites(user, batch_id=batch_id))
+
+@router.patch("/agent/invites/{invite_id}/note")
+def update_agent_invite_note(invite_id: str, body: AgentInviteNoteIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.update_agent_invite_note(user, invite_id, body.student_note))
+
+@router.get("/agent/students")
+def list_agent_students(user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.list_agent_students(user))
+
+@router.get("/admin/agents")
+def admin_list_agents(user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.admin_list_agents(user))
+
+@router.put("/admin/agents/{user_id}")
+def admin_update_agent(user_id: str, body: AdminAgentUpdateIn, user=Depends(admin_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.upsert_agent_profile(
+        user,
+        agency_type=body.agency_type or "individual",
+        institution_name=body.institution_name or "",
+        contact_name=body.contact_name,
+        contact_phone=body.contact_phone,
+        discount_rate=body.discount_rate,
+        commission_rate=body.commission_rate,
+        status=body.status,
+        notes=body.notes,
+        target_user_id=user_id,
+    ))
 
 @router.post("/auth/login")
 def login(body: LoginIn, svc: PlatformService = Depends(service)): return handle(lambda: svc.login(body.username, body.password))

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { LayoutGrid, Layers, Wand2, Settings, FileText, Workflow, Users, LogOut } from "lucide-react";
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
@@ -28,6 +29,7 @@ export const GLOBAL_NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: s
 
 const PLATFORM_SUBNAV = [
   ["users", "用户管理"], ["compute", "算力与凭证"], ["skills", "视频 Skill"], ["xiangongyun", "仙宫云 H3"],
+  ["agent", "渠道代理"],
   ["competitions", "赛事活动"], ["certification", "创作者认证"], ["tasks", "商业任务"], ["academy", "培训学院"],
 ] as const;
 
@@ -83,6 +85,18 @@ function NavButton({
  */
 export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: GlobalSidebarProps) {
   const t = useTranslations("nav");
+  const [currentPlatformSection, setCurrentPlatformSection] = useState("users");
+
+  useEffect(() => {
+    const syncPlatformSection = () => {
+      const match = window.location.hash.match(/^#\/platform\?section=([^&]+)/);
+      if (match) setCurrentPlatformSection(match[1]);
+      else if (window.location.hash.startsWith("#/platform")) setCurrentPlatformSection("users");
+    };
+    syncPlatformSection();
+    window.addEventListener("hashchange", syncPlatformSection);
+    return () => window.removeEventListener("hashchange", syncPlatformSection);
+  }, []);
 
   const handleNav = (id: GlobalTab, hash: string) => {
     onTabChange(id);
@@ -116,9 +130,29 @@ export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: Glob
             <NavButton active={activeTab === item.id} label={t(item.id)} icon={item.icon} onClick={() => handleNav(item.id, item.hash)} />
             {item.id === "platform" && activeTab === "platform" && (
               <div className="ml-7 mt-1 space-y-0.5 border-l border-glass-border pl-2" aria-label="创作者平台菜单">
-                {PLATFORM_SUBNAV.map(([section, label]) => (
-                  <button key={section} type="button" onClick={() => { onTabChange("platform"); window.location.hash = `#/platform?section=${section}`; }} className="w-full rounded-md px-2 py-1.5 text-left text-xs text-text-muted hover:bg-hover-bg hover:text-foreground">{label}</button>
-                ))}
+                {PLATFORM_SUBNAV.map(([section, label]) => {
+                  const isSubActive = currentPlatformSection === section;
+                  return (
+                    <button
+                      key={section}
+                      type="button"
+                      onClick={() => {
+                        onTabChange("platform");
+                        setCurrentPlatformSection(section);
+                        window.location.hash = `#/platform?section=${section}`;
+                      }}
+                      className={clsx(
+                        "w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors flex items-center justify-between",
+                        isSubActive
+                          ? "bg-primary/15 text-primary font-semibold"
+                          : "text-text-muted hover:bg-hover-bg hover:text-foreground"
+                      )}
+                    >
+                      <span>{label}</span>
+                      {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

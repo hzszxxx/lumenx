@@ -10,6 +10,67 @@ export type AdminUser = { id: string; username: string; email?: string | null; n
 export type AdminOverview = { users: { total: number; active: number; creators: number; admins: number }; tasks: { total: number; open: number }; competitions: { total: number; active: number }; submissions: { total: number; pending: number }; ledger_balance_cents: number };
 export type XiangongyunStatus = { provider: "xiangongyun"; verified: true; credential_id: string; account: { nickname?: string; phone?: string; uuid?: string }; balance: number | null; instances: Array<Record<string, unknown>>; checked_at: string };
 
+export type PlatformCompetition = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  rules_markdown?: string;
+  whitelist_required: number | boolean;
+  allocated_credits: number;
+  status: "draft" | "enrolling" | "ongoing" | "judging" | "ended";
+  enroll_deadline?: string | null;
+  submit_deadline?: string | null;
+  created_at: string;
+};
+
+export type PlatformTask = {
+  id: string;
+  title: string;
+  category: string;
+  brief_markdown: string;
+  bounty_cents: number;
+  required_level: string;
+  deadline: string;
+  status: string;
+  version: number;
+  created_at: string;
+};
+
+export type PlatformCourse = {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string;
+  status: string;
+};
+
+export type PlatformTemplate = {
+  id: string;
+  title: string;
+  source_project_id: string;
+  version: string;
+  metadata_json: string;
+  status: string;
+};
+
+export type PlatformCertification = {
+  status: "unapplied" | "reviewing" | "certified" | "rejected";
+  level: string;
+  source_type?: string;
+  score?: number | null;
+  feedback?: string | null;
+  certified_at?: string | null;
+};
+
+export type PlatformExam = {
+  id: string;
+  prompt: string;
+  version: string;
+  is_active: number;
+  created_at: string;
+};
+
 export function getPlatformToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(TOKEN_KEY);
@@ -42,10 +103,21 @@ export const platformApi = {
   },
   me: () => request<PlatformUser & { wallet?: { simulated_balance_cents: number } }>("/auth/me"),
   logout: async () => { await request("/auth/logout", { method: "POST" }); clearPlatformToken(); },
-  competitions: () => request<Array<{ id: string; title: string; status: string; description: string }>>("/competitions"),
-  courses: () => request<Array<{ id: string; title: string; description: string }>>("/academy/courses"),
-  tasks: () => request<Array<{ id: string; title: string; category: string; bounty_cents: number; deadline: string }>>("/tasks/square"),
-  certification: () => request<{ status: string; level: string } | null>("/certifications/status"),
+  competitions: () => request<PlatformCompetition[]>("/competitions"),
+  competitionDetail: (id: string) => request<PlatformCompetition>(`/competitions/${id}`),
+  competitionLeaderboard: (id: string) => request<Array<{ submission_id: string; user_id: string; title: string; score: number; award_title?: string; status: string }>>(`/competitions/${id}/leaderboard`),
+  enrollCompetition: (id: string, inviteCode?: string, idempotencyKey = crypto.randomUUID()) => request<{ status: string }>(`/competitions/${id}/enroll${inviteCode ? `?invite_code=${encodeURIComponent(inviteCode)}` : ""}`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey } }),
+
+  courses: () => request<PlatformCourse[]>("/academy/courses"),
+  templates: () => request<PlatformTemplate[]>("/academy/templates"),
+  forkTemplate: (templateId: string, forkProjectId = crypto.randomUUID()) => request(`/academy/templates/${templateId}/fork`, { method: "POST", body: JSON.stringify({ fork_project_id: forkProjectId }) }),
+
+  tasks: () => request<PlatformTask[]>("/tasks/square"),
+  claimTask: (taskId: string, idempotencyKey = crypto.randomUUID()) => request<{ task_id: string; status: string }>(`/tasks/${taskId}/claim`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey } }),
+
+  certification: () => request<PlatformCertification | null>("/certifications/status"),
+  activeExam: () => request<PlatformExam | null>("/certifications/exam/prompt"),
+  applyCertification: (payload: { exam_id: string; artifact: Record<string, unknown> }) => request("/certifications/apply", { method: "POST", body: JSON.stringify(payload) }),
   tokenUsage: (limit = 20) => request<{ prompt_tokens: number; completion_tokens: number; total_tokens: number; records: Array<Record<string, unknown>> }>(`/usage/tokens?limit=${limit}`),
   creditPricing: () => request<Array<{ provider: string; model: string; pricing_version: string; input_credits_per_1k: number; output_credits_per_1k: number }>>("/credits/pricing"),
   creditBalance: () => request<{ user_id: string; available_credits: number; credited_credits: number; debited_credits: number }>("/credits/balance"),
@@ -74,5 +146,95 @@ export const platformApi = {
   verifyXiangongyun: (access_token: string, idempotencyKey = crypto.randomUUID()) => request<XiangongyunStatus>("/xiangongyun/verify", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ access_token }) }),
   xiangongyunStatus: () => request<XiangongyunStatus | null>("/xiangongyun/status"),
   clearXiangongyunBinding: (idempotencyKey = crypto.randomUUID()) => request<{ status: string }>("/xiangongyun/binding", { method: "DELETE", headers: { "Idempotency-Key": idempotencyKey } }),
+
+  // Agent / Agency APIs
+  agentProfile: () => request<AgentProfile>("/agent/profile"),
+  updateAgentProfile: (payload: { agency_type?: string; institution_name?: string; contact_name?: string; contact_phone?: string; notes?: string }) => request<AgentProfile>("/agent/profile", { method: "PUT", body: JSON.stringify(payload) }),
+  purchaseAgentInvites: (payload: { quantity: number; title: string; package_type?: string; expires_at?: string }) => request<{ batch: AgentInviteBatch; codes: AgentInvite[] }>("/agent/invites/purchase", { method: "POST", body: JSON.stringify(payload) }),
+  agentBatches: () => request<AgentInviteBatch[]>("/agent/batches"),
+  agentInvites: (batchId?: string) => request<AgentInvite[]>(`/agent/invites${batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ""}`),
+  updateAgentInviteNote: (inviteId: string, student_note: string) => request<{ id: string; student_note: string }>(`/agent/invites/${inviteId}/note`, { method: "PATCH", body: JSON.stringify({ student_note }) }),
+  agentStudents: () => request<AgentStudent[]>("/agent/students"),
+  adminAgents: () => request<AdminAgentItem[]>("/admin/agents"),
+  adminUpdateAgent: (userId: string, payload: { agency_type?: string; institution_name?: string; contact_name?: string; contact_phone?: string; discount_rate?: number; commission_rate?: number; status?: string; notes?: string }) => request<AgentProfile>(`/admin/agents/${userId}`, { method: "PUT", body: JSON.stringify(payload) }),
+};
+
+export type AgentProfile = {
+  id?: string;
+  user_id: string;
+  username: string;
+  email?: string | null;
+  role: string;
+  agency_type: "individual" | "institution";
+  institution_name: string;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  discount_rate: number;
+  commission_rate: number;
+  status: "active" | "pending" | "disabled" | "unapplied";
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  metrics: {
+    total_batches: number;
+    purchased_invites: number;
+    total_invites: number;
+    used_invites: number;
+    remaining_invites: number;
+    total_students: number;
+  };
+};
+
+export type AgentInviteBatch = {
+  id: string;
+  agent_id: string;
+  batch_no: string;
+  title: string;
+  package_type: string;
+  quantity: number;
+  unit_price_cents: number;
+  total_price_cents: number;
+  status: string;
+  created_at: string;
+};
+
+export type AgentInvite = {
+  id: string;
+  code: string;
+  max_uses: number;
+  used_count: number;
+  expires_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  last_used_at?: string | null;
+  batch_id?: string | null;
+  student_note?: string | null;
+  batch_title?: string | null;
+  student_user_id?: string | null;
+  student_username?: string | null;
+  student_registered_at?: string | null;
+};
+
+export type AgentStudent = {
+  id: string;
+  agent_id: string;
+  student_user_id: string;
+  invite_id: string;
+  invite_code: string;
+  batch_id?: string | null;
+  notes?: string | null;
+  registered_at: string;
+  student_username: string;
+  student_email?: string | null;
+  batch_title?: string | null;
+};
+
+export type AdminAgentItem = AgentProfile & {
+  id: string;
+  total_batches: number;
+  total_purchased: number;
+  total_invites: number;
+  used_invites: number;
+  total_students: number;
 };
 

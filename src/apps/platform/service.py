@@ -134,20 +134,26 @@ class PlatformService:
 
     def register(self, username: str, password: str, email: str | None = None, role: str = "user", invite_code: str | None = None, test_access_code_hash: str | None = None) -> dict[str, Any]:
         if len(password) < self.config.password_min_length: raise PlatformError("weak_password", "password is too short")
-        if role not in {"user", "creator", "reviewer", "client", "admin"}: raise PlatformError("invalid_role", "unsupported role")
+        if role not in {"user", "creator", "reviewer", "client", "admin", "agent"}: raise PlatformError("invalid_role", "unsupported role")
         digest, salt = hash_password(password); user_id = uid(); timestamp = now()
         try:
             with connect(self.path) as c:
-                if self.config.registration_invite_required and not test_access_code_hash:
-                    normalized = (invite_code or "").strip().upper()
-                    if not normalized:
+                invite_row = None
+                normalized = (invite_code or "").strip().upper()
+                if not test_access_code_hash:
+                    if not normalized and self.config.registration_invite_required:
                         raise PlatformError("invite_required", "a valid invitation code is required", 422)
-                    claimed = c.execute(
-                        "UPDATE registration_invites SET used_count=used_count+1,last_used_at=? WHERE code=? AND used_count < max_uses AND (expires_at IS NULL OR expires_at > ?)",
-                        (timestamp, normalized, timestamp),
-                    )
-                    if claimed.rowcount != 1:
-                        raise PlatformError("invalid_invite", "invitation code is invalid, expired, or already used", 422)
+                    if normalized:
+                        invite_row = c.execute(
+                            "SELECT id, created_by, batch_id FROM registration_invites WHERE code=? AND used_count < max_uses AND (expires_at IS NULL OR expires_at > ?)",
+                            (normalized, timestamp),
+                        ).fetchone()
+                        claimed = c.execute(
+                            "UPDATE registration_invites SET used_count=used_count+1,last_used_at=? WHERE code=? AND used_count < max_uses AND (expires_at IS NULL OR expires_at > ?)",
+                            (timestamp, normalized, timestamp),
+                        )
+                        if claimed.rowcount != 1:
+                            raise PlatformError("invalid_invite", "invitation code is invalid, expired, or already used", 422)
                 if test_access_code_hash and c.execute(
                     "SELECT 1 FROM platform_test_access_bindings WHERE access_code_hash=?",
                     (test_access_code_hash,),
@@ -160,13 +166,27 @@ class PlatformService:
                         (test_access_code_hash, user_id, timestamp),
                     )
                 if role == "creator": c.execute("INSERT INTO creator_certifications VALUES (?,?,?,?,?,?,?,?,?,?)", (uid(), user_id, "unapplied", "standard", "direct_exam", None, None, None, None, timestamp))
+                if role == "agent":
+                    c.execute(
+                        "INSERT INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                        (user_id, "individual", username, username, None, 1.0, 0.0, "active", None, timestamp, timestamp),
+                    )
+                if invite_row and invite_row[1]:
+                    agent_id, invite_id, batch_id = invite_row[1], invite_row[0], invite_row[2]
+                    agent_profile = c.execute("SELECT user_id FROM agent_profiles WHERE user_id=?", (agent_id,)).fetchone()
+                    is_agent_user = c.execute("SELECT 1 FROM platform_users WHERE id=? AND role='agent'", (agent_id,)).fetchone()
+                    if agent_profile or is_agent_user:
+                        c.execute(
+                            "INSERT OR IGNORE INTO agent_students(id, agent_id, student_user_id, invite_id, invite_code, batch_id, notes, registered_at) VALUES (?,?,?,?,?,?,?,?)",
+                            (uid(), agent_id, user_id, invite_id, normalized, batch_id, None, timestamp),
+                        )
                 self._audit(c, user_id, "user.registered", "user", user_id, {"role": role})
         except sqlite3.IntegrityError as exc: raise PlatformError("user_exists", "username or email already exists", 409) from exc
         return {"id": user_id, "username": username, "email": email, "role": role}
 
-    def create_registration_invite(self, actor: dict[str, Any], code: str | None = None, max_uses: int = 1, expires_at: str | None = None) -> dict[str, Any]:
-        if actor.get("role") != "admin":
-            raise PlatformError("forbidden", "admin role required", 403)
+    def create_registration_invite(self, actor: dict[str, Any], code: str | None = None, max_uses: int = 1, expires_at: str | None = None, batch_id: str | None = None, student_note: str | None = None) -> dict[str, Any]:
+        if actor.get("role") not in {"admin", "agent"}:
+            raise PlatformError("forbidden", "admin or agent role required", 403)
         normalized = (code or secrets.token_urlsafe(8)).strip().upper()
         if not 6 <= len(normalized) <= 64 or not normalized.replace("-", "").isalnum():
             raise PlatformError("invalid_invite", "invitation code must be 6-64 alphanumeric characters", 422)
@@ -175,18 +195,24 @@ class PlatformService:
         invite_id = uid(); timestamp = now()
         try:
             with connect(self.path) as c:
-                c.execute("INSERT INTO registration_invites VALUES (?,?,?,?,?,?,?,?)", (invite_id, normalized, max_uses, 0, expires_at, actor["id"], timestamp, None))
+                c.execute(
+                    "INSERT INTO registration_invites(id,code,max_uses,used_count,expires_at,created_by,created_at,last_used_at,batch_id,student_note) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (invite_id, normalized, max_uses, 0, expires_at, actor["id"], timestamp, None, batch_id, student_note),
+                )
                 self._audit(c, actor["id"], "registration.invite_created", "registration_invite", invite_id, {"code": normalized, "max_uses": max_uses, "expires_at": expires_at})
         except sqlite3.IntegrityError as exc:
             raise PlatformError("invite_exists", "invitation code already exists", 409) from exc
-        return {"id": invite_id, "code": normalized, "max_uses": max_uses, "used_count": 0, "expires_at": expires_at, "created_at": timestamp}
+        return {"id": invite_id, "code": normalized, "max_uses": max_uses, "used_count": 0, "expires_at": expires_at, "created_at": timestamp, "batch_id": batch_id, "student_note": student_note}
 
     def list_registration_invites(self, actor: dict[str, Any]) -> list[dict[str, Any]]:
-        if actor.get("role") != "admin":
-            raise PlatformError("forbidden", "admin role required", 403)
+        if actor.get("role") not in {"admin", "agent"}:
+            raise PlatformError("forbidden", "admin or agent role required", 403)
         with connect(self.path) as c:
-            rows = c.execute("SELECT id,code,max_uses,used_count,expires_at,created_at,last_used_at FROM registration_invites ORDER BY created_at DESC").fetchall()
-        keys = ("id", "code", "max_uses", "used_count", "expires_at", "created_at", "last_used_at")
+            if actor.get("role") == "admin":
+                rows = c.execute("SELECT id,code,max_uses,used_count,expires_at,created_at,last_used_at,batch_id,student_note FROM registration_invites ORDER BY created_at DESC").fetchall()
+            else:
+                rows = c.execute("SELECT id,code,max_uses,used_count,expires_at,created_at,last_used_at,batch_id,student_note FROM registration_invites WHERE created_by=? ORDER BY created_at DESC", (actor["id"],)).fetchall()
+        keys = ("id", "code", "max_uses", "used_count", "expires_at", "created_at", "last_used_at", "batch_id", "student_note")
         return [dict(zip(keys, row)) for row in rows]
 
     def login(self, username: str, password: str) -> dict[str, Any]:
@@ -245,7 +271,7 @@ class PlatformService:
 
     def admin_update_user(self, actor: dict[str, Any], user_id: str, *, role: str | None = None, is_active: bool | None = None) -> dict[str, Any]:
         self._require_admin(actor)
-        if role is not None and role not in {"user", "creator", "reviewer", "client", "admin"}:
+        if role is not None and role not in {"user", "creator", "reviewer", "client", "admin", "agent"}:
             raise PlatformError("invalid_role", "unsupported role", 422)
         if user_id == actor.get("id") and is_active is False:
             raise PlatformError("self_deactivate", "an admin cannot deactivate their own account", 422)
@@ -257,7 +283,13 @@ class PlatformService:
             if row[4] == "admin" and next_role != "admin":
                 remaining = c.execute("SELECT COUNT(*) FROM platform_users WHERE role='admin' AND is_active=1 AND id<>?", (user_id,)).fetchone()[0]
                 if remaining < 1: raise PlatformError("last_admin", "cannot demote the last active admin", 422)
-            timestamp = now(); c.execute("UPDATE platform_users SET role=?,is_active=?,updated_at=? WHERE id=?", (next_role, next_active, timestamp, user_id))
+            timestamp = now()
+            c.execute("UPDATE platform_users SET role=?,is_active=?,updated_at=? WHERE id=?", (next_role, next_active, timestamp, user_id))
+            if next_role == "agent":
+                c.execute(
+                    "INSERT OR IGNORE INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (user_id, "individual", row[1], row[1], None, 1.0, 0.0, "active", None, timestamp, timestamp),
+                )
             self._audit(c, actor["id"], "admin.user_updated", "user", user_id, {"before": before, "after": {"role": next_role, "is_active": bool(next_active)}})
             updated = c.execute("SELECT id,username,email,nickname,role,is_active,created_at,updated_at FROM platform_users WHERE id=?", (user_id,)).fetchone()
         keys = ("id", "username", "email", "nickname", "role", "is_active", "created_at", "updated_at")
@@ -1277,3 +1309,313 @@ class PlatformService:
             c.execute("UPDATE certification_applications SET status=?,score=?,feedback=? WHERE id=?", (status,score,feedback,application_id))
             c.execute("UPDATE creator_certifications SET status=?,score=?,feedback=?,certified_at=? WHERE user_id=?", (status,score,feedback,now() if approved else None,row[0]))
             return {"application_id": application_id, "user_id": row[0], "status": status, "score": score, "feedback": feedback}
+
+    def get_agent_profile(self, actor: dict[str, Any], target_user_id: str | None = None) -> dict[str, Any]:
+        user_id = target_user_id if (target_user_id and actor.get("role") == "admin") else actor.get("id")
+        if not user_id:
+            raise PlatformError("unauthorized", "login required", 401)
+        with connect(self.path) as c:
+            user_row = c.execute("SELECT id, username, email, role, is_active FROM platform_users WHERE id=?", (user_id,)).fetchone()
+            if not user_row:
+                raise PlatformError("user_not_found", "user not found", 404)
+            profile = c.execute(
+                "SELECT user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at FROM agent_profiles WHERE user_id=?",
+                (user_id,),
+            ).fetchone()
+            if not profile:
+                default_status = "active" if user_row[3] in {"agent", "admin"} else "unapplied"
+                timestamp = now()
+                c.execute(
+                    "INSERT OR IGNORE INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (user_id, "individual", user_row[1], user_row[1], None, 1.0, 0.0, default_status, None, timestamp, timestamp),
+                )
+                profile = (user_id, "individual", user_row[1], user_row[1], None, 1.0, 0.0, default_status, None, timestamp, timestamp)
+
+            total_batches = c.execute("SELECT COUNT(*) FROM agent_invite_batches WHERE agent_id=?", (user_id,)).fetchone()[0]
+            purchased_invites = c.execute("SELECT COALESCE(SUM(quantity), 0) FROM agent_invite_batches WHERE agent_id=? AND status='completed'", (user_id,)).fetchone()[0]
+            invites_stats = c.execute(
+                "SELECT COUNT(*), COALESCE(SUM(used_count), 0) FROM registration_invites WHERE created_by=?",
+                (user_id,),
+            ).fetchone()
+            total_invites = invites_stats[0]
+            used_invites = invites_stats[1]
+            remaining_invites = max(0, total_invites - used_invites)
+            total_students = c.execute("SELECT COUNT(*) FROM agent_students WHERE agent_id=?", (user_id,)).fetchone()[0]
+
+            return {
+                "user_id": profile[0],
+                "username": user_row[1],
+                "email": user_row[2],
+                "role": user_row[3],
+                "agency_type": profile[1],
+                "institution_name": profile[2],
+                "contact_name": profile[3],
+                "contact_phone": profile[4],
+                "discount_rate": profile[5],
+                "commission_rate": profile[6],
+                "status": profile[7],
+                "notes": profile[8],
+                "created_at": profile[9],
+                "updated_at": profile[10],
+                "metrics": {
+                    "total_batches": total_batches,
+                    "purchased_invites": purchased_invites or total_invites,
+                    "total_invites": total_invites,
+                    "used_invites": used_invites,
+                    "remaining_invites": remaining_invites,
+                    "total_students": total_students,
+                },
+            }
+
+    def upsert_agent_profile(
+        self,
+        actor: dict[str, Any],
+        *,
+        agency_type: str = "individual",
+        institution_name: str = "",
+        contact_name: str | None = None,
+        contact_phone: str | None = None,
+        discount_rate: float | None = None,
+        commission_rate: float | None = None,
+        status: str | None = None,
+        notes: str | None = None,
+        target_user_id: str | None = None,
+    ) -> dict[str, Any]:
+        is_admin = actor.get("role") == "admin"
+        target_id = target_user_id if (target_user_id and is_admin) else actor.get("id")
+        if not target_id:
+            raise PlatformError("unauthorized", "login required", 401)
+        if agency_type not in {"individual", "institution"}:
+            raise PlatformError("invalid_agency_type", "agency_type must be 'individual' or 'institution'", 422)
+        timestamp = now()
+        with connect(self.path) as c:
+            existing = c.execute("SELECT user_id, discount_rate, commission_rate, status FROM agent_profiles WHERE user_id=?", (target_id,)).fetchone()
+            current_discount = existing[1] if existing else 1.0
+            current_commission = existing[2] if existing else 0.0
+            current_status = existing[3] if existing else ("active" if is_admin else "pending")
+
+            next_discount = float(discount_rate) if (discount_rate is not None and is_admin) else current_discount
+            next_commission = float(commission_rate) if (commission_rate is not None and is_admin) else current_commission
+            next_status = status if (status is not None and is_admin) else (current_status or "active")
+
+            inst_name = institution_name.strip() or (contact_name or actor.get("username", "代理机构"))
+            c.execute(
+                """
+                INSERT INTO agent_profiles(user_id, agency_type, institution_name, contact_name, contact_phone, discount_rate, commission_rate, status, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    agency_type=excluded.agency_type,
+                    institution_name=excluded.institution_name,
+                    contact_name=excluded.contact_name,
+                    contact_phone=excluded.contact_phone,
+                    discount_rate=excluded.discount_rate,
+                    commission_rate=excluded.commission_rate,
+                    status=excluded.status,
+                    notes=COALESCE(excluded.notes, agent_profiles.notes),
+                    updated_at=excluded.updated_at
+                """,
+                (target_id, agency_type, inst_name, contact_name, contact_phone, next_discount, next_commission, next_status, notes, timestamp, timestamp),
+            )
+            if next_status == "active":
+                u_role = c.execute("SELECT role FROM platform_users WHERE id=?", (target_id,)).fetchone()
+                if u_role and u_role[0] not in {"admin", "agent"}:
+                    c.execute("UPDATE platform_users SET role='agent', updated_at=? WHERE id=?", (timestamp, target_id))
+            self._audit(c, actor["id"], "agent.profile_updated", "agent_profile", target_id, {"agency_type": agency_type, "institution_name": inst_name, "status": next_status})
+        return self.get_agent_profile(actor, target_id)
+
+    def purchase_agent_invites(
+        self,
+        actor: dict[str, Any],
+        quantity: int,
+        title: str,
+        package_type: str = "standard",
+        expires_at: str | None = None,
+    ) -> dict[str, Any]:
+        if actor.get("role") not in {"admin", "agent"}:
+            raise PlatformError("forbidden", "agent or admin role required", 403)
+        if quantity < 1 or quantity > 1000:
+            raise PlatformError("invalid_quantity", "quantity must be between 1 and 1000", 422)
+        title = (title or "").strip()
+        if not title:
+            raise PlatformError("invalid_title", "title is required", 422)
+
+        agent_id = actor["id"]
+        if quantity >= 100:
+            base_unit_price = 2500
+        elif quantity >= 50:
+            base_unit_price = 3500
+        elif quantity >= 10:
+            base_unit_price = 4000
+        else:
+            base_unit_price = 5000
+
+        timestamp = now()
+        batch_id = uid()
+        batch_no = f"AGT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{secrets.token_hex(3).upper()}"
+        codes_generated: list[dict[str, Any]] = []
+
+        with connect(self.path) as c:
+            prof = c.execute("SELECT discount_rate, status FROM agent_profiles WHERE user_id=?", (agent_id,)).fetchone()
+            discount_rate = float(prof[0]) if prof and prof[0] else 1.0
+            unit_price_cents = max(100, int(base_unit_price * discount_rate))
+            total_price_cents = unit_price_cents * quantity
+
+            c.execute(
+                """
+                INSERT INTO agent_invite_batches(id, agent_id, batch_no, title, package_type, quantity, unit_price_cents, total_price_cents, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
+                """,
+                (batch_id, agent_id, batch_no, title, package_type, quantity, unit_price_cents, total_price_cents, timestamp),
+            )
+
+            for i in range(quantity):
+                code_id = uid()
+                code_str = f"LX-{secrets.token_hex(4).upper()}"
+                student_tag = f"{title} #{i+1:03d}"
+                c.execute(
+                    """
+                    INSERT INTO registration_invites(id, code, max_uses, used_count, expires_at, created_by, created_at, last_used_at, batch_id, student_note)
+                    VALUES (?, ?, 1, 0, ?, ?, ?, NULL, ?, ?)
+                    """,
+                    (code_id, code_str, expires_at, agent_id, timestamp, batch_id, student_tag),
+                )
+                codes_generated.append({
+                    "id": code_id,
+                    "code": code_str,
+                    "student_note": student_tag,
+                    "max_uses": 1,
+                    "used_count": 0,
+                    "expires_at": expires_at,
+                    "batch_id": batch_id,
+                    "created_at": timestamp,
+                })
+
+            self._audit(
+                c,
+                agent_id,
+                "agent.invites_purchased",
+                "agent_invite_batches",
+                batch_id,
+                {
+                    "batch_no": batch_no,
+                    "quantity": quantity,
+                    "total_price_cents": total_price_cents,
+                    "unit_price_cents": unit_price_cents,
+                },
+            )
+
+        return {
+            "batch": {
+                "id": batch_id,
+                "agent_id": agent_id,
+                "batch_no": batch_no,
+                "title": title,
+                "package_type": package_type,
+                "quantity": quantity,
+                "unit_price_cents": unit_price_cents,
+                "total_price_cents": total_price_cents,
+                "created_at": timestamp,
+            },
+            "codes": codes_generated,
+        }
+
+    def list_agent_batches(self, actor: dict[str, Any], target_user_id: str | None = None) -> list[dict[str, Any]]:
+        is_admin = actor.get("role") == "admin"
+        agent_id = target_user_id if (target_user_id and is_admin) else actor.get("id")
+        with connect(self.path) as c:
+            if is_admin and not target_user_id:
+                rows = c.execute("SELECT id, agent_id, batch_no, title, package_type, quantity, unit_price_cents, total_price_cents, status, created_at FROM agent_invite_batches ORDER BY created_at DESC").fetchall()
+            else:
+                rows = c.execute("SELECT id, agent_id, batch_no, title, package_type, quantity, unit_price_cents, total_price_cents, status, created_at FROM agent_invite_batches WHERE agent_id=? ORDER BY created_at DESC", (agent_id,)).fetchall()
+        keys = ("id", "agent_id", "batch_no", "title", "package_type", "quantity", "unit_price_cents", "total_price_cents", "status", "created_at")
+        return [dict(zip(keys, row)) for row in rows]
+
+    def list_agent_invites(self, actor: dict[str, Any], batch_id: str | None = None, target_user_id: str | None = None) -> list[dict[str, Any]]:
+        is_admin = actor.get("role") == "admin"
+        agent_id = target_user_id if (target_user_id and is_admin) else actor.get("id")
+        clauses = []
+        params: list[Any] = []
+        if not (is_admin and not target_user_id):
+            clauses.append("r.created_by=?")
+            params.append(agent_id)
+        if batch_id:
+            clauses.append("r.batch_id=?")
+            params.append(batch_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        with connect(self.path) as c:
+            sql = f"""
+                SELECT r.id, r.code, r.max_uses, r.used_count, r.expires_at, r.created_by, r.created_at, r.last_used_at, r.batch_id, r.student_note,
+                       b.title as batch_title, s.student_user_id, u.username as student_username, s.registered_at as student_registered_at
+                FROM registration_invites r
+                LEFT JOIN agent_invite_batches b ON b.id = r.batch_id
+                LEFT JOIN agent_students s ON s.invite_id = r.id
+                LEFT JOIN platform_users u ON u.id = s.student_user_id
+                {where}
+                ORDER BY r.created_at DESC
+            """
+            rows = c.execute(sql, params).fetchall()
+
+        keys = ("id", "code", "max_uses", "used_count", "expires_at", "created_by", "created_at", "last_used_at", "batch_id", "student_note", "batch_title", "student_user_id", "student_username", "student_registered_at")
+        return [dict(zip(keys, row)) for row in rows]
+
+    def update_agent_invite_note(self, actor: dict[str, Any], invite_id: str, student_note: str) -> dict[str, Any]:
+        is_admin = actor.get("role") == "admin"
+        agent_id = actor.get("id")
+        with connect(self.path) as c:
+            row = c.execute("SELECT id, created_by FROM registration_invites WHERE id=?", (invite_id,)).fetchone()
+            if not row:
+                raise PlatformError("not_found", "invite code not found", 404)
+            if not is_admin and row[1] != agent_id:
+                raise PlatformError("forbidden", "not authorized to update this invite", 403)
+            c.execute("UPDATE registration_invites SET student_note=? WHERE id=?", (student_note.strip(), invite_id))
+        return {"id": invite_id, "student_note": student_note.strip()}
+
+    def list_agent_students(self, actor: dict[str, Any], target_user_id: str | None = None) -> list[dict[str, Any]]:
+        is_admin = actor.get("role") == "admin"
+        agent_id = target_user_id if (target_user_id and is_admin) else actor.get("id")
+        clauses = []
+        params: list[Any] = []
+        if not (is_admin and not target_user_id):
+            clauses.append("s.agent_id=?")
+            params.append(agent_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        with connect(self.path) as c:
+            sql = f"""
+                SELECT s.id, s.agent_id, s.student_user_id, s.invite_id, s.invite_code, s.batch_id, s.notes, s.registered_at,
+                       u.username as student_username, u.email as student_email, b.title as batch_title
+                FROM agent_students s
+                JOIN platform_users u ON u.id = s.student_user_id
+                LEFT JOIN agent_invite_batches b ON b.id = s.batch_id
+                {where}
+                ORDER BY s.registered_at DESC
+            """
+            rows = c.execute(sql, params).fetchall()
+
+        keys = ("id", "agent_id", "student_user_id", "invite_id", "invite_code", "batch_id", "notes", "registered_at", "student_username", "student_email", "batch_title")
+        return [dict(zip(keys, row)) for row in rows]
+
+    def admin_list_agents(self, actor: dict[str, Any]) -> list[dict[str, Any]]:
+        self._require_admin(actor)
+        with connect(self.path) as c:
+            sql = """
+                SELECT u.id, u.username, u.email, u.role, u.is_active, u.created_at,
+                       p.agency_type, p.institution_name, p.contact_name, p.contact_phone, p.discount_rate, p.commission_rate, p.status, p.notes,
+                       (SELECT COUNT(*) FROM agent_invite_batches b WHERE b.agent_id = u.id) as total_batches,
+                       (SELECT COALESCE(SUM(quantity), 0) FROM agent_invite_batches b WHERE b.agent_id = u.id) as total_purchased,
+                       (SELECT COUNT(*) FROM registration_invites r WHERE r.created_by = u.id) as total_invites,
+                       (SELECT COALESCE(SUM(used_count), 0) FROM registration_invites r WHERE r.created_by = u.id) as used_invites,
+                       (SELECT COUNT(*) FROM agent_students s WHERE s.agent_id = u.id) as total_students
+                FROM platform_users u
+                JOIN agent_profiles p ON p.user_id = u.id
+                ORDER BY u.created_at DESC
+            """
+            rows = c.execute(sql).fetchall()
+
+        keys = (
+            "id", "username", "email", "role", "is_active", "created_at",
+            "agency_type", "institution_name", "contact_name", "contact_phone", "discount_rate", "commission_rate", "status", "notes",
+            "total_batches", "total_purchased", "total_invites", "used_invites", "total_students",
+        )
+        return [dict(zip(keys, row)) for row in rows]

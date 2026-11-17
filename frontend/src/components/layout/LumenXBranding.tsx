@@ -5,12 +5,11 @@ import { useSettingsStore, type ThemePreset } from "@/store/settingsStore";
 import { publicAssetPath } from "@/lib/publicAsset";
 
 interface LumenXBrandingProps {
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   showSlogan?: boolean;
 }
 
-// Logo 变体按主题映射（Tasty Sam 同形电路枫叶，透明底）。
-// atelier-dark 复用蓝色 logo-dark.png，再用 CSS filter 着色为 teal。
+// Logo 变体按主题映射
 const LOGO_SRC: Record<ThemePreset, string> = {
   "atelier-dark": "/yingban-logo.png",
   "bridge-dark": "/yingban-logo.png",
@@ -20,7 +19,7 @@ const LOGO_SRC: Record<ThemePreset, string> = {
 };
 
 export default function LumenXBranding({ size = "md" }: LumenXBrandingProps) {
-  const logoSize = size === "sm" ? "w-28" : "w-40";
+  const logoSize = size === "sm" ? "w-24 h-24" : size === "lg" ? "w-44 h-44" : "w-36 h-36";
   const theme = useSettingsStore((s) => s.theme);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -32,7 +31,7 @@ export default function LumenXBranding({ size = "md" }: LumenXBrandingProps) {
       <img
         src={logoSrc}
         alt="YingBan"
-        className={`${logoSize} h-auto rounded-lg bg-white object-contain`}
+        className={`${logoSize} aspect-square rounded-2xl bg-white p-2 shadow-sm object-contain`}
       />
     </div>
   );

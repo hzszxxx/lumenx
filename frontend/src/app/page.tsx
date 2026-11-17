@@ -18,6 +18,7 @@ import type { GlobalTab } from "@/components/layout/GlobalSidebar";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { clearPlatformToken, getPlatformToken, platformApi } from "@/lib/platformApi";
+import { usePlatformStore } from "@/store/platformStore";
 import { requireActiveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
 import { useTranslations } from "next-intl";
 import TauriMenuListener from "@/components/layout/TauriMenuListener";
@@ -662,11 +663,12 @@ export default function Home() {
   const captureProjectListSync = useProjectStore((state) => state.captureProjectListSync);
   const syncProjectList = useProjectStore((state) => state.syncProjectList);
   const fetchSeriesList = useProjectStore((state) => state.fetchSeriesList);
+  const platformUser = usePlatformStore((state) => state.user);
   const t = useTranslations("workspace");
   const tc = useTranslations("common");
 
   useEffect(() => {
-    if (currentView === "platform" || currentView === "admin" || currentView === "settings") {
+    if (currentView === "platform" || currentView === "admin") {
       setPlatformAccess("ready");
       return;
     }
@@ -901,6 +903,13 @@ export default function Home() {
   }
 
   if (currentView === 'platform') {
+    if (!platformUser) {
+      return (
+        <div className="flex h-screen w-full flex-col bg-background overflow-y-auto">
+          <PlatformPortal />
+        </div>
+      );
+    }
     return <AppShell activeTab="platform" onTabChange={(tab) => setActiveTab(tab)}><PlatformPortal /></AppShell>;
   }
 
