@@ -119,7 +119,7 @@ export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: Glob
       >
         <LumenXBranding size="md" showSlogan={false} />
         <p className="font-display atelier-display text-[0.75rem] italic text-text-muted tracking-wide leading-snug mt-2.5">
-          Render Noise into Narrative
+          {t("brandSlogan")}
         </p>
       </button>
 

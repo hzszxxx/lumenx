@@ -83,11 +83,11 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); clearRuntimeEnvironment(); });
 
 describe('actual episode mini-list through workspace route and project shell', () => {
-    it.each([['3. Cast', 'cast'], ['4. Storyboard', 'storyboard_r2v']])('keeps %s while selecting only the new episode ID', async (label, step) => {
+    it.each([['3. Cast', 'cast', '3. 角色演员'], ['4. Storyboard', 'storyboard_r2v', '4. 分镜创作']])('keeps %s while selecting only the new episode ID', async (label, step, zhLabel) => {
         window.location.hash = '#/series/s/episode/a';
         renderWithIntl(<Home />);
         await screen.findByText('script:a');
-        fireEvent.click(screen.getByRole('button', { name: new RegExp(label.replace('.', '\\.')) }));
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(`(?:${label.replace('.', '\\.')}|${zhLabel.replace('.', '\\.')})`) }));
         await screen.findByText(`${step}:a`);
         fireEvent.click(await screen.findByRole('button', { name: /Episode b/ }));
         await waitFor(() => expect(fetchMock.mock.calls.map(([url]) => String(url).split('/projects/')[1])).toContain('b'));
@@ -113,7 +113,7 @@ describe('actual episode mini-list through workspace route and project shell', (
         await navigate('#/project/a#cast');
         await screen.findByText('cast:a');
         expect(fetchMock).toHaveBeenCalledTimes(reads);
-        fireEvent.click(screen.getByRole('button', { name: /4\. Storyboard/ }));
+        fireEvent.click(screen.getByRole('button', { name: /(?:4\. Storyboard|4\. 分镜创作)/ }));
         await screen.findByText('storyboard_r2v:a');
         act(() => useProjectStore.setState(state => ({ currentProject: { ...state.currentProject!, revision: 4 } })));
         expect(screen.getByText('storyboard_r2v:a')).toBeInTheDocument();

@@ -527,7 +527,8 @@
     "workspaceAria": "YingBan Studio · Workspace",
     "mainNavAria": "Main navigation",
     "atelier": "Atelier",
-    "platform": "Platform"
+    "platform": "Platform",
+    "brandSlogan": "Render Noise into Narrative"
   },
   "workspace": {
     "title": "My Workspace",
@@ -950,6 +951,13 @@
   "pipeline": {
     "stepLabel": "Step {number}",
     "stepIndex": "STEP 0{number}",
+    "stepScript": "Script",
+    "stepArtDirection": "Art Direction",
+    "stepCast": "Cast",
+    "stepAssets": "Assets",
+    "stepStoryboard": "Storyboard",
+    "stepMotion": "Motion",
+    "stepAssembly": "Assembly",
     "beta": "Beta",
     "railArtReady": "Set",
     "railCast": "{n} characters",

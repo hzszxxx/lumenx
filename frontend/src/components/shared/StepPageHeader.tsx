@@ -11,6 +11,18 @@
  * Mock ref: docs/design/tasty-sam/storyboard-r2v-unified.html `.wb-head`.
  */
 import type { ReactNode } from "react";
+import { useLocale } from "next-intl";
+
+const STEP_NAME_ZH: Record<string, string> = {
+    "SCRIPT": "剧本",
+    "STYLE": "风格定调",
+    "CAST": "角色演员",
+    "STORYBOARD": "分镜创作",
+    "STORYBOARD R2V": "分镜创作",
+    "ASSEMBLY": "成片合成",
+    "MOTION": "动态生成",
+    "ASSETS": "资产库",
+};
 
 export interface StepPageHeaderProps {
     /** 1-based step number; rendered as the primary-colored eyebrow numeral. */
@@ -36,16 +48,20 @@ export default function StepPageHeader({
     pills,
     trailing,
 }: StepPageHeaderProps) {
+    const locale = useLocale();
+    const isZh = locale.startsWith("zh");
     const stepStr = String(stepNumber).padStart(2, "0");
+    const displayName = isZh ? (STEP_NAME_ZH[englishName.toUpperCase()] || englishName) : englishName;
+
     return (
         <header className="shrink-0 border-b border-border-subtle px-7 pt-[22px] pb-4">
             <div className="flex items-start gap-5">
                 <div className="flex-1 min-w-0">
                     <div className="font-mono text-[0.59375rem] font-normal uppercase tracking-[0.22em] text-text-muted">
-                        <span>STEP</span>
+                        <span>{isZh ? "步骤" : "STEP"}</span>
                         <span className="ml-1.5 font-medium text-primary">{stepStr}</span>
                         <span className="mx-1.5">·</span>
-                        <span>{englishName}</span>
+                        <span>{displayName}</span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-baseline gap-3.5">
                         <h1 className="font-display text-[2.125rem] font-semibold leading-[1.05] tracking-[-0.02em] text-foreground">

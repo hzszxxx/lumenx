@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { BriefcaseBusiness, GraduationCap, KeyRound, LogIn, ShieldCheck, Sparkles, Trophy, UserRound, Users, Cpu } from "lucide-react";
 import { platformApi } from "@/lib/platformApi";
 import { readAppAccessSession } from "@/lib/appAccess";
@@ -32,6 +33,9 @@ const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
 ];
 
 export default function PlatformPortal() {
+  const tn = useTranslations("nav");
+  const locale = useLocale();
+  const isZh = locale.startsWith("zh");
   const [section, setSection] = useState<Section>("users");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -84,7 +88,7 @@ export default function PlatformPortal() {
           <div className="mb-6 flex flex-col items-center text-center">
             <LumenXBranding size="md" />
             <p className="font-display atelier-display text-[0.875rem] italic text-text-muted tracking-wide mt-2">
-              Render Noise into Narrative
+              {tn("brandSlogan")}
             </p>
           </div>
           <div className="glass-panel p-6 sm:p-8 w-full shadow-2xl">
@@ -185,7 +189,9 @@ export default function PlatformPortal() {
     <main className="min-h-full p-6 md:p-10 bg-background">
       <header className="max-w-6xl mx-auto mb-8 flex items-start justify-between gap-6">
         <div>
-          <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">Creator Platform · Account & Operations</p>
+          <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">
+            {isZh ? "创作者平台 · 账户与运营" : "Creator Platform · Account & Operations"}
+          </p>
           <h1 className="text-4xl font-display text-foreground mt-3">创作者平台</h1>
           <p className="text-text-secondary mt-2">用户、认证、赛事、培训与商业任务统一工作台</p>
         </div>
