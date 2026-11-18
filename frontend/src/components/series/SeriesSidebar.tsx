@@ -12,6 +12,8 @@ import {
   MessageSquareCode,
   Download,
   Palette,
+  Gamepad2,
+  Film,
 } from "lucide-react";
 import clsx from "clsx";
 import type { Series, Project } from "@/store/projectStore";
@@ -126,7 +128,7 @@ export default function SeriesSidebar({
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-xs text-text-secondary truncate">LumenX</span>
+            <span className="text-xs text-text-secondary truncate">影伴</span>
           </div>
 
           {/* Editable title */}
@@ -153,8 +155,20 @@ export default function SeriesSidebar({
           )}
           {titleError && <p role="alert" className="mt-2 text-xs text-status-failed-fg">{titleError}</p>}
 
+          <div className="mt-1 flex items-center gap-1.5">
+            {series.production_mode === "interactive" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.625rem] font-semibold bg-purple-500/15 border border-purple-500/30 text-purple-400">
+                <Gamepad2 size={11} /> 互动影游模式
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/10 border border-primary/20 text-primary/80">
+                <Film size={11} /> 经典线性短剧
+              </span>
+            )}
+          </div>
+
           {series.description && (
-            <p className="text-xs text-text-secondary truncate">{series.description}</p>
+            <p className="text-xs text-text-secondary truncate mt-1">{series.description}</p>
           )}
         </div>
       </div>

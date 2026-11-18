@@ -1162,7 +1162,7 @@ export default function SettingsPage() {
   const renderAbout = () => {
     const ff = system?.ffmpeg;
     const aboutRows: { k: string; v: string; tone?: "ok" | "warn" }[] = [
-      { k: t("aboutAppVersion"), v: `LumenX Studio ${APP_VERSION}` },
+      { k: t("aboutAppVersion"), v: `影伴 Studio ${APP_VERSION}` },
       { k: t("aboutBackendApi"), v: API_URL },
       { k: t("aboutDataDir"), v: dataDir || "—" },
       { k: t("logDirLabel"), v: logDir || "—" },

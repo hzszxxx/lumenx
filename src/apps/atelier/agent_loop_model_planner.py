@@ -225,7 +225,7 @@ def _build_messages(context: LoopPlannerContext, *, allowed_tools: set[str]) -> 
         AtelierAgentPlannerMessage(
             role="system",
             content=(
-                "You are LumenX Atelier's bounded planner. Return strict JSON with "
+                "You are 影伴 Atelier's bounded planner. Return strict JSON with "
                 "assistant_message, tool_calls, and optional stop_reason. Use only the tool names and schemas "
                 "listed in the user message. Do not invent tools or omit required output fields."
             ),

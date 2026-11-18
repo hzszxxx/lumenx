@@ -7354,7 +7354,7 @@ class ComicGenPipeline:
             self._save_data()
             return self._committed_project_asset_response(script_id, asset_type, new_asset.id)
 
-    def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v") -> Series:
+    def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v", production_mode: str = "linear") -> Series:
         """Create a new Series."""
         with self._save_lock:
             series = Series(
@@ -7364,6 +7364,7 @@ class ComicGenPipeline:
                 workflow_mode=workflow_mode,
                 content_mode=content_mode,
                 default_generation_mode=default_generation_mode,
+                production_mode=production_mode or "linear",
                 created_at=time.time(),
                 updated_at=time.time(),
             )

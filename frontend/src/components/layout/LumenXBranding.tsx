@@ -30,7 +30,7 @@ export default function LumenXBranding({ size = "md" }: LumenXBrandingProps) {
     <div className="flex justify-center">
       <img
         src={logoSrc}
-        alt="YingBan"
+        alt="影伴"
         className={`${logoSize} aspect-square object-contain drop-shadow-sm`}
       />
     </div>

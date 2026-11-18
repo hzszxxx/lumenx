@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useId } from "react";
 import { motion } from "framer-motion";
 import {
   Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
-  Zap, Film, Sparkles, Search, Clock, MoreVertical,
+  Zap, Film, Sparkles, Search, Clock, MoreVertical, Gamepad2,
 } from "lucide-react";
 import { useProjectStore, Project } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
@@ -111,6 +111,8 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const [contentMode, setContentMode] = useState<"scripted" | "freeform">("scripted");
   // PR-3e — default per-shot generation mode (r2v=节奏优先 / i2v=画面优先)
   const [defaultGenerationMode, setDefaultGenerationMode] = useState<"r2v" | "i2v">("r2v");
+  // Content production mode: 'linear' (普通剧) vs 'interactive' (互动剧/影游)
+  const [productionMode, setProductionMode] = useState<"linear" | "interactive">("linear");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [runtimeVersion, setRuntimeVersion] = useState(0);
@@ -136,6 +138,21 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
       sessionRef.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const stored = window.sessionStorage.getItem("active_commercial_task");
+      if (stored) {
+        const task = JSON.parse(stored);
+        if (task.demand_type === "interactive_game" || task.category?.includes("互动")) {
+          setProductionMode("interactive");
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     sessionRef.current += 1;
@@ -164,6 +181,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const resetForm = () => {
     setTitle("");
     setDescription("");
+    setProductionMode("linear");
     setWorkflowMode("r2v");
     setContentMode("scripted");
     setDefaultGenerationMode("r2v");
@@ -270,6 +288,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
         workflow_mode: workflowMode,
         content_mode: contentMode,
         default_generation_mode: defaultGenerationMode,
+        production_mode: productionMode,
       }));
       observeCreatedSeriesReceipt(receipt);
       setSeriesCreateReceipt(receipt);
@@ -316,6 +335,53 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
               placeholder={t("seriesTitlePlaceholder")}
               className="glass-input w-full"
             />
+          </div>
+
+          {/* Production Mode: Linear vs Interactive */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">{tp("productionMode")}</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setProductionMode("linear")}
+                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                  productionMode === "linear"
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-surface hover:border-text-muted"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Film size={16} className={productionMode === "linear" ? "text-primary" : "text-text-secondary"} />
+                  <span className="font-semibold text-sm text-foreground">{tp("productionLinear")}</span>
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed">{tp("productionLinearDesc")}</p>
+                {productionMode === "linear" && (
+                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
+                    {tc("recommended")}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setProductionMode("interactive")}
+                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                  productionMode === "interactive"
+                    ? "border-purple-500 bg-purple-500/10"
+                    : "border-border bg-surface hover:border-text-muted"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Gamepad2 size={16} className={productionMode === "interactive" ? "text-purple-400" : "text-text-secondary"} />
+                  <span className="font-semibold text-sm text-foreground">{tp("productionInteractive")}</span>
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed">{tp("productionInteractiveDesc")}</p>
+                {productionMode === "interactive" && (
+                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-purple-400 bg-purple-500/20 px-1.5 py-0.5 rounded">
+                    分支模式
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Workflow Mode */}
@@ -626,7 +692,7 @@ function EpisodeBreadcrumbWrapper({ seriesId, episodeId }: { seriesId: string; e
   }, [seriesId, episodeId]);
 
   const segments = [
-    { label: "LumenX", hash: "#/" },
+    { label: "影伴", hash: "#/" },
     { label: seriesTitle || t("series"), hash: `#/series/${seriesId}` },
     { label: episodeNumber != null ? t("episodeNum", { number: episodeNumber }) : t("episodeLabel") },
   ];
@@ -778,7 +844,7 @@ export default function Home() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      if (hash === '#/atelier') {
+      if (/^#\/atelier(?:\?.*)?$/.test(hash)) {
         setCurrentView('atelier');
         setActiveTab('atelier');
         setProjectId(null);
@@ -1222,6 +1288,15 @@ export default function Home() {
                       >
                         {s.title}
                       </button>
+                      {s.production_mode === "interactive" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold bg-purple-500/15 border border-purple-500/30 text-purple-400">
+                          <Gamepad2 size={12} /> 互动影游
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6875rem] font-medium bg-primary/10 border border-primary/20 text-primary/80">
+                          <Film size={12} /> 普通短剧
+                        </span>
+                      )}
                       <span className="font-mono text-[0.625rem] uppercase tracking-wider text-text-muted">
                         {t("series")} · {t("frames", { count: eps.length })}
                       </span>

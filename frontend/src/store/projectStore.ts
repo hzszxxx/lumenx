@@ -283,6 +283,8 @@ export interface Series {
     /** PR-3e — Visual control preference. 'r2v' = 节奏优先 (new shots default
      *  direct_r2v); 'i2v' = 画面优先 (new shots default t2i_i2v). */
     default_generation_mode?: "r2v" | "i2v";
+    /** Production mode: 'linear' (普通线性短剧) or 'interactive' (互动短剧/影游) */
+    production_mode?: "linear" | "interactive";
     episode_ids: string[];
     created_at: number;
     updated_at: number;

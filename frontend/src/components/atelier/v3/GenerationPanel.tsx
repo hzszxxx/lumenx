@@ -190,7 +190,7 @@ function isLostAckTransportError(cause: unknown): boolean {
     return cause instanceof TypeError || (cause instanceof Error && cause.message === "Failed to fetch");
 }
 
-export function GenerationPanel({ project, selectedNode, ownerKey, disabled, models, targetRect = null, targetAvailableRect = null }: {
+export function GenerationPanel({ project, selectedNode, ownerKey, disabled, models, targetRect = null, targetAvailableRect = null, onOpenWipeCompare }: {
     project: AtelierProject;
     selectedNode: AtelierNode | null;
     ownerKey: string;
@@ -198,6 +198,7 @@ export function GenerationPanel({ project, selectedNode, ownerKey, disabled, mod
     models?: AtelierComposerModelOption[];
     targetRect?: PinnedComposerTargetRect | null;
     targetAvailableRect?: PinnedComposerTargetRect | null;
+    onOpenWipeCompare?: (candidateVideoUrl: string) => void;
 }) {
     const t = useTranslations("atelier.generationPanel");
     const createVideoCandidate = useAtelierStore(state => state.createVideoCandidate);
@@ -597,6 +598,7 @@ export function GenerationPanel({ project, selectedNode, ownerKey, disabled, mod
                     {item.kind === "legacy" ? <div className="mt-2">{item.deleted && importedVideo ? t("hiddenImportedPreview") : canSelect ? t("importedPreview") : t("legacyPreview")}</div> : null}
                     {videoUrl ? <PreviewVideo src={videoUrl} alt={item.kind === "generation" ? `${selectedNode.title || selectedNode.id} candidate` : item.title} className="mt-2 aspect-video rounded-xl border border-white/[0.08]" /> : null}
                     <div className="mt-2 flex flex-wrap gap-2">
+                        {onOpenWipeCompare && status === "completed" && !!videoUrl ? <button type="button" className={panelButtonClass} disabled={blocked} onClick={() => onOpenWipeCompare(videoUrl)}>卷帘对比</button> : null}
                         {canReview ? <button type="button" className={panelButtonClass} disabled={blocked} onClick={() => setReviewingCandidateId(id)}>{t("reviewTake")}</button> : null}
                         {canBranch ? <button type="button" className={panelButtonClass} disabled={blocked} onClick={() => void run(`branch:${id}`, () => branchFromCandidate(selectedNode.id, id), t("branchCreated"),
                             cause => isLostAckTransportError(cause) && useAtelierStore.getState().needsRefresh ? { kind: "refresh-required", ownerKey: draftKey, projectRevision: project.revision } : null)}>{t("createBranch")}</button> : null}

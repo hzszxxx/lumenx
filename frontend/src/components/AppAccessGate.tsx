@@ -225,7 +225,7 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
                 <div className="min-h-screen flex items-center justify-center px-4 py-12">
                     <section className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl backdrop-blur-xl">
                     <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.35em] text-primary/80">LumenX</p>
+                        <p className="text-xs uppercase tracking-[0.35em] text-primary/80">影伴</p>
                         <h1 id="app-access-title" className="text-2xl font-semibold text-white">
                             {showLogin ? t("unlockTitle") : t("checkingTitle")}
                         </h1>

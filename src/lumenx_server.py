@@ -78,7 +78,7 @@ def create_server(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run LumenX without a desktop GUI.")
+    parser = argparse.ArgumentParser(description="Run 影伴 without a desktop GUI.")
     parser.add_argument("--data-dir", type=Path, required=True, help="Persistent configuration, logs and output root.")
     parser.add_argument("--static-dir", type=Path, help="Optional production app shell, served at /static.")
     parser.add_argument("--host", default="127.0.0.1")

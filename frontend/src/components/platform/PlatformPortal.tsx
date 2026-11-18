@@ -15,10 +15,11 @@ import TaskSettings from "@/components/platform/TaskSettings";
 import AcademySettings from "@/components/platform/AcademySettings";
 import UserSettings from "@/components/platform/UserSettings";
 import AgentCenter from "@/components/platform/AgentCenter";
+import WalletSettings from "@/components/platform/WalletSettings";
 import LumenXBranding from "@/components/layout/LumenXBranding";
-import { Building2 } from "lucide-react";
+import { Building2, Wallet } from "lucide-react";
 
-type Section = "users" | "compute" | "skills" | "xiangongyun" | "agent" | "competitions" | "certification" | "tasks" | "academy";
+type Section = "users" | "compute" | "skills" | "xiangongyun" | "agent" | "competitions" | "certification" | "tasks" | "wallet" | "academy";
 
 const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
   { id: "users", label: "用户管理", icon: Users },
@@ -29,6 +30,7 @@ const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
   { id: "competitions", label: "赛事活动", icon: Trophy },
   { id: "certification", label: "创作者认证", icon: ShieldCheck },
   { id: "tasks", label: "商业任务", icon: BriefcaseBusiness },
+  { id: "wallet", label: "收益与钱包", icon: Wallet },
   { id: "academy", label: "培训学院", icon: GraduationCap },
 ];
 
@@ -243,6 +245,7 @@ export default function PlatformPortal() {
           {section === "competitions" && <CompetitionSettings />}
           {section === "certification" && <CertificationSettings />}
           {section === "tasks" && <TaskSettings />}
+          {section === "wallet" && <WalletSettings />}
           {section === "academy" && <AcademySettings />}
         </div>
       </div>

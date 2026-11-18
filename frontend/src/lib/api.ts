@@ -1533,7 +1533,7 @@ export const api = {
     // Series CRUD
     createSeriesV2: async (
         title: string,
-        opts: { description?: string; workflow_mode?: string; content_mode?: "scripted" | "freeform"; default_generation_mode?: "r2v" | "i2v" } = {},
+        opts: { description?: string; workflow_mode?: string; content_mode?: "scripted" | "freeform"; default_generation_mode?: "r2v" | "i2v"; production_mode?: "linear" | "interactive" } = {},
     ) => {
         const response = await axios.post(`${API_URL}/series`, {
             title,
@@ -1541,6 +1541,7 @@ export const api = {
             workflow_mode: opts.workflow_mode ?? "r2v",
             content_mode: opts.content_mode ?? "scripted",
             default_generation_mode: opts.default_generation_mode ?? "r2v",
+            production_mode: opts.production_mode ?? "linear",
         });
         return response.data;
     },

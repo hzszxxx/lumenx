@@ -134,7 +134,7 @@ export default function AgentCenter() {
     }
     const formatted = unused
       .map((item, idx) => {
-        return `【LumenX / 影伴学员专属激活码】\n序号：#${idx + 1}\n班级：${item.batch_title || "实训班"}\n注册码：${item.code}\n学生备注：${item.student_note || "待分配"}\n注册地址：https://yingban.renban.net/#/platform\n`;
+        return `【影伴学员专属激活码】\n序号：#${idx + 1}\n班级：${item.batch_title || "实训班"}\n注册码：${item.code}\n学生备注：${item.student_note || "待分配"}\n注册地址：https://yingban.renban.net/#/platform\n`;
       })
       .join("\n-------------------------\n");
     void navigator.clipboard.writeText(formatted);

@@ -1079,6 +1079,9 @@ class Series(BaseModel):
     # from this pool via VoicePickerModal's 我的复刻 / 我的设计 tabs.
     custom_voices: List["CustomVoice"] = Field(default_factory=list, description="User-created custom voices (clones + designs)")
 
+    # Content production mode: 'linear' (普通线性短剧) or 'interactive' (互动短剧/影游)
+    production_mode: str = Field("linear", description="Production mode: 'linear' (普通线性剧) or 'interactive' (互动剧/影游)")
+
     # R2V v2 Phase 6 — content source mode. Orthogonal to workflow_mode.
     # 'scripted'  = traditional flow (Script step parses entities first)
     # 'freeform'  = user creates shots/cast directly (no script parse step)

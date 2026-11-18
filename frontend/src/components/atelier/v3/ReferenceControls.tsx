@@ -74,8 +74,15 @@ export function ReferenceControls({ project, targetId, ownerKey, disabled, label
                     </button>
                 </span>
             </li>)}
-            {rows.map(row => <li key={row.key} className="flex items-center justify-between gap-2 text-xs text-white/80">
-                <span className="truncate">{row.title}</span>
+            {rows.map((row, index) => <li key={row.key} className="flex items-center justify-between gap-2 text-xs text-white/80">
+                <span className="min-w-0 truncate flex items-center gap-1.5">
+                    {target.type === "video" && (
+                        index === 0 ? <span className="shrink-0 rounded border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300 font-medium">首帧 (Start)</span>
+                        : index === 1 ? <span className="shrink-0 rounded border border-cyan-400/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300 font-medium">尾帧 (End)</span>
+                        : <span className="shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/50">参考 (Ref)</span>
+                    )}
+                    <span className="truncate">{row.title}</span>
+                </span>
                 <button type="button" className={buttonClass} disabled={disabled}
                     aria-label={`${labels.detach} ${row.title}`}
                     onClick={() => onDetach({ sourceNodeId: row.sourceNodeId })}>

@@ -315,7 +315,7 @@ export default function ProjectPackageImportDialog({ isOpen, onClose }: ProjectP
             >
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <p className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-text-muted">LumenX Package</p>
+                        <p className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-text-muted">影伴 Package</p>
                         <h2 id={titleId} className="mt-1 font-display text-[1.375rem] font-semibold text-foreground">
                             {t("importTitle")}
                         </h2>

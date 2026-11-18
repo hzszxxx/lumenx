@@ -123,69 +123,64 @@ logger = get_logger(__name__)
 
 DEFAULT_STORYBOARD_POLISH_PROMPT = """
 # 角色
-你是一名资深分镜师与提示词工程师。你的任务是把一段草稿提示词改写成高质量的图像生成提示词，专用于多参考图（multi-reference）工作流。
+你是一名融合顶级电影摄影师与《张导专属》视听导演体系的 AI 分镜提示词工程师。你的任务是把草稿提示词改写成高质量的电影级图像生成提示词，专用于多参考图（multi-reference）工作流。
 
 # 背景
-用户已选定若干参考图（素材）来构成一个画面。
-在提示词中描述这些素材时，你必须用它们的 Image ID（如 "Image 1"、"Image 2"）来指代。
+用户已选定若干参考图（素材）来构成画面。在描述这些素材时，你必须用它们的 Image ID（如 "Image 1"、"Image 2"）来准确指代。
 
 # 可用素材
 {ASSETS}
 
-# 规则
-1.  **整合素材**：描述对应的角色、场景或道具时，显式写出 "Image X"。
-2.  **自然连贯**：不要简单拼接。要写成连贯的句子或段落来描述视觉画面。
-3.  **严格忠实**：不要臆造草稿中不存在的情绪、动作或剧情。若草稿写 "坐着"，不要擅自加 "悲伤地" 或 "开心地"，除非草稿明确写明。保持叙述中性、准确。
-4.  **丰富细节**：可基于草稿补充视觉细节（光线、氛围、情绪），但要保持素材指代清晰。
-5.  **不要解释**：只返回润色后的提示词文本。
-6.  **双语输出**：
-    - **Prompt CN**：流畅中文，严格遵循草稿内容。
-    - **Prompt EN**：自然英文描述，优先体现视觉氛围。
+# 电影级视听导演法则
+1. **素材精准整合**：指代角色、场景或道具时，显式标明 "Image X"，绝不混淆多角色对应关系。
+2. **6:3:1 视觉空间层次**：
+   - 60% 主视觉焦点：角色关键动作、神态与主体形态；
+   - 30% 环境与空间透视：主光源方向、景深虚化、建筑/室内空间纵深；
+   - 10% 电影质感细节：边缘发丝逆光、织物微纹理、胶片颗粒微反差，避免画面平淡。
+3. **去 CG 塑料与去油光规范**：
+   - 强调 35mm 胶片真人质感，漫射自然光（Diffused lighting），真实皮肤纹理（Subsurface scattering）；
+   - 严禁过度磨皮、严禁面部油腻高光与 CG 塑料反光。
+4. **参数代替空洞形容词**：
+   - 严禁输出 "masterpiece, best quality, 绝美" 等无意义空标签；
+   - 用真实视听语言描述：如 "50mm镜头平视、伦勃朗侧光、浅景深背景虚化、冷暖环境光微反差"。
+5. **严格忠实叙事**：不要凭空捏造草稿中不存在的情绪或剧情事件，保持镜头戏剧张力真实自然。
+6. **双语结构化输出**：
+   - **Prompt CN**：专业流畅的中文镜头与画面描述，含 Image X 指代。
+   - **Prompt EN**：高品质英文影视级视觉描述（含真实胶片摄影参数与 Image X 指代），优先供 SD/Flux/Midjourney/可灵生成。
 
 # 输出格式
 严格返回一个 JSON 对象：
 {{
-    "prompt_cn": "含 Image X 指代的中文描述……",
-    "prompt_en": "English cinematic description with Image X references..."
-}}
-
-# 示例
-**输入草稿**：男孩（Image 1）坐在病床（Image 2）上。
-**输出**：
-{{
-    "prompt_cn": "图像1中的男孩坐在图像2的病床边缘。病房内光线柔和，自然光从侧面照射在男孩身上，勾勒出真实的轮廓。画面构图稳定，质感写实。",
-    "prompt_en": "The boy from Image 1 is seated on the edge of the hospital bed in Image 2. Soft natural light illuminates the scene from the side, highlighting the fabric textures of the bedding and the realistic skin tone of the boy. Cinematic composition, high resolution, photorealistic."
+    "prompt_cn": "图像1中的男孩坐在图像2的病床边缘。病房内光线柔和，自然侧光照射在男孩身上，勾勒出真实的轮廓与微弱发丝光。画面构图稳定，景深自然，质感写实。",
+    "prompt_en": "The boy from Image 1 is seated on the edge of the hospital bed in Image 2. Soft directional window light illuminates the subject, subtle rim light highlighting hair and fabric textures, 35mm film photography, cinematic depth of field, photorealistic."
 }}
 
 # 用户草稿提示词
 {DRAFT}
 """.strip()
 
-DEFAULT_VIDEO_POLISH_PROMPT = """你是一名资深视频提示词工程师。你的任务是为「图生视频」（Image-to-Video）模型优化一段草稿提示词。
+DEFAULT_VIDEO_POLISH_PROMPT = """你是一名精通电影镜头调度与 AI 视频物理动量的资深视频提示词工程师。你的任务是为「图生视频」（Image-to-Video，如 Runway Gen-3 / 可灵 / Sora / Wan 2.1）将一段草稿优化为工业级视频生成提示词。
 
-准则：
-1.  **结构**：提示词 = 运动描述 + 镜头运动。
-2.  **运动描述**：描述图像中各元素（角色、物体）的动态动作。用副词控制速度与强度（如 "缓慢地"、"快速地"、"轻微的"）。
-3.  **镜头运动**：如有需要，显式说明镜头移动（如 "推近"、"向左平移"、"固定镜头"）。
-4.  **清晰**：简洁但具体，聚焦视觉运动。
+# 核心运镜与动势准则（张导专属体系）
+1. **动量因果链（Blocking & Momentum）**：
+   - 动作必须具有明确的物理过程：起始发力 -> 运动轨迹 -> 减速/停顿/碰撞反馈，禁止无因果的瞬间瞬移与肢体抽搐。
+   - 用精确副词控制运动节律与速度量级（如："缓步微探"、"骤然发力拔刀"、"胸口剧烈起伏呼吸"）。
+2. **微表情与身体反应系统**：
+   - 丰富角色的微动作：眼神焦点转移、喉结微动、下颌紧绷、手指抓握衣角等真实生理反应。
+3. **专业摄影机调度**：
+   - 显式定义运镜方式与速度曲线：推镜（Dolly In）、拉镜（Dolly Out）、跟镜（Tracking）、横移（Pan）、升降（Crane/Boom）或手持轻微呼吸晃动（Subtle handheld movement）。
+   - 描述镜头视差与前景遮挡运动，强化三维空间感。
+4. **清晰纯粹**：聚焦于画面内"正在发生的可拍摄运动"，严禁内心独白与抽象剧情解释。
 
-示例：
-
-*   **拉远（Zoom Out）**："一个柔软圆润的动画角色带着好奇的表情醒来，发现自己的床是一颗巨大的金色玉米粒。镜头拉远，露出整个房间原来是一座巨大的玉米仓，回声四起，玉米粒堆得像墙一样高，一束温暖的阳光从高处的窗户洒入，投下长长的影子。"
-*   **向左平移（Pan Left）**："镜头向左平移，缓缓扫过一扇奢华的橱窗，里面满是光鲜的模特与昂贵商品。镜头继续向左，离开橱窗，露出隔壁巷子角落里一个衣衫褴褛、瑟瑟发抖的流浪汉。"
-
-任务：
-按上述准则，把下面的草稿提示词改写成高质量的视频生成提示词。
-
-输出格式：
+# 输出格式
 严格返回一个 JSON 对象：
 {{
-    "prompt_cn": "润色后的中文视频提示词，关注运动和镜头",
-    "prompt_en": "Polished English video prompt, focusing on motion and camera"
+    "prompt_cn": "润色后的中文视频提示词，涵盖角色物理动量、微表情与摄影机运镜速度",
+    "prompt_en": "Polished English video prompt detailing kinematics, micro-expressions, dynamic lighting and camera trajectory"
 }}"""
 
 DEFAULT_R2V_POLISH_PROMPT = """# 角色
-你是参考生视频（Reference-to-Video）模型的提示词工程师。
+你是参考生视频（Reference-to-Video）模型的电影级提示词工程师。
 
 # 背景
 R2V（Reference-to-Video）模型通过把参考角色视频与文本提示词结合来生成视频片段。
@@ -209,14 +204,14 @@ slot，因此 :name 后缀不会干扰——它只是补充可见的上下文。
    [character1:小兔子] 被引用三次，三次都保持 [character1:小兔子]。不要为已有 slot 的角色
    臆造新的 slot 编号（如 [character3:小兔子]）。每个 slot 与一张参考图 1:1 对应，新增 slot
    会破坏模型对参考图数量的预期。
-2. **结构**：使用如下格式：
-   - 场景设定（环境、光线、氛围）
-   - 角色动作（[characterN:name] 在做什么、表情、动作）
-   - 镜头运动（如适用）
-3. **对白格式**：若提示词包含对白，按如下格式书写：
+2. **结构化电影镜头**：使用如下格式：
+   - 场景与光影设定（环境、主光源、冷暖反差、氛围）
+   - 角色动作与动势（[characterN:name] 发力过程、面部神态表情细节、交互物理反馈）
+   - 摄影机运动拓扑（推拉摇移、轴线稳定、跟随节奏）
+3. **对白与声画对齐**：若提示词包含对白，按如下格式书写：
    '[character1:name] says: "对白内容"'
-4. **保留意图**：保持原有意图与情绪基调。
-5. **强化**：补充视觉细节以增强戏剧效果（光线、"缓慢地"/"快速地" 等速度副词）。
+4. **连续性与防穿帮**：保持角色相对站位与空间轴线稳定（180度法则），避免肢体融合或角色特征漂移。
+5. **强化视觉动力学**：补充光影动态变化（如角色走动时光斑在脸部的流转）与动速副词。
 
 # 输出格式
 严格返回一个 JSON 对象：
@@ -231,18 +226,20 @@ slot，因此 :name 后缀不会干扰——它只是补充可见的上下文。
 SLOTS：character1 = "White rabbit / 小兔子", character2 = "Robot dog / 机械狗"
 输出：
 {{
-    "prompt_cn": "[character1:小兔子] 从门里猛然跳出，落地时耳朵竖起，充满活力。房间昏暗，温暖的光线从尘土飞扬的窗户中透入。[character1:小兔子] 兴奋地环顾四周说道：'我正好赶上了！' 镜头随着跳跃略微倾斜。",
-    "prompt_en": "[character1:White rabbit] bursts through the door with an exaggerated jump, landing energetically with ears perked up. The room is dimly lit with warm ambient light streaming through dusty windows. [character1:White rabbit] looks around excitedly and says: 'I made it just in time!' Camera follows the jump with a slight tilt."
+    "prompt_cn": "[character1:小兔子] 猛地推门跳入室内，双脚落地时激起微弱尘埃，长耳敏锐竖起，神情既机警又兴奋。破败房间昏暗，柔和的夕阳光线从残破木窗斜射而入。[character1:小兔子] 眼神迅速扫视四周，握紧小拳头说道：'我正好赶上了！' 镜头采用低角度中景，随着跳入动作轻微下摇后平稳跟进。",
+    "prompt_en": "[character1:White rabbit] forcefully pushes the door open and leaps into the dim room, kicking up subtle dust upon landing, ears perking alertly. Warm twilight slants through the broken wooden window. [character1:White rabbit] glances around with bright, determined eyes and says: 'I made it just in time!' Low-angle medium shot, camera slightly tilts down with the landing and stabilizes with cinematic tracking."
 }}""".strip()
 
 
 DEFAULT_ENTITY_EXTRACTION_PROMPT = """
-你是一名专业的分镜师与编剧。
-分析下面的小说文本，为漫画/视频制作提取结构化数据。
+你是一名精通电影美术设定与角色造型的专业编剧与分镜师。
+分析下面的文本，为剧本/视频制作提取高质量的结构化资产数据（角色、场景、道具）。
 
-重要：
+重要规则：
 - 所有描述性内容（名称、描述）必须使用中文（简体中文）。
-- 只提取角色（characters）、场景（scenes）和道具（props）。
+- 角色外观：提取长期固定的外貌特征（发型发色、五官轮廓、标志性体态与专属主色调），严禁混入临时瞬态表情（如愤怒哭泣）或即时动作。
+- 场景空间：提取 6:3:1 视觉空间要素（主建筑/地貌主体 60%、环境纵深与透视 30%、主光源方向与色调氛围 10%）。
+- 道具：提取关键剧情道具的材质形态与视觉特征。
 
 严格按以下结构输出合法 JSON：
 {
@@ -250,18 +247,18 @@ DEFAULT_ENTITY_EXTRACTION_PROMPT = """
         {
             "id": "char_001",
             "name": "角色名（如 '叶墨'、'叶墨 (古装)'）",
-            "description": "外观描述（发型、眼睛、体型、显著特征）。不要包含具体的面部表情（如 悲伤、愤怒）或临时动作（如 奔跑、哭泣）。聚焦于长期固定的外形特征。",
+            "description": "固定外观特征描述（发型、五官轮廓、体型体态、标志性特征或色系）。聚焦于长期固定的外形锚点，去临时表情与即时动作。",
             "age": "年龄估计（如 '25'）",
             "gender": "性别",
-            "clothing": "默认服装描述。若某角色服装有显著变化（如 从便装换成婚纱），为每个服装变体单独创建一个角色条目，并取一个有区分度的名字（如 '名字 (服装)'）。",
+            "clothing": "默认服装描述（颜色、款式、材质、标志性配饰）。若有显著变体单独建条目。",
             "visual_weight": 5  // 1-5 重要度
         }
     ],
     "scenes": [
         {
             "id": "scene_001",
-            "name": "地点名（如 '咖啡店'、'古代遗迹'）",
-            "description": "外观描述（光线、氛围、关键元素）",
+            "name": "地点名（如 '临江阁古董店'、'雨夜天台'）",
+            "description": "空间结构与光影描述（6:3:1 空间主体、环境深度、主光源与色调基准）",
             "visual_weight": 3
         }
     ],
@@ -269,7 +266,7 @@ DEFAULT_ENTITY_EXTRACTION_PROMPT = """
         {
             "id": "prop_001",
             "name": "道具名",
-            "description": "外观描述"
+            "description": "材质与形态特征（如 '黄铜雕花怀表，表盖带磨损划痕'）"
         }
     ]
 }
@@ -279,15 +276,15 @@ DEFAULT_ENTITY_EXTRACTION_PROMPT = """
 """
 
 
-DEFAULT_STYLE_ANALYSIS_PROMPT = """你是一个专业的电影美术指导和视觉风格顾问。
-请根据提供的剧本内容，分析其题材、情绪和氛围，推荐3种截然不同但都适合的视觉风格。
+DEFAULT_STYLE_ANALYSIS_PROMPT = """你是一个专业的电影美术指导与视觉风格顾问（基于《风格审美》与视觉母版体系）。
+请根据提供的剧本内容，深度分析其故事题材、情绪基调与时空氛围，推荐 3 种截然不同、具备高度影视美学与艺术质感的视觉风格母版。
 
 对于每种风格，请提供：
-1. 风格名称（简洁、专业，使用英文）
-2. 风格描述（1-2句话，用中文）
-3. 推荐理由（为什么这个风格适合这个剧本，用中文，50字以内）
-4. Stable Diffusion 正向提示词（详细的风格关键词，英文，逗号分隔，不超过50个词）
-5. Stable Diffusion 负向提示词（避免的视觉元素，英文，逗号分隔，不超过30个词）
+1. 风格名称（简洁、专业，中英文对照，如 "Cinematic 35mm Film / 35mm电影胶片质感"）
+2. 风格描述（1-2句话，用中文，精确阐述色调、光影和质感基准）
+3. 推荐理由（为什么这个风格能强化剧本的戏剧张力，用中文，50字以内）
+4. Stable Diffusion / Midjourney 正向提示词（详细的风格母版关键词，英文，逗号分隔，包含光影、色调、艺术媒介、镜头光学特性，不超过50个词）
+5. Stable Diffusion / Midjourney 负向提示词（防止 AI 塑料感与风格漂移的排除词，英文，逗号分隔，不超过30个词）
 
 IMPORTANT:
 - 你的回复必须是严格的JSON格式。
@@ -299,9 +296,10 @@ IMPORTANT:
 - 只返回3个推荐风格，不要多也不要少。
 
 CRITICAL STYLE GUIDELINES:
-- 正向提示词必须只描述：光影、色调、材质、艺术媒介、氛围、镜头语言 (e.g., "cinematic lighting, film grain, watercolor texture, dark atmosphere").
-- 严禁描述具体实体：不要包含人物、服装、具体物品、环境细节 (e.g., 禁止 "cracked helmet", "blood stains", "monster", "forest", "sword").
-- 风格必须是通用的，能套用到任何角色或场景上，而不会改变其原本的物理结构。
+- 正向提示词必须只描述：摄影媒介、光影系统、色彩空间、材质微反差、景深与质感 (e.g., "35mm anamorphic lens, cinematic lighting, rembrandt shadow, muted teal and orange palette, subtle halation, Kodak Vision3 grain").
+- 严禁空洞词汇：禁止使用 "masterpiece", "best quality", "ultra high res", "trending on artstation" 等低效词汇。
+- 严禁描述特定具体剧情实体：不要包含具体专有角色姓名、临时剧情动作 (e.g., 禁止 "cracked helmet", "blood stains", "monster", "forest", "sword").
+- 负向提示词必须包含排油排脏与去 CG 感词汇 (e.g., "3d render, plastic skin, oversaturated, oily face, flat lighting, amateur, blurry").
 
 返回格式：
 {
@@ -318,17 +316,21 @@ CRITICAL STYLE GUIDELINES:
 
 
 DEFAULT_STORYBOARD_EXTRACTION_PROMPT = """# 角色
-你是一名电影级的分镜师。你的任务是将剧本文本拆解为一系列连续的分镜帧。
+你是一名精通影视视听语言与张导专属镜头调度的电影级分镜师。你的任务是将剧本文本拆解为一系列节奏紧凑、画面感极强的连续分镜帧。
 
-# 核心规则
-1. **视觉节拍拆解**: 一行包含多个动作时，拆为多帧。每帧仅含一个主要动作。
-2. **角色可见性**: character_ref_names 只列画面中可见的角色。
-3. **实体约束**: 场景名、角色名、道具名严格匹配已提取实体。
-4. **语言**: 简体中文。
-5. **景别枚举**: 必须从以下选项中选择: 大特写 | 特写 | 近景 | 中景 | 全景 | 远景 | 大远景
-6. **角度枚举**: 必须从以下选项中选择: 平视 | 俯视 | 仰视 | 鸟瞰 | 蚁视 | 过肩 | 荷兰角 | 主观视角
-7. **时长**: 基于动作复杂度估算整数秒（范围 3-10 秒）。简单静态 3-4s，标准动作 5-6s，复杂/情绪镜头 7-10s。
-8. **对白**: 如果帧中有角色说话，dialogue 和 speaker 必须填写。一帧只能有一个说话人——多人对话必须拆为多帧。
+# 核心导演规则
+1. **视觉节拍拆解**: 一行包含多个动作或情绪转折时，必须拆为多帧。每帧仅承载一个核心动作事件或角色微反应。
+2. **参数代替形容词**: `action_summary` 必须描述可拍摄的具象物理动作、神态细节与视线方向（如"猛然拍案起身，双目圆睁怒视对方"，严禁使用"激动地"、"非常愤怒"、"大场面"等空洞词汇）。
+3. **镜头语言与空间机位**:
+   - 景别与角度要服务于戏剧张力：冲突高潮推进至特写/大特写，环境交代使用全景/远景，对话采用过肩或侧面平视；
+   - 保持 180 度轴线原则，同一场次内人物相对站位与视线交互（Eye-line match）保持空间稳定。
+4. **角色可见性**: character_ref_names 只列画面中实际可见的角色。
+5. **实体约束**: 场景名、角色名、道具名严格匹配已提取实体列表。
+6. **景别枚举**: 必须从以下选项中选择: 大特写 | 特写 | 近景 | 中景 | 全景 | 远景 | 大远景
+7. **角度枚举**: 必须从以下选项中选择: 平视 | 俯视 | 仰视 | 鸟瞰 | 蚁视 | 过肩 | 荷兰角 | 主观视角
+8. **运镜枚举**: 必须从以下选项中选择: 静止 | 推镜头 | 拉镜头 | 摇镜头 | 移镜头 | 跟随 | 升降 | 手持微晃
+9. **时长估算**: 基于动作复杂度与表演节奏估算整数秒（3-10 秒）。简单静态反应 3-4s，标准动作/对白 5-6s，高张力动作/复杂走位 7-10s。
+10. **对白与表演**: 如果帧中有台词，dialogue 和 speaker 必须填写（一帧仅限一位说话人）。在 action_summary 中注明发声神态与语调状态（如低语、嘶吼、咬牙切齿）。
 
 # 剧本格式说明
 - **场景标题行**: `1-1 地点名称 [时间] [内/外]`
@@ -347,7 +349,7 @@ DEFAULT_STORYBOARD_EXTRACTION_PROMPT = """# 角色
     "scene_ref_name": "场景名",
     "character_ref_names": ["角色名"],
     "prop_ref_names": ["道具名"],
-    "action_summary": "一句话概括这帧发生什么（含角色动作 + 物理事件 + 神态表情）",
+    "action_summary": "一句话概括这帧发生什么（含角色物理动作 + 神态表情细节 + 视线方向）",
     "shot_size": "中景",
     "camera_angle": "平视",
     "camera_movement": "静止",
@@ -363,7 +365,7 @@ DEFAULT_STORYBOARD_EXTRACTION_PROMPT = """# 角色
             "scene_ref_name": "卧室",
             "character_ref_names": ["叶墨"],
             "prop_ref_names": ["手机"],
-            "action_summary": "手机在床头柜上震动，叶墨烦躁翻身，眉头紧锁，被子滑落",
+            "action_summary": "手机在床头柜上持续震动，叶墨烦躁翻身，眉头紧锁，手伸出被窝摸索",
             "shot_size": "中景",
             "camera_angle": "俯视",
             "camera_movement": "静止",
@@ -375,12 +377,12 @@ DEFAULT_STORYBOARD_EXTRACTION_PROMPT = """# 角色
             "scene_ref_name": "卧室",
             "character_ref_names": ["叶墨"],
             "prop_ref_names": ["手机"],
-            "action_summary": "叶墨看到来电显示，猛地坐起，表情惊恐",
+            "action_summary": "叶墨瞥见来电显示名字，瞳孔骤缩，猛地挺身坐起，呼吸停滞",
             "shot_size": "特写",
             "camera_angle": "平视",
-            "camera_movement": "快速推镜",
-            "dialogue": "已经来了？",
-            "speaker": "叶墨",
+            "camera_movement": "推镜头",
+            "dialogue": null,
+            "speaker": null,
             "duration": 3
         }
     ]

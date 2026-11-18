@@ -1923,6 +1923,8 @@ class CreateSeriesRequest(BaseModel):
     # PR-3e (r2v-workflow-v3) — Visual control preference.
     # 'r2v' (节奏优先, default) | 'i2v' (画面优先).
     default_generation_mode: str = "r2v"
+    # Production mode: 'linear' (普通剧) or 'interactive' (互动剧/影游)
+    production_mode: str = "linear"
 
 
 class UpdateSeriesRequest(BaseModel):
@@ -1933,6 +1935,7 @@ class UpdateSeriesRequest(BaseModel):
     workflow_mode: str = ""
     content_mode: str = ""
     default_generation_mode: str = ""
+    production_mode: str = ""
     # R2V v2: series-level art_direction baseline (Phase 2). Inherits +
     # override flows at the episode level read this as the source of truth.
     art_direction: Optional[ArtDirection] = None
@@ -1949,6 +1952,7 @@ def create_series(request: CreateSeriesRequest,
         request.workflow_mode,
         request.content_mode,
         request.default_generation_mode,
+        request.production_mode,
     )
     return signed_response(series, runtime=pipeline)
 

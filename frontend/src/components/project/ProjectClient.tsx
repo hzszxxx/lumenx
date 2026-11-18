@@ -210,7 +210,7 @@ export default function ProjectClient({ id, breadcrumbSegments, initialStep = "s
         );
     }
 
-    const segments = breadcrumbSegments || [{ label: "LumenX", hash: "#/" }, { label: currentProject.title }];
+    const segments = breadcrumbSegments || [{ label: "影伴", hash: "#/" }, { label: currentProject.title }];
 
     const settingsActions = (
         <>

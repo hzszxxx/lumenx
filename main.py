@@ -161,7 +161,7 @@ def _open_webview(url: str, *, data_dir: Path | str | None = None) -> None:
 
     storage_root = Path(data_dir).expanduser() if data_dir is not None else default_user_data_dir()
     webview.create_window(
-        title="LumenX Studio",
+        title="影伴 Studio",
         url=url,
         width=1280,
         height=800,
@@ -269,12 +269,12 @@ def run_desktop(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run LumenX Studio desktop shell.")
+    parser = argparse.ArgumentParser(description="Run 影伴 Studio desktop shell.")
     parser.add_argument(
         "--backend-url",
-        help="Open an existing deployed LumenX app entry URL after checking backend health.",
+        help="Open an existing deployed 影伴 app entry URL after checking backend health.",
     )
-    parser.add_argument("--data-dir", type=Path, help="LumenX user data root.")
+    parser.add_argument("--data-dir", type=Path, help="影伴 user data root.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=17177)
     return parser.parse_args(argv)
