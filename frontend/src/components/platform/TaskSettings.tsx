@@ -27,12 +27,14 @@ import {
   Plus,
   FileCheck2,
   Gamepad2,
+  Eye,
 } from "lucide-react";
 import { platformApi, type PlatformTask, type DeliverableSpecs, type MilestoneSpec, type CopyrightTerms } from "@/lib/platformApi";
 import { usePlatformStore } from "@/store/platformStore";
 import TaskCreateDialog from "./TaskCreateDialog";
 import ContractSignDialog from "./ContractSignDialog";
 import ContractViewerDialog from "./ContractViewerDialog";
+import { WatermarkPreviewModal } from "./WatermarkPreviewModal";
 
 // 业务核心赛道定义
 const DEMAND_TYPES = [
@@ -82,6 +84,7 @@ export default function TaskSettings() {
   const [deliveryNote, setDeliveryNote] = useState("");
   const [watermarkConfirmed, setWatermarkConfirmed] = useState(true);
   const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
+  const [previewingWatermarkTask, setPreviewingWatermarkTask] = useState<PlatformTask | null>(null);
 
   // 审核状态（用于管理员/甲方角色快速验收）
   const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
@@ -493,7 +496,7 @@ export default function TaskSettings() {
                         <Calendar size={13} className="text-text-muted" />
                         交付截止：{new Date(task.deadline).toLocaleDateString()}
                       </span>
-                      <span>等级要求：{task.required_level.toUpperCase()}</span>
+                      <span>等级要求：{(task.required_level || "standard").toUpperCase()}</span>
                       <span className="flex items-center gap-1 text-emerald-400/90">
                         <ShieldCheck size={13} />
                         赏金已托管至平台
@@ -678,15 +681,26 @@ export default function TaskSettings() {
                               />
                             </div>
 
-                            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={watermarkConfirmed}
-                                onChange={(e) => setWatermarkConfirmed(e.target.checked)}
-                                className="rounded text-primary focus:ring-0"
-                              />
-                              <span>已为初剪样片嵌入【影伴交付审阅样片 · 严禁商用】半透明防盗水印（平台强制保护）</span>
-                            </label>
+                            <div className="flex items-center justify-between flex-wrap gap-2 pt-0.5">
+                              <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={watermarkConfirmed}
+                                  onChange={(e) => setWatermarkConfirmed(e.target.checked)}
+                                  className="rounded text-primary focus:ring-0"
+                                />
+                                <span>已为初剪样片嵌入【影伴交付审阅样片 · 严禁商用】半透明防盗水印（平台强制保护）</span>
+                              </label>
+
+                              <button
+                                type="button"
+                                onClick={() => setPreviewingWatermarkTask(task)}
+                                className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                              >
+                                <Eye size={12} />
+                                预览防盗水印效果与 FFmpeg 压制指令
+                              </button>
+                            </div>
 
                             <div className="flex items-center gap-2 pt-1">
                               <button
@@ -833,6 +847,16 @@ export default function TaskSettings() {
         <ContractViewerDialog
           task={viewingContractTask}
           onClose={() => setViewingContractTask(null)}
+        />
+      )}
+
+      {/* 商业交付样片防盗水印预览弹窗 */}
+      {previewingWatermarkTask && (
+        <WatermarkPreviewModal
+          isOpen={true}
+          task={previewingWatermarkTask}
+          creatorName={user?.username || "认证创作者"}
+          onClose={() => setPreviewingWatermarkTask(null)}
         />
       )}
     </div>
