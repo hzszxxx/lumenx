@@ -193,12 +193,24 @@ export function InteractiveBranchConfig({
           </div>
 
           {/* 选项列表 */}
-          <div className="space-y-2">
-            {choices.map((choice, idx) => (
-              <div
-                key={choice.id}
-                className="p-2.5 rounded-lg border border-white/10 bg-black/40 space-y-2"
+          {choices.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/15 p-3 text-center text-[11px] text-white/40 space-y-1.5">
+              <p>暂无分支选项（所有连线已断开）</p>
+              <button
+                type="button"
+                onClick={handleAddChoice}
+                className="text-purple-300 hover:text-purple-200 underline cursor-pointer"
               >
+                点击添加新分支选项
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {choices.map((choice, idx) => (
+                <div
+                  key={choice.id}
+                  className="p-2.5 rounded-lg border border-white/10 bg-black/40 space-y-2"
+                >
                 <div className="flex items-center justify-between gap-2">
                   <input
                     type="text"
@@ -207,17 +219,15 @@ export function InteractiveBranchConfig({
                     className="flex-1 bg-transparent border-b border-white/20 text-xs text-white focus:border-purple-400 outline-none pb-0.5"
                     placeholder="输入选项文案..."
                   />
-                  {choices.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveChoice(choice.id)}
-                      className="text-white/30 hover:text-red-400 p-0.5"
-                      title="删除此选项"
+                      className="text-white/40 hover:text-red-400 p-1 cursor-pointer transition-colors"
+                      title="删除此选项并断开连接"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={13} />
                     </button>
-                  )}
-                </div>
+                  </div>
 
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="text-white/40 shrink-0">跳转镜头:</span>
@@ -236,7 +246,8 @@ export function InteractiveBranchConfig({
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
 
           {/* 一键在画布上创建下游分支节点 */}
           {onCreateBranchNode && (

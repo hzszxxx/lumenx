@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, ImageIcon, Loader2, Play, Plus, RotateCw, Sparkles, Upload, Video, Volume2, SplitSquareVertical } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ImageIcon, Loader2, Play, Plus, RotateCw, Sparkles, Upload, Video, Volume2, SplitSquareVertical, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { MediaKind } from "@/components/atelier/v3/types";
 import { PortDot } from "./NodePort";
@@ -17,6 +17,7 @@ interface Props {
   id: string;
   kind: MediaKind;
   onAddNextStep?: (id: string) => void;
+  onDelete?: (id: string) => void;
   onWipeCompare?: (id: string) => void;
   src?: string;
   poster?: string;
@@ -254,6 +255,7 @@ export function MediaNode({
   onCancel,
   onPortDown,
   onAddNextStep,
+  onDelete,
   onWipeCompare,
 }: Props) {
   const t = useTranslations("atelier.node");
@@ -343,8 +345,40 @@ export function MediaNode({
     return (
       <div
         style={{ left: 0, top: 0, width: `${MAX_MEDIA_WIDTH}px`, transform: `translate(${x}px, ${y}px)` }}
-        className="atelier-bloom atelier-bloom-secondary absolute overflow-visible rounded-[20px]"
+        className="atelier-bloom atelier-bloom-secondary absolute overflow-visible rounded-[20px] group"
       >
+        {/* 悬停快速删除节点按钮 */}
+        {onDelete && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(id);
+            }}
+            className="absolute -top-2.5 -right-2.5 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-500 text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+            title="删除此节点"
+            aria-label="删除此节点"
+          >
+            <Trash2 size={11} className="stroke-[2.2]" />
+          </button>
+        )}
+        {/* 边缘悬停快速添加后续分镜按钮 */}
+        {onAddNextStep && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddNextStep(id);
+            }}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-primary text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+            title="在此镜头后衍生添加下一步分镜"
+            aria-label="添加下一步任务"
+          >
+            <Plus size={13} className="stroke-[2.5]" />
+          </button>
+        )}
         <div
           role="button"
           tabIndex={0}
@@ -636,6 +670,23 @@ export function MediaNode({
           />
         ) : null}
 
+        {/* 悬停快速删除节点按钮 */}
+        {onDelete && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(id);
+            }}
+            className="absolute -top-2.5 -right-2.5 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-500 text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+            title="删除此节点"
+            aria-label="删除此节点"
+          >
+            <Trash2 size={11} className="stroke-[2.2]" />
+          </button>
+        )}
+
         {/* 边缘悬停快速添加后续分镜按钮 */}
         {onAddNextStep && (
           <button
@@ -914,6 +965,23 @@ export function MediaNode({
           className="absolute right-1 top-1/2 -translate-y-1/2 z-10"
         />
       ) : null}
+
+      {/* 悬停快速删除节点按钮 */}
+      {onDelete && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(id);
+          }}
+          className="absolute -top-2.5 -right-2.5 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-500 text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+          title="删除此节点"
+          aria-label="删除此节点"
+        >
+          <Trash2 size={11} className="stroke-[2.2]" />
+        </button>
+      )}
 
       {/* 边缘悬停快速添加后续分镜按钮 */}
       {onAddNextStep && (

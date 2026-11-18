@@ -1004,6 +1004,32 @@ export function AtelierShell() {
     });
   }, [currentProject, selectedNode]);
 
+  const handleRemoveInteractiveLink = useCallback((fromNodeId: string, choiceId: string) => {
+    useAtelierStore.setState(state => {
+      if (!state.currentProject) return state;
+      return {
+        currentProject: {
+          ...state.currentProject,
+          nodes: state.currentProject.nodes.map(n => {
+            if (n.id !== fromNodeId) return n;
+            const branchData = getInteractiveBranchData(n);
+            const choices = (branchData.choices || []).filter(c => c.id !== choiceId);
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interactive: {
+                  ...branchData,
+                  choices,
+                },
+              } as unknown as JsonRecord,
+            };
+          }),
+        },
+      };
+    });
+  }, []);
+
   const handleCreateDownstreamBranch = useCallback((branchTitle: string) => {
     if (!selectedNode || !currentProject) return;
     void run(async owner => {
@@ -1237,10 +1263,33 @@ export function AtelierShell() {
     }, t("saveError"));
   }, [currentProject, draft, isCurrentOwner, run, selectedNode, selectedOwner, t, updateNodeText]);
 
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    void run(async () => { await deleteNodes([nodeId]); }, t("deleteError"));
+  }, [deleteNodes, run, t]);
+
   const deleteSelected = useCallback(() => {
     if (!selectedNode) return;
-    void run(async () => { await deleteNodes([selectedNode.id]); }, t("deleteError"));
-  }, [deleteNodes, run, selectedNode, t]);
+    handleDeleteNode(selectedNode.id);
+  }, [handleDeleteNode, selectedNode]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const target = document.activeElement;
+      if (target) {
+        const tagName = target.tagName.toLowerCase();
+        if (tagName === "input" || tagName === "textarea" || tagName === "select" || (target as HTMLElement).isContentEditable) {
+          return;
+        }
+      }
+      if (selectedNodeId) {
+        e.preventDefault();
+        deleteSelected();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deleteSelected, selectedNodeId]);
 
   const uploadMedia = async (file: File, targetId?: string) => {
     if (!shellOwner || !isCurrentOwner(shellOwner) || uploadDisabled) return;
@@ -1284,7 +1333,7 @@ export function AtelierShell() {
     if (node.type === "idea") {
       return (
         <div key={node.id} onPointerDownCapture={event => beginDrag(node, event)}>
-          <IdeaNode id={node.id} body={bodyOf(node)} x={x} y={y} selected={selected} onSelect={selectNode} onAddNextStep={handleAddNextStep} />
+          <IdeaNode id={node.id} body={bodyOf(node)} x={x} y={y} selected={selected} onSelect={selectNode} onAddNextStep={handleAddNextStep} onDelete={handleDeleteNode} />
         </div>
       );
     }
@@ -1339,7 +1388,7 @@ export function AtelierShell() {
     if (media) {
       return (
         <div key={node.id} onPointerDownCapture={event => beginDrag(node, event)}>
-          <MediaNode {...media} onSelect={selectNode} onAddNextStep={handleAddNextStep} onWipeCompare={handleTriggerWipeCompare} />
+          <MediaNode {...media} onSelect={selectNode} onAddNextStep={handleAddNextStep} onWipeCompare={handleTriggerWipeCompare} onDelete={handleDeleteNode} />
         </div>
       );
     }
@@ -1588,29 +1637,49 @@ export function AtelierShell() {
                         markerEnd="url(#branchArrow)"
                         className="transition-all"
                       />
-                      <g transform={`translate(${midX}, ${midY})`}>
+                      <g
+                        transform={`translate(${midX}, ${midY})`}
+                        style={{ pointerEvents: "all" }}
+                        className="group cursor-pointer select-none"
+                      >
                         <rect
-                          x="-42"
-                          y="-11"
-                          width="84"
-                          height="22"
-                          rx="11"
+                          x="-52"
+                          y="-12"
+                          width="104"
+                          height="24"
+                          rx="12"
                           fill="#180b2a"
                           stroke="#a855f7"
                           strokeWidth="1.2"
-                          className="shadow-lg"
+                          className="shadow-lg transition-colors hover:border-pink-500 hover:fill-purple-950"
                         />
                         <text
-                          x="0"
-                          y="3"
+                          x="-8"
+                          y="4"
                           textAnchor="middle"
                           fill="#f3e8ff"
                           fontSize="10"
                           fontWeight="500"
                           pointerEvents="none"
                         >
-                          {link.choiceLabel.length > 7 ? link.choiceLabel.slice(0, 6) + "…" : link.choiceLabel}
+                          {link.choiceLabel.length > 6 ? link.choiceLabel.slice(0, 5) + "…" : link.choiceLabel}
                         </text>
+                        {/* 快捷断开/删除连线按钮 */}
+                        <g
+                          role="button"
+                          aria-label="断开此连线"
+                          transform="translate(38, 0)"
+                          className="cursor-pointer hover:opacity-100 opacity-70 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveInteractiveLink(link.fromNode.id, link.choiceId);
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <circle r="7" fill="#ef4444" />
+                          <line x1="-3" y1="-3" x2="3" y2="3" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                          <line x1="3" y1="-3" x2="-3" y2="3" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                        </g>
                       </g>
                     </g>
                   );
