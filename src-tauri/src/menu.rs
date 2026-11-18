@@ -9,12 +9,12 @@ pub fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Err
     // ─── App Menu ───
     let app_menu = Submenu::with_items(
         app,
-        "LumenX Studio",
+        "影伴 Studio",
         true,
         &[
-            &PredefinedMenuItem::about(app, Some("About LumenX Studio"), Default::default())?,
+            &PredefinedMenuItem::about(app, Some("关于 影伴 Studio"), Default::default())?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "preferences", "Preferences...", true, Some("CmdOrCtrl+,"))?,
+            &MenuItem::with_id(app, "preferences", "偏好设置...", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::services(app, None)?,
             &PredefinedMenuItem::separator(app)?,
@@ -29,11 +29,11 @@ pub fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Err
     // ─── File Menu ───
     let file_menu = Submenu::with_items(
         app,
-        "File",
+        "文件",
         true,
         &[
-            &MenuItem::with_id(app, "new_project", "New Project", true, Some("CmdOrCtrl+N"))?,
-            &MenuItem::with_id(app, "open_project", "Open Project...", true, Some("CmdOrCtrl+O"))?,
+            &MenuItem::with_id(app, "new_project", "新建工程", true, Some("CmdOrCtrl+N"))?,
+            &MenuItem::with_id(app, "open_project", "打开工程...", true, Some("CmdOrCtrl+O"))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::close_window(app, None)?,
         ],
@@ -42,7 +42,7 @@ pub fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Err
     // ─── Edit Menu ───
     let edit_menu = Submenu::with_items(
         app,
-        "Edit",
+        "编辑",
         true,
         &[
             &PredefinedMenuItem::undo(app, None)?,
@@ -58,12 +58,12 @@ pub fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Err
     // ─── View Menu ───
     let view_menu = Submenu::with_items(
         app,
-        "View",
+        "视图",
         true,
         &[
-            &MenuItem::with_id(app, "zoom_in", "Zoom In", true, Some("CmdOrCtrl+="))?,
-            &MenuItem::with_id(app, "zoom_out", "Zoom Out", true, Some("CmdOrCtrl+-"))?,
-            &MenuItem::with_id(app, "zoom_reset", "Actual Size", true, Some("CmdOrCtrl+0"))?,
+            &MenuItem::with_id(app, "zoom_in", "放大", true, Some("CmdOrCtrl+="))?,
+            &MenuItem::with_id(app, "zoom_out", "缩小", true, Some("CmdOrCtrl+-"))?,
+            &MenuItem::with_id(app, "zoom_reset", "实际大小 (100%)", true, Some("CmdOrCtrl+0"))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::fullscreen(app, None)?,
         ],
@@ -72,7 +72,7 @@ pub fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Err
     // ─── Window Menu ───
     let window_menu = Submenu::with_items(
         app,
-        "Window",
+        "窗口",
         true,
         &[
             &PredefinedMenuItem::minimize(app, None)?,
@@ -85,13 +85,13 @@ pub fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Err
     // ─── Help Menu ───
     let help_menu = Submenu::with_items(
         app,
-        "Help",
+        "帮助",
         true,
         &[
-            &MenuItem::with_id(app, "docs", "Documentation", true, None::<&str>)?,
-            &MenuItem::with_id(app, "release_notes", "Release Notes", true, None::<&str>)?,
+            &MenuItem::with_id(app, "docs", "使用文档与教程", true, None::<&str>)?,
+            &MenuItem::with_id(app, "release_notes", "更新发布日志", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "report_issue", "Report Issue...", true, None::<&str>)?,
+            &MenuItem::with_id(app, "report_issue", "反馈问题与建议...", true, None::<&str>)?,
         ],
     )?;
 

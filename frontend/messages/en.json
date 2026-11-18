@@ -591,7 +591,7 @@
     "imported": "Project package imported",
     "readbackFailed": "The package was submitted, but the new project could not be confirmed. Read it again before importing another copy.",
     "retryReadback": "Retry readback",
-    "unknownSubmit": "The package may have been submitted, but LumenX could not confirm the acknowledgement. Check the project list before importing again.",
+    "unknownSubmit": "The package may have been submitted, but 影伴 could not confirm the acknowledgement. Check the project list before importing again.",
     "importFailed": "Project package import failed"
   },
   "settings": {
@@ -776,6 +776,11 @@
     "workflowR2VDesc": "5-step streamlined flow, per-shot i2v / r2v generation mode toggle",
     "workflowI2V": "Legacy Workflow",
     "workflowI2VDesc": "Traditional 9-step flow, preserved for backward compatibility (StoryboardComposer + VideoGenerator)",
+    "productionMode": "Production Mode",
+    "productionLinear": "🎬 Linear Series (Classic)",
+    "productionLinearDesc": "Sequential storyboard flow focusing on video quality, character consistency, and export as MP4",
+    "productionInteractive": "🎮 Interactive Story / FMV Game",
+    "productionInteractiveDesc": "Branching decision tree with choices, multiple endings, and interactive simulator player",
     "contentMode": "Content mode",
     "contentScripted": "I have a script",
     "contentScriptedDesc": "Traditional flow: import script → extract entities → storyboard → generate video",
@@ -3089,7 +3094,11 @@
       "workflowInsertSuccess": "Workflow template inserted",
       "workflowInsertPartial": "Workflow template partially inserted",
       "workflowInsertError": "Workflow template failed",
-      "templateRelationships": "Template relationships"
+      "templateRelationships": "Template relationships",
+      "batchImportStoryboard": "Batch Import Storyboard",
+      "wipeCompareTitle": "Clay vs Render Wipe Comparison",
+      "clayDemoldEnhance": "Clay/Previz Demold Enhancement",
+      "injectDemoldMaterial": "Inject Demold Material"
     },
     "sequenceEditor": {
       "title": "Sequence",

@@ -32,6 +32,26 @@ type AuditEvent = { id: string; actor_id: string | null; event_type: string; ent
 type Invite = { id: string; code: string; max_uses: number; used_count: number; expires_at?: string | null; created_at: string; student_note?: string | null; batch_title?: string | null };
 
 const roles = ["user", "creator", "agent", "reviewer", "client", "admin"];
+const ROLE_LABELS: Record<string, string> = {
+  user: "普通用户",
+  creator: "认证创作者",
+  agent: "渠道代理商",
+  reviewer: "审核验收员",
+  client: "商单发包方",
+  admin: "系统管理员",
+};
+
+const AUDIT_EVENT_LABELS: Record<string, string> = {
+  user_created: "用户注册/创建",
+  user_updated: "更新用户信息",
+  user_role_updated: "更新用户角色",
+  user_status_toggled: "切换启用状态",
+  invite_created: "生成邀请码",
+  agent_created: "创建渠道代理",
+  agent_updated: "更新代理配置",
+  setting_updated: "更新系统配置",
+};
+
 const navItems: Array<{ id: Section; label: string; icon: LucideIcon }> = [
   { id: "overview", label: "运营概览", icon: LayoutDashboard },
   { id: "users", label: "用户与权限", icon: Users },
@@ -106,7 +126,7 @@ export default function AdminConsole() {
     return (
       <main className="min-h-full p-10 bg-background text-foreground">
         <div className="glass-panel max-w-xl mx-auto p-8">
-          <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">LumenX · Admin Console</p>
+          <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">影伴 · 管理控制台</p>
           <h1 className="text-2xl font-display mt-3">管理员登录</h1>
           <p className="text-text-secondary mt-3">使用平台管理员账户进入独立管理后台。</p>
           <form onSubmit={submitLogin} className="space-y-4 mt-6">
@@ -228,9 +248,9 @@ export default function AdminConsole() {
       <div className="min-h-screen grid lg:grid-cols-[248px_1fr]">
         <aside className="border-r border-glass-border bg-surface/70 p-4 flex flex-col">
           <div className="px-3 py-4 mb-5">
-            <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">LumenX</p>
+            <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">影伴</p>
             <h1 className="text-xl font-display mt-2">管理后台</h1>
-            <p className="text-xs text-text-muted mt-1">Admin Console</p>
+            <p className="text-xs text-text-muted mt-1">系统管理控制台</p>
           </div>
           <nav aria-label="管理后台主导航" className="space-y-1">
             {navItems.map(({ id, label, icon: Icon }) => (
@@ -266,7 +286,7 @@ export default function AdminConsole() {
 
         <section className="p-6 md:p-10">
           <header className="max-w-7xl mx-auto mb-8">
-            <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">Platform Operations</p>
+            <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">平台运营管理中心</p>
             <div className="flex flex-wrap items-end justify-between gap-4 mt-3">
               <div>
                 <h2 className="text-4xl font-display">{navItems.find((item) => item.id === section)?.label}</h2>
@@ -348,7 +368,7 @@ export default function AdminConsole() {
                             >
                               {roles.map((role) => (
                                 <option key={role} value={role}>
-                                  {role === "agent" ? "agent (代理商)" : role}
+                                  {ROLE_LABELS[role] ?? role}
                                 </option>
                               ))}
                             </select>
@@ -576,9 +596,9 @@ export default function AdminConsole() {
                             value={editStatus}
                             onChange={(e) => setEditStatus(e.target.value)}
                           >
-                            <option value="active">正常合作 (active)</option>
-                            <option value="pending">待审核 (pending)</option>
-                            <option value="disabled">暂停合作 (disabled)</option>
+                            <option value="active">正常合作</option>
+                            <option value="pending">待审核</option>
+                            <option value="disabled">暂停合作</option>
                           </select>
                         </div>
 
@@ -721,9 +741,9 @@ export default function AdminConsole() {
                       {auditEvents.map((item) => (
                         <tr key={item.id} className="border-b border-glass-border">
                           <td className="py-3 text-text-secondary">{new Date(item.created_at).toLocaleString()}</td>
-                          <td>{item.event_type}</td>
+                          <td>{AUDIT_EVENT_LABELS[item.event_type] ?? item.event_type}</td>
                           <td>
-                            {item.entity_type} {item.entity_id ? `· ${item.entity_id.slice(0, 8)}` : ""}
+                            {item.entity_type === "user" ? "用户" : item.entity_type === "agent" ? "代理商" : item.entity_type === "invite" ? "邀请码" : item.entity_type === "setting" ? "系统配置" : item.entity_type} {item.entity_id ? `· ${item.entity_id.slice(0, 8)}` : ""}
                           </td>
                           <td className="text-text-secondary">{item.actor_id ? item.actor_id.slice(0, 8) : "系统"}</td>
                         </tr>

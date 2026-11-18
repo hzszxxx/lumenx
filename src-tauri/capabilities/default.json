@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default permissions for LumenX Studio",
+  "description": "Default permissions for 影伴 Studio",
   "windows": ["main"],
   "permissions": [
     "core:default",

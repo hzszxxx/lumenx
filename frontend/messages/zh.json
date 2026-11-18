@@ -591,7 +591,7 @@
     "imported": "工程包已导入",
     "readbackFailed": "工程包已提交，但未能确认新项目。请重新读取，勿重复导入。",
     "retryReadback": "重新读取",
-    "unknownSubmit": "工程包可能已经提交，但 LumenX 无法确认回执。请先核对项目列表，再决定是否重新导入。",
+    "unknownSubmit": "工程包可能已经提交，但 影伴 无法确认回执。请先核对项目列表，再决定是否重新导入。",
     "importFailed": "工程包导入失败"
   },
   "settings": {
@@ -776,6 +776,11 @@
     "workflowR2VDesc": "5 步精简流程，per-shot 可选 i2v / r2v 生成模式",
     "workflowI2V": "传统工作流 (Legacy)",
     "workflowI2VDesc": "传统 9 步流程，保留向后兼容（StoryboardComposer + VideoGenerator）",
+    "productionMode": "制作形态",
+    "productionLinear": "🎬 普通线性短剧 (经典单线)",
+    "productionLinearDesc": "单线时序分镜流，专注画质、人物一致性与镜头节奏，导出为连续剧集 MP4",
+    "productionInteractive": "🎮 互动短剧 / 影游 (分支决策树)",
+    "productionInteractiveDesc": "网状决策树、多分支与多结局，支持设置选择支、分支跳转与互动模拟器试玩",
     "contentMode": "内容模式",
     "contentScripted": "我有剧本",
     "contentScriptedDesc": "传统流程：先导入剧本 → 解析实体 → 拆分镜 → 生成视频",
@@ -3089,7 +3094,11 @@
       "workflowInsertSuccess": "工作流模板已插入",
       "workflowInsertPartial": "工作流模板已部分插入",
       "workflowInsertError": "工作流模板插入失败",
-      "templateRelationships": "模板关系"
+      "templateRelationships": "模板关系",
+      "batchImportStoryboard": "分镜表批量导入",
+      "wipeCompareTitle": "白模与成片卷帘对比",
+      "clayDemoldEnhance": "白模/灰模预演渲染增强",
+      "injectDemoldMaterial": "注入脱模材质"
     },
     "sequenceEditor": {
       "title": "序列",

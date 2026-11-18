@@ -145,5 +145,5 @@ pub fn run() {
             check_backend_health,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running LumenX Studio");
+        .expect("error while running 影伴 Studio");
 }

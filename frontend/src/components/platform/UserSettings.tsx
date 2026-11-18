@@ -28,8 +28,8 @@ export default function UserSettings() {
             <div>
               <div className="flex items-center gap-2.5">
                 <h2 className="text-xl font-bold text-foreground">{user.username}</h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-mono font-medium uppercase">
-                  {user.role}
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                  {user.role === "admin" ? "系统管理员" : user.role === "agent" ? "渠道代理商" : user.role === "creator" ? "认证创作者" : user.role === "reviewer" ? "审核验收员" : user.role === "client" ? "商单发包方" : "普通用户"}
                 </span>
               </div>
               <p className="text-xs text-text-secondary mt-1">
