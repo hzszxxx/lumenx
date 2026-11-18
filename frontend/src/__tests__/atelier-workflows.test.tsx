@@ -6,8 +6,8 @@ import { BUILT_IN_WORKFLOW_TEMPLATES, WORKFLOW_TEMPLATE_MIME, getBuiltInWorkflow
 import { WorkflowsPanel } from "@/components/atelier/v3/WorkflowsPanel";
 
 describe("Atelier built-in workflow templates", () => {
-  it("ships six safe built-ins with unique ids, safe node fields, and valid reference edges", () => {
-    expect(BUILT_IN_WORKFLOW_TEMPLATES).toHaveLength(6);
+  it("ships eight safe built-ins with unique ids, safe node fields, and valid reference edges", () => {
+    expect(BUILT_IN_WORKFLOW_TEMPLATES).toHaveLength(8);
     const ids = new Set<string>();
     for (const template of BUILT_IN_WORKFLOW_TEMPLATES) {
       expect(ids.has(template.id)).toBe(false);
@@ -36,9 +36,9 @@ describe("Atelier built-in workflow templates", () => {
   it("filters cards, inserts by click, and drags only the template id", () => {
     const onInsert = vi.fn();
     render(<WorkflowsPanel labels={{ title: "Workflows", all: "All", insert: "Insert", drag: "Drag" }} disabled={false} onInsert={onInsert} />);
-    expect(screen.getAllByRole("button", { name: /Insert/ })).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: /Insert/ })).toHaveLength(8);
     fireEvent.click(screen.getByRole("tab", { name: "Image" }));
-    expect(screen.getAllByRole("button", { name: /Insert/ }).length).toBeLessThan(6);
+    expect(screen.getAllByRole("button", { name: /Insert/ }).length).toBeLessThan(8);
     fireEvent.click(screen.getAllByRole("button", { name: /Insert/ })[0]);
     expect(onInsert).toHaveBeenCalledWith(expect.objectContaining({ category: "image" }));
 

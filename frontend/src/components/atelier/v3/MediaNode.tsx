@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, ImageIcon, Loader2, Play, RotateCw, Sparkles, Upload, Video, Volume2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ImageIcon, Loader2, Play, Plus, RotateCw, Sparkles, Upload, Video, Volume2, SplitSquareVertical } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { MediaKind } from "@/components/atelier/v3/types";
 import { PortDot } from "./NodePort";
@@ -16,6 +16,8 @@ interface Props {
   onPickTake?: (candidateId: string) => void;
   id: string;
   kind: MediaKind;
+  onAddNextStep?: (id: string) => void;
+  onWipeCompare?: (id: string) => void;
   src?: string;
   poster?: string;
   filename?: string;
@@ -251,6 +253,8 @@ export function MediaNode({
   onRetryWithModel,
   onCancel,
   onPortDown,
+  onAddNextStep,
+  onWipeCompare,
 }: Props) {
   const t = useTranslations("atelier.node");
   const def = DEFAULT_SIZE[kind];
@@ -428,6 +432,20 @@ export function MediaNode({
               <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-atelier-brand-400 px-2 py-[3px] text-[10px] font-medium text-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.6)]">
                 <Check size={9} aria-hidden="true" /> {t("selectedPill")}
               </span>
+            ) : null}
+            {onWipeCompare ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onWipeCompare(id);
+                }}
+                title="开启白模与成片卷帘对比 (Wipe View)"
+                className="absolute right-2 top-2 z-10 flex items-center gap-1 px-2 py-1 rounded-md bg-black/60 hover:bg-black/90 text-white/90 backdrop-blur-md border border-white/20 text-[10px] font-medium transition-all opacity-0 group-hover:opacity-100 cursor-pointer shadow-md"
+              >
+                <SplitSquareVertical size={11} className="text-purple-400" />
+                <span>比对</span>
+              </button>
             ) : null}
           </div>
           {/* Q5 · demo take strip — candidate tiles under the media (58×34,
@@ -617,6 +635,23 @@ export function MediaNode({
             className="absolute right-1 top-1/2 -translate-y-1/2 z-10"
           />
         ) : null}
+
+        {/* 边缘悬停快速添加后续分镜按钮 */}
+        {onAddNextStep && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddNextStep(id);
+            }}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-primary text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+            title="在此镜头后衍生添加下一步分镜"
+            aria-label="添加下一步任务"
+          >
+            <Plus size={13} className="stroke-[2.5]" />
+          </button>
+        )}
       </div>
     );
   }
@@ -879,6 +914,23 @@ export function MediaNode({
           className="absolute right-1 top-1/2 -translate-y-1/2 z-10"
         />
       ) : null}
+
+      {/* 边缘悬停快速添加后续分镜按钮 */}
+      {onAddNextStep && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddNextStep(id);
+          }}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-primary text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+          title="在此镜头后衍生添加下一步分镜"
+          aria-label="添加下一步任务"
+        >
+          <Plus size={13} className="stroke-[2.5]" />
+        </button>
+      )}
     </div>
   );
 }

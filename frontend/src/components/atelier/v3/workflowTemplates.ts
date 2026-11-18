@@ -120,6 +120,38 @@ export const BUILT_IN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     ],
     edges: [edge("beat1-to-clip1", "beat1", "clip1"), edge("beat2-to-clip2", "beat2", "clip2")],
   },
+  {
+    id: "clay-previz-to-shot",
+    version: 1,
+    category: "video",
+    title: "Clay previz to shot",
+    summary: "Transform 3D blockout / clay render into a photorealistic cinematic shot with character consistency.",
+    nodes: [
+      node({ localId: "clay", type: "image", title: "Clay blockout frame", prompt: "Upload 3D clay render, depth map, or graybox camera view.", x: 0, y: 0, width: 260, height: 180 }),
+      node({ localId: "character", type: "image", title: "Character reference", prompt: "Upload character turnaround or key visual reference.", x: 0, y: 220, width: 260, height: 180 }),
+      node({ localId: "shot", type: "video", title: "Cinematic shot", prompt: "Photorealistic cinematic render keeping clay geometry, depth, and camera angle.", x: 340, y: 100, width: 260, height: 146 }),
+    ],
+    edges: [
+      edge("clay-to-shot", "clay", "shot"),
+      edge("character-to-shot", "character", "shot"),
+    ],
+  },
+  {
+    id: "clay-start-end-previz-to-shot",
+    version: 1,
+    category: "video",
+    title: "Clay start-end previz to shot",
+    summary: "Interpolate camera movement between a start-frame clay blockout and an end-frame clay blockout.",
+    nodes: [
+      node({ localId: "startClay", type: "image", title: "Start clay frame", prompt: "Camera start pose / initial clay composition.", x: 0, y: 0, width: 260, height: 180 }),
+      node({ localId: "endClay", type: "image", title: "End clay frame", prompt: "Camera end pose / target clay composition.", x: 0, y: 220, width: 260, height: 180 }),
+      node({ localId: "shot", type: "video", title: "Interpolated shot", prompt: "Smooth camera motion interpolating between start and end clay frames, photorealistic render.", x: 340, y: 100, width: 260, height: 146 }),
+    ],
+    edges: [
+      edge("start-to-shot", "startClay", "shot"),
+      edge("end-to-shot", "endClay", "shot"),
+    ],
+  },
 ];
 
 const safeNodeKeys = new Set(["localId", "type", "title", "prompt", "body", "x", "y", "width", "height"]);

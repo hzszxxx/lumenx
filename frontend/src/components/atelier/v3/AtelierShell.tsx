@@ -31,13 +31,27 @@ import {
   buildReferenceLinks,
   canAttachAtelierReference,
   findOpenAtelierCanvasPosition,
+  getAtelierCanvasNodeData,
   getAtelierCanvasPlacementRects,
   getAtelierPendingReferenceNodes,
   getAtelierReferenceMediaUrls,
+  getAtelierReferenceNodeIds,
   hasAtelierNodeActiveExecution,
+  resolveAtelierReferenceMedia,
 } from "@/lib/atelierCanvas";
 import { ATELIER_IMAGE_UPLOAD_ACCEPT, ATELIER_UPLOAD_ACCEPT, getAtelierUploadKind } from "@/lib/atelierUploadApi";
 import type { AtelierNode, JsonValue } from "@/lib/atelierTypes";
+import { Sparkles, X, Check, ShieldCheck, Clock, Layers, Coins, Plus, FileText, Gamepad2, Film, Play, Download, Box, SplitSquareVertical, FileSpreadsheet } from "lucide-react";
+import { InteractiveSimulatorModal } from "./InteractiveSimulatorModal";
+import { InteractiveBranchConfig } from "./InteractiveBranchConfig";
+import ClayWipeCompareModal from "./ClayWipeCompareModal";
+import StoryboardBatchImportModal, { type ParsedStoryboardShot } from "./StoryboardBatchImportModal";
+import {
+  buildCanvasInteractiveLinks,
+  computeBranchBezierPath,
+  getInteractiveBranchData,
+  type InteractiveBranchLink,
+} from "@/lib/interactiveDrama";
 import "./atelier-v3.css";
 
 type ShellOwner = {
@@ -227,6 +241,84 @@ function resizePreview(drag: DragState, dx: number, dy: number): Preview {
   return { width: Math.max(minWidth, drag.width + dx), height: Math.max(minHeight, drag.height + dy) };
 }
 
+export function resolveNodeRenderAndClay(node: AtelierNode, allNodes: AtelierNode[]): { renderUrl: string | null; clayUrl: string | null } {
+  // 1. Resolve Render URL (the final/generated media of this node)
+  const renderUrl =
+    resolveAtelierReferenceMedia(node) ||
+    node.media_urls?.[0] ||
+    (node as any).media_url ||
+    (typeof node.data?.media_url === "string" ? node.data.media_url : null) ||
+    (typeof node.data?.video_url === "string" ? node.data.video_url : null) ||
+    null;
+
+  // 2. Resolve Clay URL (upstream reference, 3D previz, or direct reference image/video)
+  const canvasData = getAtelierCanvasNodeData(node);
+  const directRef =
+    canvasData.reference_image_urls?.[0] ||
+    canvasData.reference_video_urls?.[0] ||
+    (node as any).reference_image_urls?.[0] ||
+    (typeof (node.data as any)?.clay_url === "string" ? (node.data as any).clay_url : null) ||
+    (typeof (node as any)?.clay_url === "string" ? (node as any).clay_url : null) ||
+    null;
+
+  let upstreamRefMedia: string | null = null;
+  const refNodeIds = getAtelierReferenceNodeIds(node);
+  for (const refId of refNodeIds) {
+    const srcNode = allNodes.find(n => n.id === refId);
+    if (srcNode) {
+      const srcMedia = resolveAtelierReferenceMedia(srcNode) || srcNode.media_urls?.[0] || (srcNode as any).media_url;
+      if (srcMedia) {
+        upstreamRefMedia = srcMedia;
+        break;
+      }
+    }
+  }
+
+  if (!upstreamRefMedia) {
+    for (const pending of canvasData.pending_reference_nodes) {
+      const srcNode = allNodes.find(n => n.id === pending.source_node_id);
+      if (srcNode) {
+        const srcMedia = resolveAtelierReferenceMedia(srcNode) || srcNode.media_urls?.[0] || (srcNode as any).media_url;
+        if (srcMedia) {
+          upstreamRefMedia = srcMedia;
+          break;
+        }
+      }
+    }
+  }
+
+  const clayUrl = directRef || upstreamRefMedia || null;
+  return { renderUrl, clayUrl };
+}
+
+export const CLAY_STYLE_PRESETS = [
+  {
+    id: "ue5_scifi",
+    name: "UE5 次世代科幻",
+    promptSnippet: "遵循参考白模几何遮挡与构图透视，Unreal Engine 5 Nanite超清金属拉丝与高分子聚合物材质，次表面散射，8K超清光追反射，去除石膏白模塑料感",
+  },
+  {
+    id: "panavision_35mm",
+    name: "35mm 胶片电影",
+    promptSnippet: "严格保留白模机位与景深，Shot on 35mm Panavision变形镜头，Kodak Vision3真实胶片颗粒与质感，自然电影级边缘光，去除任何3D建模假感",
+  },
+  {
+    id: "oriental_xianxia",
+    name: "东方仙侠奇幻",
+    promptSnippet: "遵循白模场景空间构图，真丝古风刺绣绫罗绸缎质感，晨雾弥漫与柔和仙侠丁达尔光效，超精细皮肤纹理与发丝光泽，真实影视级实景渲染",
+  },
+  {
+    id: "cyberpunk_neon",
+    name: "赛博霓虹雨夜",
+    promptSnippet: "保留白模几何轮廓与建筑机位，雨夜湿漉沥青反光地面，品红与青蓝高饱和霓虹招牌反光，皮革外套做旧磨损纹理，高对比度赛博朋克光影",
+  },
+  {
+    id: "hyperreal_cg",
+    name: "超写实 CG 动画",
+    promptSnippet: "保留白模角色体态与动作姿态，Pixar与工业光魔级3D动画材质，细腻环境光遮蔽(AO)，生动微表情与柔和摄影棚三点布光，院线动画质感",
+  },
+];
+
 export function AtelierShell() {
   const t = useTranslations("atelier.foundation");
   const projects = useAtelierStore(state => state.projects);
@@ -280,6 +372,49 @@ export function AtelierShell() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [preview, setPreview] = useState<Record<string, Preview>>({});
+  const [activeCommercialTask, setActiveCommercialTask] = useState<{
+    id: string;
+    title: string;
+    bounty_cents: number;
+    client_name?: string;
+    category?: string;
+    level_tier?: string;
+    settlement_mode?: string;
+    brief_markdown: string;
+    deliverable_specs_json?: string;
+    milestone_specs_json?: string;
+    acceptance_criteria_json?: string;
+    copyright_terms_json?: string;
+  } | null>(null);
+  const [showTaskBriefModal, setShowTaskBriefModal] = useState(false);
+  const [showSimulatorModal, setShowSimulatorModal] = useState(false);
+  const [showBatchImportModal, setShowBatchImportModal] = useState(false);
+  const [wipeCompareData, setWipeCompareData] = useState<{
+    open: boolean;
+    renderUrl: string;
+    renderKind: "video" | "image";
+    clayUrl: string;
+    clayKind: "video" | "image";
+    title?: string;
+  } | null>(null);
+  const [selectedClayPreset, setSelectedClayPreset] = useState<string>("ue5_scifi");
+  const [canvasProductionMode, setCanvasProductionMode] = useState<"linear" | "interactive">("linear");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.sessionStorage.getItem("active_commercial_task");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setActiveCommercialTask(parsed);
+        if (parsed.demand_type === "interactive_game" || parsed.category?.includes("互动")) {
+          setCanvasProductionMode("interactive");
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
   const [interactionSession, setInteractionSession] = useState(0);
   const sessionRef = useRef(0);
   const dragRef = useRef<DragState | null>(null);
@@ -342,6 +477,7 @@ export function AtelierShell() {
   const selectedNodeUploadBlocked = !!selectedNode && hasAtelierNodeActiveExecution(selectedNode);
   const unconsumedReceipts = currentProject?.node_delete_receipts.filter(receipt => receipt.restored_at === null) ?? [];
   const canvasLinks = useMemo(() => buildCanvasReferenceLinks(currentProject?.nodes ?? []), [currentProject?.nodes]);
+  const interactiveLinks = useMemo(() => (currentProject ? buildCanvasInteractiveLinks(currentProject.nodes) : []), [currentProject]);
   const workflowNoticeText = workflowNotice?.owner === shellOwnerId ? workflowNotice.text : null;
 
   const bumpInteractionSession = useCallback(() => {
@@ -609,23 +745,457 @@ export function AtelierShell() {
   }, [attachPendingReferenceNode, attachReferenceNode, createNode, isCurrentOwner, run, selectNode, t]);
 
   const dropWorkflowTemplate = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    if (writeDisabled || !event.dataTransfer.types.includes(WORKFLOW_TEMPLATE_MIME)) return;
+    if (writeDisabled) return;
     event.preventDefault();
-    const templateId = event.dataTransfer.getData(WORKFLOW_TEMPLATE_MIME);
-    const template = getBuiltInWorkflowTemplate(templateId);
-    if (!template) {
-      setLocalError(t("workflowInsertError"));
+
+    // 1. Workflow template drop
+    if (event.dataTransfer.types.includes(WORKFLOW_TEMPLATE_MIME)) {
+      const templateId = event.dataTransfer.getData(WORKFLOW_TEMPLATE_MIME);
+      const template = getBuiltInWorkflowTemplate(templateId);
+      if (!template) {
+        setLocalError(t("workflowInsertError"));
+        return;
+      }
+      insertWorkflowTemplate(template, canvasPointFromDrop(event, canvasViewportRef.current, pan, zoom));
       return;
     }
-    insertWorkflowTemplate(template, canvasPointFromDrop(event, canvasViewportRef.current, pan, zoom));
-  }, [insertWorkflowTemplate, pan, t, writeDisabled, zoom]);
+
+    // 2. Direct OS files drag-and-drop (batch image / previz frames)
+    const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    if (files.length > 0) {
+      const dropPoint = canvasPointFromDrop(event, canvasViewportRef.current, pan, zoom);
+      void (async () => {
+        let prevNodeId: string | null = null;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const kind = getAtelierUploadKind(file);
+          const layout = {
+            x: Math.round(dropPoint.x + i * 360),
+            y: Math.round(dropPoint.y),
+            width: ATELIER_MEDIA_RENDERED_BOUNDS[kind].width,
+            height: ATELIER_MEDIA_RENDERED_BOUNDS[kind].height,
+          };
+          const ack = await createMediaNode({
+            file,
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            nodeType: kind,
+            ...layout,
+          });
+          const realId = ack.node_ids[0];
+          if (prevNodeId && realId) {
+            const project = useAtelierStore.getState().currentProject;
+            const prevNode = project?.nodes.find(n => n.id === prevNodeId);
+            const currNode = project?.nodes.find(n => n.id === realId);
+            if (prevNode && currNode && canAttachAtelierReference(currNode, prevNode)) {
+              if (getAtelierReferenceMediaUrls(prevNode).length > 0) {
+                await attachReferenceNode(realId, { sourceNodeId: prevNodeId });
+              } else {
+                await attachPendingReferenceNode(realId, { sourceNodeId: prevNodeId });
+              }
+            }
+          }
+          prevNodeId = realId;
+        }
+        setWorkflowNotice({
+          owner: shellOwnerId,
+          kind: "success",
+          text: `已从外部直接拖拽导入 ${files.length} 个白模/参考素材并排布成链！`,
+        });
+      })();
+    }
+  }, [attachPendingReferenceNode, attachReferenceNode, createMediaNode, insertWorkflowTemplate, pan, shellOwnerId, t, writeDisabled, zoom]);
 
   const allowWorkflowDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    if (event.dataTransfer.types.includes(WORKFLOW_TEMPLATE_MIME) && !writeDisabled) {
+    if (writeDisabled) return;
+    if (event.dataTransfer.types.includes(WORKFLOW_TEMPLATE_MIME) || event.dataTransfer.types.includes("Files")) {
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
     }
   }, [writeDisabled]);
+
+  const handleBatchImportShots = useCallback(async (shots: ParsedStoryboardShot[]) => {
+    if (shots.length === 0) return;
+    await run(async owner => {
+      if (!isCurrentOwner(owner)) throw new Error("Atelier environment or project changed during request");
+      const ownerId = ownerKey(owner);
+      const startX = 120;
+      const startY = 160;
+      let prevNodeId: string | null = null;
+      let firstRealId: string | null = null;
+
+      for (let i = 0; i < shots.length; i++) {
+        const shot = shots[i];
+        let clayNodeId: string | null = null;
+
+        // If this shot has a clayUrl, create an Image node right above the video node
+        if (shot.clayUrl) {
+          const clayAck = await createMediaNode("image", {
+            mediaUrl: shot.clayUrl,
+            filename: `${shot.shotId}_3D白模.jpg`,
+            x: startX + i * 360,
+            y: startY - 210,
+            width: 260,
+            height: 180,
+          });
+          clayNodeId = clayAck.node_ids[0];
+        }
+
+        const ack = await createNode({
+          type: "video",
+          title: `${shot.shotId} ${shot.title}`,
+          prompt: shot.prompt,
+          body: null,
+          x: startX + i * 360,
+          y: startY,
+          width: 260,
+          height: 180,
+        });
+        const realId = ack.node_ids[0];
+        if (!firstRealId) firstRealId = realId;
+
+        // If this shot has a companion clay image node, attach it as direct reference
+        if (clayNodeId && realId) {
+          await attachReferenceNode(realId, { sourceNodeId: clayNodeId });
+        } else if (prevNodeId && realId) {
+          // Otherwise chain with previous shot
+          const project = useAtelierStore.getState().currentProject;
+          const prevNode = project?.nodes.find(n => n.id === prevNodeId);
+          const currNode = project?.nodes.find(n => n.id === realId);
+          if (prevNode && currNode && canAttachAtelierReference(currNode, prevNode)) {
+            const hasMedia = getAtelierReferenceMediaUrls(prevNode).length > 0;
+            if (hasMedia) {
+              await attachReferenceNode(realId, { sourceNodeId: prevNodeId });
+            } else {
+              await attachPendingReferenceNode(realId, { sourceNodeId: prevNodeId });
+            }
+          }
+        }
+        prevNodeId = realId;
+      }
+
+      if (firstRealId && isCurrentOwner(owner)) {
+        selectNode(firstRealId);
+        setWorkflowNotice({ owner: ownerId, kind: "success", text: `已成功批量排布 ${shots.length} 个分镜镜头节点与关联白模底图！` });
+      }
+    }, "分镜批量导入失败");
+  }, [attachPendingReferenceNode, attachReferenceNode, createMediaNode, createNode, isCurrentOwner, run, selectNode]);
+
+  const injectCommercialBrief = useCallback(() => {
+    if (!activeCommercialTask) return;
+    void run(async owner => {
+      const layout = nextCanvasPosition(currentProject?.nodes, 340, 240);
+      const ack = await createNode({
+        type: "idea",
+        title: `商单需求：${activeCommercialTask.title}`,
+        prompt: `【商业Brief要求】\n${activeCommercialTask.brief_markdown}`,
+        body: activeCommercialTask.brief_markdown,
+        ...layout,
+      });
+      if (isCurrentOwner(owner) && useAtelierStore.getState().currentProject?.id === ack.project.id) {
+        selectNode(ack.node_ids[0] ?? null);
+      }
+      setShowTaskBriefModal(false);
+    }, t("createError"));
+  }, [activeCommercialTask, createNode, currentProject?.nodes, isCurrentOwner, run, selectNode, t]);
+
+  const handleScaffoldStarterTree = useCallback(() => {
+    void run(async owner => {
+      const startAck = await createNode({
+        type: "idea",
+        title: "起始镜头：雨夜旧宅",
+        prompt: "雨夜雷鸣，主角在封闭公馆中苏醒，门锁已锁死，桌上有火柴与羊皮信纸。",
+        body: "【抉择倒计时 10s】选项A：划火柴搜寻密室暗格 / 选项B：强行破门呼救",
+        x: 100,
+        y: 120,
+        width: 320,
+        height: 180,
+      });
+
+      await createNode({
+        type: "idea",
+        title: "分支A：点燃火柴搜寻暗格",
+        prompt: "火光照亮书架后的转轮暗格，主角顺着暗格发现密室暗道，无声潜入。",
+        body: "通向结局1：成功智取逃离，并拿到关键信物。",
+        x: 480,
+        y: 40,
+        width: 320,
+        height: 170,
+      });
+
+      await createNode({
+        type: "idea",
+        title: "分支B：强行破门惊动守卫",
+        prompt: "剧烈的撞击声在空旷走廊回荡，巡逻守卫被惊动，拔出武器将门从外反锁并包围四周。",
+        body: "通向结局2：触发警报，身陷地下暗室 (Bad End)。",
+        x: 480,
+        y: 240,
+        width: 320,
+        height: 170,
+      });
+
+      await createNode({
+        type: "idea",
+        title: "结局1：智取逃生 (Normal End)",
+        prompt: "穿过暗室通道从废弃花园翻出公馆，雨势渐小，主角成功生还脱险。",
+        body: "达成通关成就：密道生还者",
+        x: 860,
+        y: 40,
+        width: 300,
+        height: 160,
+      });
+
+      await createNode({
+        type: "idea",
+        title: "结局2：深陷暗室 (Bad End)",
+        prompt: "警报机关被彻底锁死，地下室开始弥漫瓦斯烟雾，逃生失败。",
+        body: "达成结局：深渊死锁 (Bad End)",
+        x: 860,
+        y: 240,
+        width: 300,
+        height: 160,
+      });
+
+      if (isCurrentOwner(owner) && startAck.node_ids[0]) selectNode(startAck.node_ids[0]);
+    }, t("createError"));
+  }, [createNode, isCurrentOwner, run, selectNode, t]);
+
+  const handleSaveBranchConfig = useCallback((branchData: {
+    isEnding: boolean;
+    endingType: "normal" | "bad" | "secret";
+    choices: Array<{ id: string; label: string; targetNodeId: string; timeoutSeconds: number }>;
+  }) => {
+    if (!selectedNode || !currentProject) return;
+    useAtelierStore.setState(state => {
+      if (!state.currentProject) return state;
+      return {
+        currentProject: {
+          ...state.currentProject,
+          nodes: state.currentProject.nodes.map(n =>
+            n.id === selectedNode.id
+              ? { ...n, data: { ...n.data, interactive: branchData } }
+              : n
+          ),
+        },
+      };
+    });
+  }, [currentProject, selectedNode]);
+
+  const handleCreateDownstreamBranch = useCallback((branchTitle: string) => {
+    if (!selectedNode || !currentProject) return;
+    void run(async owner => {
+      const layout = nextCanvasPosition(currentProject.nodes, 320, 180, selectedNode.x + 360, selectedNode.y);
+      const ack = await createNode({
+        type: "idea",
+        title: branchTitle,
+        prompt: `【分支行动】${branchTitle}`,
+        body: `从镜头「${selectedNode.title}」延伸出的抉择分支`,
+        ...layout,
+      });
+      const newNodeId = ack.node_ids[0];
+      if (newNodeId) {
+        const branchData = getInteractiveBranchData(selectedNode);
+        const choices = branchData.choices || [];
+        const updatedChoices = [
+          ...choices,
+          {
+            id: `choice-${Date.now()}`,
+            label: branchTitle,
+            targetNodeId: newNodeId,
+            timeoutSeconds: 10,
+          },
+        ];
+        useAtelierStore.setState(state => {
+          if (!state.currentProject) return state;
+          return {
+            currentProject: {
+              ...state.currentProject,
+              nodes: state.currentProject.nodes.map(n =>
+                n.id === selectedNode.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        interactive: {
+                          ...branchData,
+                          isEnding: false,
+                          choices: updatedChoices,
+                        },
+                      },
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+        if (isCurrentOwner(owner)) selectNode(newNodeId);
+      }
+    }, t("createError"));
+  }, [createNode, currentProject, isCurrentOwner, run, selectedNode, selectNode, t]);
+
+  const handleAddNextStep = useCallback((fromNodeId: string) => {
+    if (!currentProject) return;
+    const source = currentProject.nodes.find(n => n.id === fromNodeId);
+    if (!source) return;
+    void run(async owner => {
+      const layout = nextCanvasPosition(currentProject.nodes, 320, 180, source.x + 360, source.y);
+      const isMediaSource = source.type === "image" || source.type === "video";
+      const ack = await createNode({
+        type: isMediaSource ? "video" : "idea",
+        title: `接续：${source.title || source.id.slice(-4)}`,
+        prompt: `承接镜头「${source.title || source.id}」的剧情推进与视觉风格`,
+        body: `承接自「${source.title || source.id}」的后续动作`,
+        ...layout,
+      });
+      const newNodeId = ack.node_ids[0];
+      if (newNodeId) {
+        // 1. 自动建立 LibTV 级生产素材引用约束 (Reference Link)
+        const updatedProject = useAtelierStore.getState().currentProject;
+        const targetNode = updatedProject?.nodes.find(n => n.id === newNodeId);
+        if (targetNode && canAttachAtelierReference(targetNode, source)) {
+          try {
+            if (getAtelierReferenceMediaUrls(source).length > 0) {
+              await attachReferenceNode(newNodeId, { sourceNodeId: source.id });
+            } else {
+              await attachPendingReferenceNode(newNodeId, { sourceNodeId: source.id });
+            }
+          } catch {
+            // 素材关联如遇状态锁定不阻断主节点生成
+          }
+        }
+
+        // 2. 自动建立互动决策与时序流向逻辑 (Interactive Choice)
+        const branchData = getInteractiveBranchData(source);
+        const choices = branchData.choices || [];
+        const nextLetter = ["A", "B", "C", "D"][choices.length] || `${choices.length + 1}`;
+        const updatedChoices = [
+          ...choices,
+          {
+            id: `choice-${Date.now()}`,
+            label: `选项${nextLetter}：走向下一步`,
+            targetNodeId: newNodeId,
+            timeoutSeconds: 10,
+          },
+        ];
+        useAtelierStore.setState(state => {
+          if (!state.currentProject) return state;
+          return {
+            currentProject: {
+              ...state.currentProject,
+              nodes: state.currentProject.nodes.map(n =>
+                n.id === source.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        interactive: {
+                          ...branchData,
+                          isEnding: false,
+                          choices: updatedChoices,
+                        },
+                      },
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+        if (isCurrentOwner(owner)) selectNode(newNodeId);
+      }
+    }, t("createError"));
+  }, [attachPendingReferenceNode, attachReferenceNode, createNode, currentProject, isCurrentOwner, run, selectNode, t]);
+
+  const handleTriggerWipeCompare = useCallback((nodeId: string) => {
+    const targetNode = currentProject?.nodes.find(n => n.id === nodeId);
+    if (!targetNode) return;
+    const { renderUrl, clayUrl } = resolveNodeRenderAndClay(targetNode, currentProject?.nodes ?? []);
+
+    if (renderUrl && clayUrl) {
+      setWipeCompareData({
+        open: true,
+        renderUrl,
+        renderKind: targetNode.type === "video" ? "video" : "image",
+        clayUrl,
+        clayKind: "image",
+        title: `分镜比对: ${targetNode.title || targetNode.id}`,
+      });
+    } else {
+      selectNode(nodeId);
+      setWorkflowNotice({
+        owner: shellOwnerId,
+        kind: "error",
+        text: renderUrl
+          ? "该分镜尚未挂载白模参考图。已为您选定该节点，可在右侧检查器一键创建或挂载白模底图以进行卷帘比对。"
+          : "该分镜尚未生成成片，请等待生成完毕后再进行比对。",
+      });
+    }
+  }, [currentProject?.nodes, selectNode, shellOwnerId]);
+
+  const handleScaffoldClayNodeForSelected = useCallback(async () => {
+    if (!selectedNode || !currentProject) return;
+    await run(async owner => {
+      const ownerId = ownerKey(owner);
+      const clayAck = await createNode({
+        type: "image",
+        title: `${selectedNode.title || "分镜"} - 3D白模底图`,
+        prompt: "上传 3D 白模构图、深度图或灰模机位底图",
+        body: null,
+        x: selectedNode.x,
+        y: selectedNode.y - 210,
+        width: selectedNode.width || 260,
+        height: 180,
+      });
+      const clayNodeId = clayAck.node_ids[0];
+      if (clayNodeId) {
+        await attachReferenceNode(selectedNode.id, { sourceNodeId: clayNodeId });
+        if (isCurrentOwner(owner)) {
+          selectNode(clayNodeId);
+          setWorkflowNotice({
+            owner: ownerId,
+            kind: "success",
+            text: `已创建【${selectedNode.title || "分镜"}】专属白模底图节点并建立关联！可在该节点上传 3D 白模底图。`,
+          });
+        }
+      }
+    }, "创建白模底图节点失败");
+  }, [attachReferenceNode, createNode, currentProject, isCurrentOwner, run, selectNode, selectedNode]);
+
+  const handleExportInteractivePackage = useCallback(() => {
+    if (!currentProject) return;
+    const storyNodes = currentProject.nodes.filter(n => n.type !== "region");
+    const endings = storyNodes.filter(n => n.title?.includes("结局") || n.title?.includes("End") || n.title?.includes("通关"));
+    
+    const pkg = {
+      schema_version: "1.0.0",
+      story_title: currentProject.title,
+      production_mode: "interactive",
+      exported_at: new Date().toISOString(),
+      platform: "LumenX FMV Engine",
+      commercial_task_id: activeCommercialTask?.id || null,
+      stats: {
+        total_nodes: storyNodes.length,
+        ending_count: endings.length,
+      },
+      nodes: storyNodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        title: node.title,
+        prompt: node.prompt,
+        body: isBodyNode(node) ? bodyOf(node) : undefined,
+        is_ending: node.title?.includes("结局") || node.title?.includes("End"),
+        layout: { x: node.x, y: node.y, width: node.width, height: node.height },
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${currentProject.title || "interactive_story"}_package.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [activeCommercialTask?.id, currentProject]);
 
   const saveText = useCallback(() => {
     if (!selectedNode || !currentProject || draft.owner !== selectedOwner) return;
@@ -690,7 +1260,7 @@ export function AtelierShell() {
     if (node.type === "idea") {
       return (
         <div key={node.id} onPointerDownCapture={event => beginDrag(node, event)}>
-          <IdeaNode id={node.id} body={bodyOf(node)} x={x} y={y} selected={selected} onSelect={selectNode} />
+          <IdeaNode id={node.id} body={bodyOf(node)} x={x} y={y} selected={selected} onSelect={selectNode} onAddNextStep={handleAddNextStep} />
         </div>
       );
     }
@@ -745,7 +1315,7 @@ export function AtelierShell() {
     if (media) {
       return (
         <div key={node.id} onPointerDownCapture={event => beginDrag(node, event)}>
-          <MediaNode {...media} onSelect={selectNode} />
+          <MediaNode {...media} onSelect={selectNode} onAddNextStep={handleAddNextStep} onWipeCompare={handleTriggerWipeCompare} />
         </div>
       );
     }
@@ -776,12 +1346,88 @@ export function AtelierShell() {
   return (
     <section className="atelier-v3-root h-dvh max-h-dvh overflow-hidden bg-[#050508] text-white" aria-label={t("title")}>
       <div className="flex h-full min-h-0 flex-col">
-        <header className="shrink-0 flex items-center justify-between border-b border-white/[0.08] bg-black/30 px-5 py-4 backdrop-blur-xl">
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-[-0.03em]">{t("title")}</h1>
-            <p className="text-sm text-white/45">{t("subtitle")}</p>
+        <header className="shrink-0 flex items-center justify-between border-b border-white/[0.08] bg-black/30 px-5 py-3.5 backdrop-blur-xl">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="font-display text-xl font-semibold tracking-[-0.03em]">{t("title")}</h1>
+              <p className="text-xs text-white/45">{t("subtitle")}</p>
+            </div>
+            {activeCommercialTask && (
+              <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-xs text-amber-200 shadow-sm animate-in fade-in">
+                <Sparkles size={13} className="text-amber-400 shrink-0" />
+                <span className="font-medium truncate max-w-[180px]">
+                  履约中：{activeCommercialTask.title}
+                </span>
+                <span className="font-mono text-amber-400 font-semibold">
+                  ¥{(activeCommercialTask.bounty_cents / 100).toLocaleString()}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowTaskBriefModal(true)}
+                  className="underline hover:text-white text-xs ml-0.5 font-medium cursor-pointer"
+                >
+                  查看Brief
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.sessionStorage.removeItem("active_commercial_task");
+                    }
+                    setActiveCommercialTask(null);
+                  }}
+                  className="text-amber-400/60 hover:text-white p-0.5"
+                  title="退出商单模式"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
+            {/* 剧作形态隔离指示与切换器 */}
+            <div className="flex items-center rounded-xl border border-white/[0.1] bg-black/40 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setCanvasProductionMode("linear")}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  canvasProductionMode === "linear"
+                    ? "bg-primary text-white font-semibold shadow-sm"
+                    : "text-white/60 hover:text-white"
+                }`}
+                title="普通短剧：经典单线时序分镜流"
+              >
+                <Film size={12} /> 普通短剧
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanvasProductionMode("interactive")}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  canvasProductionMode === "interactive"
+                    ? "bg-purple-600 text-white font-semibold shadow-sm"
+                    : "text-white/60 hover:text-white"
+                }`}
+                title="互动影游：网状决策树与多结局分支"
+              >
+                <Gamepad2 size={12} /> 互动影游
+              </button>
+            </div>
+
+            {canvasProductionMode === "interactive" && (
+              <button
+                type="button"
+                onClick={() => setShowSimulatorModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-purple-500/40 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 hover:text-purple-200 text-xs font-semibold shadow-sm transition-all cursor-pointer animate-in fade-in"
+                title="打开互动模拟器，像玩家一样试玩分支剧情"
+              >
+                <Play size={12} className="fill-purple-300 text-purple-300" />
+                试玩模拟器
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            <a className="rounded-xl border border-white/[0.1] px-3 py-2 text-sm text-white/70 hover:bg-white/[0.06]" href="#/platform?section=tasks">
+              商单大厅
+            </a>
             <a className="rounded-xl border border-white/[0.1] px-3 py-2 text-sm text-white/70 hover:bg-white/[0.06]" href="#/workspace">
               {t("returnWorkspace")}
             </a>
@@ -836,6 +1482,10 @@ export function AtelierShell() {
               <button type="button" className={commandButtonClass(writeDisabled)} disabled={writeDisabled} onClick={() => createNodeAndSelect("audio")}>{t("createAudio")}</button>
               <button type="button" className={commandButtonClass(writeDisabled)} disabled={writeDisabled} onClick={createRegion}>{t("createRegion")}</button>
               <button type="button" className={commandButtonClass(writeDisabled)} disabled={writeDisabled} onClick={() => setWorkflowsOpen(value => !value)}>{t("workflows")}</button>
+              <button type="button" className={commandButtonClass(writeDisabled)} disabled={writeDisabled} onClick={() => setShowBatchImportModal(true)} title="批量导入分镜表格">
+                <FileSpreadsheet size={13} className="inline mr-1 text-purple-400" />
+                分镜表批量导入
+              </button>
               <MediaUploadButton ownerKey={shellOwnerId} label={t("uploadMedia")} busyLabel={t("uploading")} errorLabel={t("uploadError")}
                 accept={ATELIER_UPLOAD_ACCEPT} disabled={uploadDisabled} onUpload={file => uploadMedia(file)} />
               <button type="button" className={commandButtonClass(false)} onClick={() => setZoom(z => Math.min(2, z + 0.1))}>{t("zoomIn")}</button>
@@ -863,6 +1513,16 @@ export function AtelierShell() {
               }}
             >
               <svg aria-label={t("templateRelationships")} data-testid="atelier-reference-edges" className="pointer-events-none absolute left-0 top-0 h-[6000px] w-[6000px] overflow-visible">
+                <defs>
+                  <linearGradient id="branchBeamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#c084fc" stopOpacity="0.85" />
+                    <stop offset="50%" stopColor="#ec4899" stopOpacity="0.9" />
+                    <stop offset="100%" stopColor="#818cf8" stopOpacity="0.85" />
+                  </linearGradient>
+                  <marker id="branchArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 8 5 L 0 9 z" fill="#c084fc" />
+                  </marker>
+                </defs>
                 {canvasLinks.map(link => {
                   const x1 = link.from.x + link.from.width / 2;
                   const y1 = link.from.y + link.from.height / 2;
@@ -872,6 +1532,64 @@ export function AtelierShell() {
                     x1={x1} y1={y1} x2={x2} y2={y2}
                     stroke={link.pending ? "rgba(255,255,255,0.34)" : link.stale ? "rgba(251,191,36,0.42)" : "rgba(100,108,255,0.42)"}
                     strokeWidth="2" strokeDasharray={link.pending ? "8 7" : link.stale ? "4 5" : undefined} />;
+                })}
+                {/* 互动影游分支贝塞尔光束连线与动态决策徽标 */}
+                {interactiveLinks.map(link => {
+                  const fromX = preview[link.fromNode.id]?.x ?? link.fromNode.x;
+                  const fromY = preview[link.fromNode.id]?.y ?? link.fromNode.y;
+                  const fromWidth = preview[link.fromNode.id]?.width ?? link.fromNode.width;
+                  const fromHeight = preview[link.fromNode.id]?.height ?? link.fromNode.height;
+
+                  const toX = preview[link.toNode.id]?.x ?? link.toNode.x;
+                  const toY = preview[link.toNode.id]?.y ?? link.toNode.y;
+                  const toHeight = preview[link.toNode.id]?.height ?? link.toNode.height;
+
+                  const startX = fromX + fromWidth;
+                  const startY = fromY + fromHeight / 2;
+                  const endX = toX;
+                  const endY = toY + toHeight / 2;
+
+                  const pathD = computeBranchBezierPath(startX, startY, endX, endY);
+                  const midX = (startX + endX) / 2;
+                  const midY = (startY + endY) / 2;
+
+                  return (
+                    <g key={link.key} data-testid="atelier-branch-edge">
+                      <path
+                        d={pathD}
+                        fill="none"
+                        stroke="url(#branchBeamGradient)"
+                        strokeWidth="2.5"
+                        strokeDasharray="6 4"
+                        markerEnd="url(#branchArrow)"
+                        className="transition-all"
+                      />
+                      <g transform={`translate(${midX}, ${midY})`}>
+                        <rect
+                          x="-42"
+                          y="-11"
+                          width="84"
+                          height="22"
+                          rx="11"
+                          fill="#180b2a"
+                          stroke="#a855f7"
+                          strokeWidth="1.2"
+                          className="shadow-lg"
+                        />
+                        <text
+                          x="0"
+                          y="3"
+                          textAnchor="middle"
+                          fill="#f3e8ff"
+                          fontSize="10"
+                          fontWeight="500"
+                          pointerEvents="none"
+                        >
+                          {link.choiceLabel.length > 7 ? link.choiceLabel.slice(0, 6) + "…" : link.choiceLabel}
+                        </text>
+                      </g>
+                    </g>
+                  );
                 })}
               </svg>
               <div aria-hidden="true" className="atelier-bloom pointer-events-none absolute left-[22%] top-[10%]" />
@@ -895,6 +1613,95 @@ export function AtelierShell() {
                     <textarea className={`${fieldClass()} mt-1 min-h-[72px]`} aria-label={t("promptLabel")} value={draft.prompt} onChange={event => setDraft(prev => ({ ...prev, prompt: event.target.value }))} />
                   </label>
                 ) : null}
+                {(selectedNode.type === "image" || selectedNode.type === "video") && (() => {
+                  const { renderUrl: nodeRenderUrl, clayUrl: nodeClayUrl } = resolveNodeRenderAndClay(
+                    selectedNode,
+                    currentProject?.nodes ?? []
+                  );
+
+                  return (
+                    <div className="rounded-xl border border-sky-500/25 bg-sky-950/20 p-3 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-sky-300">
+                          <Box size={14} className="text-sky-400" />
+                          白模 / 灰模预演渲染增强与比对
+                        </span>
+                      </div>
+
+                      {/* 预设风格标签 */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] text-white/50 block">脱模渲染风格预设：</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {CLAY_STYLE_PRESETS.map(preset => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedClayPreset(preset.id);
+                                setDraft(prev => ({
+                                  ...prev,
+                                  prompt: prev.prompt ? `${prev.prompt}，${preset.promptSnippet}` : preset.promptSnippet,
+                                }));
+                              }}
+                              className={`px-2 py-1 rounded text-[10px] font-medium border transition-colors cursor-pointer ${
+                                selectedClayPreset === preset.id
+                                  ? "bg-sky-500/30 border-sky-400 text-sky-100"
+                                  : "bg-black/30 border-white/10 text-white/60 hover:text-white hover:bg-white/5"
+                              }`}
+                              title={preset.promptSnippet}
+                            >
+                              {preset.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 卷帘对比按钮 */}
+                      {nodeRenderUrl && nodeClayUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWipeCompareData({
+                              open: true,
+                              renderUrl: nodeRenderUrl,
+                              renderKind: selectedNode.type === "video" ? "video" : "image",
+                              clayUrl: nodeClayUrl,
+                              clayKind: "image",
+                              title: `分镜比对: ${selectedNode.title || selectedNode.id}`,
+                            });
+                          }}
+                          className="w-full mt-2 py-2 px-3 rounded-lg bg-gradient-to-r from-sky-600 to-purple-600 hover:from-sky-500 hover:to-purple-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-purple-600/20"
+                        >
+                          <SplitSquareVertical size={13} />
+                          <span>打开白模 vs 成片卷帘对比 (Wipe View)</span>
+                        </button>
+                      )}
+
+                      {/* 尚无关联白模时的引导按钮 */}
+                      {!nodeClayUrl && (
+                        <div className="space-y-1.5 pt-1">
+                          <p className="text-[11px] text-amber-300/80">
+                            {nodeRenderUrl
+                              ? "当前分镜已完成渲染，但尚未关联 3D 白模底稿。"
+                              : "建议为该分镜挂载 3D 白模或几何线稿，以锁定镜头机位与景深。"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void handleScaffoldClayNodeForSelected()}
+                            className="w-full py-2 px-3 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 text-xs font-medium border border-sky-400/30 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Plus size={13} />
+                            一键创建 3D 白模底图节点并建立关联
+                          </button>
+                        </div>
+                      )}
+
+                      <p className="text-[10px] text-white/45 leading-relaxed">
+                        以 3D 白模作为构图底模时，一键注入次世代材质修饰，并可随时展开卷帘对比检查画面透视与主体还原度。
+                      </p>
+                    </div>
+                  );
+                })()}
                 {isBodyNode(selectedNode) ? (
                   <label className="block text-xs text-white/45">
                     {t("bodyLabel")}
@@ -905,6 +1712,17 @@ export function AtelierShell() {
                   <button type="button" className={commandButtonClass(writeDisabled)} disabled={writeDisabled} onClick={saveText}>{isSaving ? t("commandBusy") : t("saveText")}</button>
                   <button type="button" className={commandButtonClass(writeDisabled)} disabled={writeDisabled} onClick={deleteSelected}>{t("deleteNode")}</button>
                 </div>
+                {/* 互动影游模式下专属的分支与决策配置面板 */}
+                {canvasProductionMode === "interactive" && currentProject && selectedNode.type !== "region" && (
+                  <InteractiveBranchConfig
+                    node={selectedNode}
+                    nodes={currentProject.nodes}
+                    onUpdateNodePrompt={prompt => setDraft(prev => ({ ...prev, prompt }))}
+                    onOpenSimulator={() => setShowSimulatorModal(true)}
+                    onCreateBranchNode={handleCreateDownstreamBranch}
+                    onSaveBranchConfig={handleSaveBranchConfig}
+                  />
+                )}
                 {currentProject && selectedNode.type !== "region" ? <RegionMembershipControls
                   key={`${shellOwnerId}:${selectedNode.id}:membership`}
                   node={selectedNode}
@@ -929,6 +1747,25 @@ export function AtelierShell() {
               </div>
             ) : (
               <p className="mt-4 text-sm text-white/45">{t("noSelection")}</p>
+            )}
+            {/* 互动影游专属标准化工程包导出 */}
+            {canvasProductionMode === "interactive" && currentProject && (
+              <div className="mt-4 p-3.5 rounded-xl border border-purple-500/30 bg-purple-950/20 space-y-2 text-xs">
+                <div className="flex items-center gap-1.5 text-purple-300 font-semibold">
+                  <Download size={13} className="text-purple-400" />
+                  <span>导出互动影游标准化工程包</span>
+                </div>
+                <p className="text-[11px] text-white/50 leading-relaxed">
+                  导出包含多分支 DAG 决策树、各镜头切片提示词与结局收敛规则的 JSON 工程规范，可直接交付客户或接入游戏引擎。
+                </p>
+                <button
+                  type="button"
+                  onClick={handleExportInteractivePackage}
+                  className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/20"
+                >
+                  <Download size={13} /> 下载互动短剧工程包 JSON
+                </button>
+              </div>
             )}
             {currentProject ? <div className="mt-4">
               <ProjectPackageControls
@@ -958,6 +1795,30 @@ export function AtelierShell() {
                 disabled={writeDisabled}
                 targetRect={selectedComposerLayout.rect}
                 targetAvailableRect={selectedComposerLayout.availableRect}
+                onOpenWipeCompare={(candidateVideoUrl) => {
+                  if (!selectedNode) return;
+                  const firstRefUrl = selectedNode.reference_image_urls?.[0];
+                  const pendingRefSourceId = selectedNode.pending_reference_nodes?.[0]?.source_node_id;
+                  const pendingRefSourceMedia = pendingRefSourceId ? currentProject?.nodes.find(n => n.id === pendingRefSourceId)?.media_url : null;
+                  const clayUrl = firstRefUrl || pendingRefSourceMedia || null;
+
+                  if (clayUrl) {
+                    setWipeCompareData({
+                      open: true,
+                      renderUrl: candidateVideoUrl,
+                      renderKind: "video",
+                      clayUrl,
+                      clayKind: "image",
+                      title: `候选比对: ${selectedNode.title || selectedNode.id}`,
+                    });
+                  } else {
+                    setWorkflowNotice({
+                      owner: shellOwnerId,
+                      kind: "error",
+                      text: "该分镜尚未关联白模参考图，请先在下方挂载白模参考图以进行卷帘比对。",
+                    });
+                  }
+                }}
               />
             </div> : null}
             {currentProject ? <div className="mt-4">
@@ -1000,6 +1861,114 @@ export function AtelierShell() {
             owner={{ apiBase: runtimeEnvironment.apiUrl, storageId: runtimeEnvironment.storageId, projectId: currentProject.id }} />
         </div> : null}
       </div>
+
+      {/* 商业需求 Brief 与验收标准弹窗 */}
+      {showTaskBriefModal && activeCommercialTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-glass-border bg-[#0d0e14]/95 p-6 shadow-2xl space-y-4 text-white">
+            <div className="flex items-start justify-between border-b border-white/10 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold">
+                    商单履约 Brief
+                  </span>
+                  <span className="text-sm font-mono text-amber-400 font-bold">
+                    赏金 ¥{(activeCommercialTask.bounty_cents / 100).toLocaleString()}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white mt-1.5">{activeCommercialTask.title}</h3>
+                {activeCommercialTask.client_name && (
+                  <p className="text-xs text-white/50 mt-0.5">发包方：{activeCommercialTask.client_name}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTaskBriefModal(false)}
+                className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 技术规格与验收规则 */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <span className="text-amber-400 font-semibold block mb-1">交付物技术规格</span>
+                <p className="text-white/70">
+                  {activeCommercialTask.deliverable_specs_json
+                    ? activeCommercialTask.deliverable_specs_json
+                    : "分辨率: 1080P · 画幅: 9:16 · 帧率: 30fps"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <span className="text-amber-400 font-semibold block mb-1">阶段验收与放款</span>
+                <p className="text-white/70">
+                  {activeCommercialTask.settlement_mode === "milestone"
+                    ? "分阶段结算 (40%分镜确认 / 60%成片终审放款)"
+                    : "终审合格一次性全额结算"}
+                </p>
+              </div>
+            </div>
+
+            {/* Brief 简报正文 */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/80 leading-relaxed whitespace-pre-line max-h-60 overflow-y-auto">
+              <h4 className="text-xs font-semibold text-white/90 mb-2">需求详细简报：</h4>
+              {activeCommercialTask.brief_markdown}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
+              <span className="text-white/45">
+                分镜制作完成后，可前往平台导出审阅样片进行第一阶段验收
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={injectCommercialBrief}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={14} /> 一键注入需求节点到画布
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTaskBriefModal(false)}
+                  className="px-3.5 py-2 rounded-xl border border-white/10 hover:bg-white/10 text-white/75"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 互动影游 · 决策模拟试玩器弹窗 */}
+      <InteractiveSimulatorModal
+        isOpen={showSimulatorModal}
+        onClose={() => setShowSimulatorModal(false)}
+        nodes={currentProject?.nodes ?? []}
+        taskTitle={activeCommercialTask?.title}
+        onScaffoldStarterTree={handleScaffoldStarterTree}
+      />
+
+      {/* 白模与成片卷帘对比播放器弹窗 */}
+      {wipeCompareData && (
+        <ClayWipeCompareModal
+          open={wipeCompareData.open}
+          onClose={() => setWipeCompareData(null)}
+          renderUrl={wipeCompareData.renderUrl}
+          renderKind={wipeCompareData.renderKind}
+          clayUrl={wipeCompareData.clayUrl}
+          clayKind={wipeCompareData.clayKind}
+          title={wipeCompareData.title}
+        />
+      )}
+
+      {/* 白模分镜表批量导入弹窗 */}
+      <StoryboardBatchImportModal
+        open={showBatchImportModal}
+        onClose={() => setShowBatchImportModal(false)}
+        onImportShots={handleBatchImportShots}
+      />
     </section>
   );
 }
