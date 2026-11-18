@@ -61,9 +61,30 @@ class WhitelistIn(BaseModel): user_id: str; invite_code: str | None = None
 class ArtifactIn(BaseModel):
     product: str | None = Field(default=None, pattern=r"^(studio|atelier)$")
     artifact_id: str; artifact_version: str; sha256: str = Field(pattern=r"^[0-9a-f]{64}$"); media_type: str | None = None; project_id: str; project_title_snapshot: str | None = None; title: str | None = None; description: str = ""
-class TaskIn(BaseModel): title: str; category: str; brief_markdown: str; bounty_cents: int = Field(ge=0); deadline: str; required_level: str = "standard"; status: str = "draft"
+class TaskIn(BaseModel):
+    title: str
+    category: str
+    brief_markdown: str
+    bounty_cents: int = Field(ge=0)
+    deadline: str
+    required_level: str = "standard"
+    status: str = "draft"
+    demand_type: str = "ai_drama"
+    deliverable_specs_json: str | dict[str, Any] = "{}"
+    budget_mode: str = "fixed"
+    budget_min_cents: int = 0
+    budget_max_cents: int = 0
+    settlement_mode: str = "one_time"
+    milestone_specs_json: str | list[Any] = "[]"
+    copyright_terms_json: str | dict[str, Any] = "{}"
+    acceptance_criteria_json: str | list[Any] = "[]"
+    reference_media_json: str | list[Any] = "[]"
+    client_name: str = ""
+    level_tier: str = "standard"
 class DeliveryIn(ArtifactIn): delivery_note: str = ""
 class ReviewIn(BaseModel): approved: bool; feedback: str = ""
+class ConvertCreditsIn(BaseModel): amount_cents: int = Field(gt=0)
+class WithdrawalIn(BaseModel): amount_cents: int = Field(gt=0); payout_channel: str = Field(default="alipay"); account_info: str = Field(min_length=2, max_length=120)
 class ExamIn(BaseModel): prompt: str; version: str
 class CourseIn(BaseModel): title: str; description: str = ""; video_url: str = ""
 class TemplateIn(BaseModel): title: str; source_project_id: str; version: str = "1"; metadata: dict[str, Any] = {}
@@ -494,13 +515,16 @@ def cert_status(user=Depends(current_user), svc: PlatformService = Depends(servi
 def review_cert(application_id: str, body: CertReviewIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.review_certification(user, application_id, body.approved, body.score, body.feedback))
 
 @router.get("/tasks/square")
-def square(user=Depends(current_user), svc: PlatformService = Depends(service)): return svc.task_square()
+def square(user=Depends(current_user), svc: PlatformService = Depends(service)): return svc.task_square(user)
 
 @router.post("/tasks")
 def create_task(body: TaskIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.create_task(user, body.model_dump()))
 
 @router.post("/tasks/{task_id}/claim")
 def claim(task_id: str, idempotency_key: str = Header(..., alias="Idempotency-Key"), user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.claim_task(user, task_id, idempotency_key))
+
+@router.get("/tasks/{task_id}/contract")
+def task_contract(task_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.get_task_contract(user, task_id))
 
 @router.post("/tasks/{task_id}/deliver")
 def deliver(task_id: str, body: DeliveryIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.deliver_task(user, task_id, body.model_dump()))
@@ -516,3 +540,11 @@ def wallet(user=Depends(current_user), svc: PlatformService = Depends(service)):
 
 @router.get("/settlement/transactions")
 def transactions(user=Depends(current_user), svc: PlatformService = Depends(service)): return svc.transactions(user)
+
+@router.post("/settlement/convert-credits")
+def convert_credits(body: ConvertCreditsIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.convert_wallet_credits(user, body.amount_cents))
+
+@router.post("/settlement/withdraw")
+def withdraw(body: WithdrawalIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.request_wallet_withdrawal(user, body.amount_cents, body.payout_channel, body.account_info))

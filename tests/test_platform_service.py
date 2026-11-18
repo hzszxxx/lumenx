@@ -354,6 +354,93 @@ def test_xiangongyun_rejects_malformed_provider_payload(tmp_path):
     assert error.value.code == "xiangongyun_api_error"
 
 
+def test_xiangongyun_multi_user_isolation(tmp_path):
+    svc = credential_service(tmp_path)
+    alice = svc.register("alice", "a" * 12)
+    bob = svc.register("bob", "b" * 12)
+    charlie = svc.register("charlie", "c" * 12)
+
+    class Response:
+        def __init__(self, payload): self.payload = payload
+        def __enter__(self): return self
+        def __exit__(self, *_): return None
+        def read(self): return json.dumps(self.payload).encode()
+
+    def fake_urlopen(request, timeout):
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        if token == "alice-token-32-chars-long-00000":
+            data = {
+                "/open/whoami": {"data": {"nickname": "AliceCloud", "phone": "13800000001", "uuid": "uuid-alice"}},
+                "/open/balance": {"data": {"balance": 100.5}},
+                "/open/instances": {"data": {"list": [{"id": "inst-alice", "name": "Alice-H3", "status": "running"}]}},
+            }
+        elif token == "bob-token-32-chars-long-0000000":
+            data = {
+                "/open/whoami": {"data": {"nickname": "BobCloud", "phone": "13900000002", "uuid": "uuid-bob"}},
+                "/open/balance": {"data": {"balance": 42.0}},
+                "/open/instances": {"data": {"list": [{"id": "inst-bob", "name": "Bob-H3", "status": "stopped"}]}},
+            }
+        else:
+            raise ValueError(f"unexpected token: {token}")
+        path = request.full_url.removeprefix("https://api.xiangongyun.com")
+        return Response(data[path])
+
+    with patch("src.apps.platform.service.urlopen", side_effect=fake_urlopen):
+        alice_bind = svc.xiangongyun_verify(alice, "alice-token-32-chars-long-00000", idempotency_key="alice-bind-1")
+        bob_bind = svc.xiangongyun_verify(bob, "bob-token-32-chars-long-0000000", idempotency_key="bob-bind-1")
+
+    # 1. Credential IDs must be different
+    assert alice_bind["credential_id"] != bob_bind["credential_id"]
+
+    # 2. Status isolation
+    alice_status = svc.xiangongyun_status(alice)
+    bob_status = svc.xiangongyun_status(bob)
+    charlie_status = svc.xiangongyun_status(charlie)
+
+    assert alice_status is not None
+    assert alice_status["account"]["uuid"] == "uuid-alice"
+    assert alice_status["account"]["nickname"] == "AliceCloud"
+    assert alice_status["balance"] == 100.5
+    assert alice_status["instances"][0]["id"] == "inst-alice"
+    assert alice_status["credential_id"] == alice_bind["credential_id"]
+
+    assert bob_status is not None
+    assert bob_status["account"]["uuid"] == "uuid-bob"
+    assert bob_status["account"]["nickname"] == "BobCloud"
+    assert bob_status["balance"] == 42.0
+    assert bob_status["instances"][0]["id"] == "inst-bob"
+    assert bob_status["credential_id"] == bob_bind["credential_id"]
+
+    assert charlie_status is None
+
+    # 3. Cross-user credential access is blocked
+    with pytest.raises(PlatformError) as exc_info:
+        svc.resolve_credential(alice, bob_bind["credential_id"])
+    assert exc_info.value.code == "credential_not_found"
+
+    with pytest.raises(PlatformError) as exc_info:
+        svc.resolve_credential(bob, alice_bind["credential_id"])
+    assert exc_info.value.code == "credential_not_found"
+
+    # 4. Each user can resolve their own credential
+    assert svc.resolve_credential(alice, alice_bind["credential_id"])["secret"] == "alice-token-32-chars-long-00000"
+    assert svc.resolve_credential(bob, bob_bind["credential_id"])["secret"] == "bob-token-32-chars-long-0000000"
+
+    # 5. Bob clears his binding; Alice's binding remains intact
+    assert svc.clear_xiangongyun_binding(bob, idempotency_key="bob-clear-1") == {"status": "cleared"}
+    assert svc.xiangongyun_status(bob) is None
+    with pytest.raises(PlatformError) as exc_info:
+        svc.resolve_credential(bob, bob_bind["credential_id"])
+    assert exc_info.value.code == "credential_revoked"
+
+    alice_status_after = svc.xiangongyun_status(alice)
+    assert alice_status_after is not None
+    assert alice_status_after["account"]["uuid"] == "uuid-alice"
+    assert alice_status_after["balance"] == 100.5
+    assert svc.resolve_credential(alice, alice_bind["credential_id"])["secret"] == "alice-token-32-chars-long-00000"
+
+
+
 def test_skill_manifest_and_workspace_scope_are_restricted(tmp_path):
     svc = service(tmp_path)
     user = svc.register("alice", "a" * 12)

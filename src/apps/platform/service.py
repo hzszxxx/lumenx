@@ -1262,15 +1262,60 @@ class PlatformService:
             return {"submission_id": submission_id, "status": status, "score": score, "award_title": award_title}
 
     def create_task(self, actor: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
-        if actor["role"] not in {"admin", "client"}: raise PlatformError("forbidden", "only client or admin can publish tasks", 403)
-        item = {"id": uid(), **payload, "status": payload.get("status", "draft"), "version": 0, "created_at": now()}
-        with connect(self.path) as c: c.execute("INSERT INTO commercial_tasks (id,title,category,brief_markdown,bounty_cents,required_level,deadline,status,version,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)", (item["id"],item["title"],item["category"],item["brief_markdown"],item["bounty_cents"],item.get("required_level","standard"),item["deadline"],item["status"],0,item["created_at"]))
+        if actor["role"] not in {"admin", "client", "creator", "user"}: raise PlatformError("forbidden", "unauthorized to publish tasks", 403)
+        item = {
+            "id": uid(),
+            **payload,
+            "status": payload.get("status", "published"),
+            "demand_type": payload.get("demand_type", "ai_drama"),
+            "deliverable_specs_json": json.dumps(payload["deliverable_specs_json"], ensure_ascii=False) if isinstance(payload.get("deliverable_specs_json"), (dict, list)) else str(payload.get("deliverable_specs_json") or "{}"),
+            "budget_mode": payload.get("budget_mode", "fixed"),
+            "budget_min_cents": int(payload.get("budget_min_cents") or 0),
+            "budget_max_cents": int(payload.get("budget_max_cents") or 0),
+            "settlement_mode": payload.get("settlement_mode", "one_time"),
+            "milestone_specs_json": json.dumps(payload["milestone_specs_json"], ensure_ascii=False) if isinstance(payload.get("milestone_specs_json"), list) else str(payload.get("milestone_specs_json") or "[]"),
+            "copyright_terms_json": json.dumps(payload["copyright_terms_json"], ensure_ascii=False) if isinstance(payload.get("copyright_terms_json"), dict) else str(payload.get("copyright_terms_json") or "{}"),
+            "acceptance_criteria_json": json.dumps(payload["acceptance_criteria_json"], ensure_ascii=False) if isinstance(payload.get("acceptance_criteria_json"), list) else str(payload.get("acceptance_criteria_json") or "[]"),
+            "reference_media_json": json.dumps(payload["reference_media_json"], ensure_ascii=False) if isinstance(payload.get("reference_media_json"), list) else str(payload.get("reference_media_json") or "[]"),
+            "client_name": str(payload.get("client_name") or ""),
+            "level_tier": str(payload.get("level_tier") or "standard"),
+            "version": 0,
+            "created_at": now(),
+        }
+        with connect(self.path) as c:
+            c.execute(
+                "INSERT INTO commercial_tasks (id,title,category,brief_markdown,bounty_cents,required_level,deadline,status,version,created_at,demand_type,deliverable_specs_json,budget_mode,budget_min_cents,budget_max_cents,settlement_mode,milestone_specs_json,copyright_terms_json,acceptance_criteria_json,reference_media_json,client_name,level_tier) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    item["id"], item["title"], item["category"], item["brief_markdown"], item["bounty_cents"],
+                    item.get("required_level", "standard"), item["deadline"], item["status"], 0, item["created_at"],
+                    item["demand_type"], item["deliverable_specs_json"], item["budget_mode"], item["budget_min_cents"],
+                    item["budget_max_cents"], item["settlement_mode"], item["milestone_specs_json"],
+                    item["copyright_terms_json"], item["acceptance_criteria_json"], item["reference_media_json"],
+                    item["client_name"], item["level_tier"],
+                ),
+            )
         return item
 
-    def task_square(self) -> list[dict[str, Any]]:
-        with connect(self.path) as c: rows = c.execute("SELECT id,title,category,brief_markdown,bounty_cents,required_level,deadline,status,version,created_at FROM commercial_tasks WHERE status='published' ORDER BY deadline").fetchall()
-        keys = ["id","title","category","brief_markdown","bounty_cents","required_level","deadline","status","version","created_at"]
-        return [dict(zip(keys, r)) for r in rows]
+    def task_square(self, actor: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        cols = [
+            "id", "title", "category", "brief_markdown", "bounty_cents", "required_level", "deadline",
+            "status", "version", "created_at", "claimed_by", "demand_type", "deliverable_specs_json",
+            "budget_mode", "budget_min_cents", "budget_max_cents", "settlement_mode", "milestone_specs_json",
+            "copyright_terms_json", "acceptance_criteria_json", "reference_media_json", "client_name", "level_tier",
+            "contract_id", "contract_signed_at",
+        ]
+        col_sql = ",".join(cols)
+        with connect(self.path) as c:
+            if actor and actor.get("id"):
+                rows = c.execute(
+                    f"SELECT {col_sql} FROM commercial_tasks "
+                    "WHERE status='published' OR (claimed_by=? AND status IN ('claimed','in_progress')) ORDER BY CASE WHEN claimed_by=? THEN 0 ELSE 1 END, deadline",
+                    (actor["id"], actor["id"]),
+                ).fetchall()
+            else:
+                rows = c.execute(f"SELECT {col_sql} FROM commercial_tasks WHERE status='published' ORDER BY deadline").fetchall()
+        return [dict(zip(cols, r)) for r in rows]
 
     def claim_task(self, actor: dict[str, Any], task_id: str, idem: str) -> dict[str, Any]:
         if actor["role"] != "creator": raise PlatformError("forbidden", "only certified creators can claim tasks", 403)
@@ -1279,9 +1324,52 @@ class PlatformService:
             if old: return old
             cert = c.execute("SELECT status FROM creator_certifications WHERE user_id=?", (actor["id"],)).fetchone()
             if not cert or cert[0] != "certified": raise PlatformError("creator_not_certified", "creator certification is required", 403)
-            cur = c.execute("UPDATE commercial_tasks SET status='claimed',claimed_by=?,claim_time=?,version=version+1 WHERE id=? AND status='published'", (actor["id"], now(), task_id))
+            
+            contract_id = f"contract-{task_id}"
+            contract_signed_at = now()
+            digest_content = f"{task_id}:{actor['id']}:{contract_signed_at}"
+            digest_hash = hashlib.sha256(digest_content.encode()).hexdigest()
+            contract_terms = {
+                "contract_type": "commercial_undertaking_nda",
+                "title": "商业制作承揽与保密协议",
+                "milestone_settlement": "40% 分镜确认结算 + 60% 成片验收结算",
+                "nda_clause": "创作者对制作过程中的剧本、资产及商业信息承担严格保密义务，未经发包方许可不得擅自对外公开发布。",
+                "copyright_clause": "商单全额放款结算后，成片商用权归发包方所有；创作者享有作品署名权及非商用作品集展示权。",
+                "arbitration_clause": "如产生交付分歧，以商单结构化技术规格（Brief）为验收依据，由影伴平台专员介入居间仲裁担保。",
+            }
+            c.execute(
+                "INSERT OR REPLACE INTO commercial_contracts (id, task_id, creator_id, contract_type, status, digest_hash, terms_snapshot_json, signer_name, signed_ip, signed_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (contract_id, task_id, actor["id"], "commercial_undertaking_nda", "signed", digest_hash, json.dumps(contract_terms, ensure_ascii=False), actor.get("username", "certified_creator"), "127.0.0.1", contract_signed_at, contract_signed_at)
+            )
+            cur = c.execute(
+                "UPDATE commercial_tasks SET status='claimed',claimed_by=?,claim_time=?,contract_id=?,contract_signed_at=?,version=version+1 WHERE id=? AND status='published'",
+                (actor["id"], contract_signed_at, contract_id, contract_signed_at, task_id)
+            )
             if cur.rowcount != 1: raise PlatformError("task_unavailable", "task is no longer available", 409)
-            result = {"task_id": task_id, "claimed_by": actor["id"], "status": "claimed"}; self._save_idem(c, actor["id"], idem, result); c.execute("INSERT INTO task_history VALUES (?,?,?,?,?,?,?,?)", (uid(),task_id,"published","claimed",actor["id"],None,idem,now())); return result
+            result = {
+                "task_id": task_id,
+                "claimed_by": actor["id"],
+                "status": "claimed",
+                "contract_id": contract_id,
+                "contract_signed_at": contract_signed_at,
+                "digest_hash": digest_hash,
+            }
+            self._save_idem(c, actor["id"], idem, result)
+            c.execute("INSERT INTO task_history VALUES (?,?,?,?,?,?,?,?)", (uid(),task_id,"published","claimed",actor["id"],None,idem,now()))
+            return result
+
+    def get_task_contract(self, actor: dict[str, Any], task_id: str) -> dict[str, Any]:
+        with connect(self.path) as c:
+            row = c.execute(
+                "SELECT id, task_id, creator_id, contract_type, status, digest_hash, terms_snapshot_json, signer_name, signed_at FROM commercial_contracts WHERE task_id=?",
+                (task_id,),
+            ).fetchone()
+            if not row:
+                raise PlatformError("not_found", "contract not found", 404)
+            keys = ("id", "task_id", "creator_id", "contract_type", "status", "digest_hash", "terms_snapshot_json", "signer_name", "signed_at")
+            data = dict(zip(keys, row))
+            data["terms"] = json.loads(data["terms_snapshot_json"] or "{}")
+            return data
 
     def transition_task(self, actor: dict[str, Any], task_id: str, target: TaskStatus, reason: str | None = None) -> dict[str, Any]:
         with connect(self.path) as c:
@@ -1336,6 +1424,35 @@ class PlatformService:
         with connect(self.path) as c:
             rows = c.execute("SELECT le.id,le.transaction_id,le.amount_cents,le.direction,le.reference_type,le.reference_id,le.created_at FROM ledger_entries le JOIN ledger_accounts la ON la.id=le.account_id WHERE la.user_id=? ORDER BY le.created_at DESC", (actor["id"],)).fetchall()
         return [dict(zip(("entry_id","transaction_id","amount_cents","direction","reference_type","reference_id","created_at"), row)) for row in rows]
+
+    def convert_wallet_credits(self, actor: dict[str, Any], amount_cents: int) -> dict[str, Any]:
+        if amount_cents <= 0: raise PlatformError("invalid_amount", "amount must be positive")
+        with connect(self.path) as c:
+            balance = c.execute("SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_cents ELSE -amount_cents END),0) FROM ledger_entries le JOIN ledger_accounts la ON la.id=le.account_id WHERE la.user_id=?", (actor["id"],)).fetchone()[0]
+            if balance < amount_cents: raise PlatformError("insufficient_balance", "wallet balance is insufficient")
+            account = c.execute("SELECT id FROM ledger_accounts WHERE user_id=?", (actor["id"],)).fetchone()
+            if not account: raise PlatformError("not_found", "account not found")
+            account_id = account[0]
+            tx_id = uid()
+            c.execute("INSERT INTO ledger_entries VALUES (?,?,?,?,?,?,?,?,?)", (uid(), tx_id, account_id, amount_cents, "debit", "convert_credits", tx_id, "convert-credits", now()))
+            amount_credits = int((amount_cents / 100) * 100 * 1.2)
+            c.execute("INSERT INTO credit_ledger VALUES (?,?,?,?,?,?,?,?,?)", (uid(), actor["id"], amount_credits, "credit", "wallet_convert", tx_id, f"convert-{tx_id}", json.dumps({"reason": f"商单收益兑换算力(¥{amount_cents/100:.2f}含20%补贴)"}, ensure_ascii=False), now()))
+            new_credits = c.execute("SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_credits ELSE -amount_credits END),0) FROM credit_ledger WHERE user_id=?", (actor["id"],)).fetchone()[0]
+            sim_balance = c.execute("SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_cents ELSE -amount_cents END),0) FROM ledger_entries le JOIN ledger_accounts la ON la.id=le.account_id WHERE la.user_id=?", (actor["id"],)).fetchone()[0]
+        return {"converted_cents": amount_cents, "granted_credits": amount_credits, "available_credits": new_credits, "simulated_balance_cents": sim_balance}
+
+    def request_wallet_withdrawal(self, actor: dict[str, Any], amount_cents: int, payout_channel: str, account_info: str) -> dict[str, Any]:
+        if amount_cents <= 0: raise PlatformError("invalid_amount", "amount must be positive")
+        with connect(self.path) as c:
+            balance = c.execute("SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_cents ELSE -amount_cents END),0) FROM ledger_entries le JOIN ledger_accounts la ON la.id=le.account_id WHERE la.user_id=?", (actor["id"],)).fetchone()[0]
+            if balance < amount_cents: raise PlatformError("insufficient_balance", "wallet balance is insufficient")
+            account = c.execute("SELECT id FROM ledger_accounts WHERE user_id=?", (actor["id"],)).fetchone()
+            if not account: raise PlatformError("not_found", "account not found")
+            account_id = account[0]
+            tx_id = uid()
+            c.execute("INSERT INTO ledger_entries VALUES (?,?,?,?,?,?,?,?,?)", (uid(), tx_id, account_id, amount_cents, "debit", "withdrawal", tx_id, f"{payout_channel}:{account_info}", now()))
+            sim_balance = c.execute("SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_cents ELSE -amount_cents END),0) FROM ledger_entries le JOIN ledger_accounts la ON la.id=le.account_id WHERE la.user_id=?", (actor["id"],)).fetchone()[0]
+        return {"withdrawal_id": tx_id, "amount_cents": amount_cents, "payout_channel": payout_channel, "simulated_balance_cents": sim_balance, "status": "submitted"}
 
     def release_expired_tasks(self) -> int:
         released = 0

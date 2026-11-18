@@ -38,6 +38,27 @@ export type PlatformCompetition = {
   created_at: string;
 };
 
+export type DeliverableSpecs = {
+  format?: string; // 9:16 / 16:9 / 1:1
+  resolution?: string; // 1080P / 4K
+  duration_seconds?: number; // 30s
+  deliverable_count?: number; // 3条
+  fps?: number; // 25 / 30 / 60
+  assets_included?: string[]; // 分镜流, 角色定妆卡, 无损音频, 剪辑工程
+};
+
+export type MilestoneSpec = {
+  stage: string;
+  percentage: number;
+  description: string;
+};
+
+export type CopyrightTerms = {
+  scope: string; // "全网商业信息流" / "品牌电商主图与社媒" / "全版权买断"
+  allow_derivative: boolean;
+  require_ai_label: boolean;
+};
+
 export type PlatformTask = {
   id: string;
   title: string;
@@ -49,6 +70,40 @@ export type PlatformTask = {
   status: string;
   version: number;
   created_at: string;
+  claimed_by?: string | null;
+  demand_type?: "visual_content" | "short_video_flow" | "ai_drama" | "interactive_game" | string;
+  deliverable_specs_json?: string;
+  budget_mode?: "fixed" | "range" | "per_unit";
+  budget_min_cents?: number;
+  budget_max_cents?: number;
+  settlement_mode?: "one_time" | "milestone";
+  milestone_specs_json?: string;
+  copyright_terms_json?: string;
+  acceptance_criteria_json?: string;
+  reference_media_json?: string;
+  client_name?: string;
+  level_tier?: "beginner" | "standard" | "pro";
+  contract_id?: string | null;
+  contract_signed_at?: string | null;
+};
+
+export type PlatformContract = {
+  id: string;
+  task_id: string;
+  creator_id: string;
+  contract_type: string;
+  status: string;
+  digest_hash: string;
+  signer_name: string;
+  signed_at: string;
+  terms: {
+    contract_type?: string;
+    title?: string;
+    milestone_settlement?: string;
+    nda_clause?: string;
+    copyright_clause?: string;
+    arbitration_clause?: string;
+  };
 };
 
 export type PlatformCourse = {
@@ -127,7 +182,46 @@ export const platformApi = {
   forkTemplate: (templateId: string, forkProjectId = crypto.randomUUID()) => request(`/academy/templates/${templateId}/fork`, { method: "POST", body: JSON.stringify({ fork_project_id: forkProjectId }) }),
 
   tasks: () => request<PlatformTask[]>("/tasks/square"),
-  claimTask: (taskId: string, idempotencyKey = crypto.randomUUID()) => request<{ task_id: string; status: string }>(`/tasks/${taskId}/claim`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey } }),
+  createTask: (payload: {
+    title: string;
+    category: string;
+    brief_markdown: string;
+    bounty_cents: number;
+    deadline: string;
+    required_level?: string;
+    status?: string;
+    demand_type?: string;
+    deliverable_specs_json?: string | Record<string, unknown>;
+    budget_mode?: string;
+    budget_min_cents?: number;
+    budget_max_cents?: number;
+    settlement_mode?: string;
+    milestone_specs_json?: string | Array<unknown>;
+    copyright_terms_json?: string | Record<string, unknown>;
+    acceptance_criteria_json?: string | Array<unknown>;
+    reference_media_json?: string | Array<unknown>;
+    client_name?: string;
+    level_tier?: string;
+  }) => request<PlatformTask>("/tasks", { method: "POST", body: JSON.stringify(payload) }),
+  claimTask: (taskId: string, idempotencyKey = crypto.randomUUID()) => request<{ task_id: string; status: string; contract_id?: string; contract_signed_at?: string; digest_hash?: string }>(`/tasks/${taskId}/claim`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey } }),
+  taskContract: (taskId: string) => request<PlatformContract>(`/tasks/${taskId}/contract`),
+  deliverTask: (taskId: string, payload: {
+    product?: "studio" | "atelier";
+    artifact_id: string;
+    artifact_version: string;
+    sha256: string;
+    media_type?: string;
+    project_id: string;
+    project_title_snapshot?: string;
+    title?: string;
+    description?: string;
+    delivery_note?: string;
+  }) => request<{ id: string; task_id: string; version_num: number; status: string }>(`/tasks/${taskId}/deliver`, { method: "POST", body: JSON.stringify(payload) }),
+  reviewTask: (taskId: string, payload: { approved: boolean; feedback?: string }) => request<{ task_id: string; status: string; feedback: string }>(`/tasks/${taskId}/review`, { method: "POST", body: JSON.stringify(payload) }),
+  wallet: () => request<{ user_id: string; simulated_balance_cents: number }>("/settlement/wallet"),
+  transactions: () => request<Array<{ entry_id: string; transaction_id: string; amount_cents: number; direction: string; reference_type: string; reference_id: string; created_at: string }>>("/settlement/transactions"),
+  convertCredits: (amountCents: number) => request<{ converted_cents: number; granted_credits: number; available_credits: number; simulated_balance_cents: number }>("/settlement/convert-credits", { method: "POST", body: JSON.stringify({ amount_cents: amountCents }) }),
+  withdraw: (payload: { amount_cents: number; payout_channel: string; account_info: string }) => request<{ withdrawal_id: string; amount_cents: number; payout_channel: string; simulated_balance_cents: number; status: string }>("/settlement/withdraw", { method: "POST", body: JSON.stringify(payload) }),
 
   certification: () => request<PlatformCertification | null>("/certifications/status"),
   activeExam: () => request<PlatformExam | null>("/certifications/exam/prompt"),

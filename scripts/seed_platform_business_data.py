@@ -30,7 +30,7 @@ def seed_platform_data(db_path: str):
             "面向全球 AIGC 影视导演、编剧与短片创作者，设立 100,000 算力奖池与签约合作机会。赛道包含科幻叙事、悬疑反转与东方奇幻。",
             """### 赛制要求
 1. **作品时长**：2~5 分钟完整微短片，需具备清晰人物弧光与动量因果链；
-2. **工具链**：推荐使用 LumenX 画布与 Studio，结合张导电影级分镜 Skill；
+2. **工具链**：推荐使用 影伴 画布与 Studio，结合张导电影级分镜 Skill；
 3. **交付规格**：1080P/4K H.264 MP4，包含完整画外音或对白音频；
 4. **奖项设置**：
    - 最佳导演奖：50,000 算力 + ¥20,000 创作基金
@@ -87,7 +87,7 @@ def seed_platform_data(db_path: str):
 
     # 2. Certification Exams
     exam_id = str(uuid.uuid4())
-    exam_prompt = """【LumenX 官方认证创作者 · 综合实操考题（第一期）】
+    exam_prompt = """【影伴 官方认证创作者 · 综合实操考题（第一期）】
 考核目标：验证创作者使用影视工业化管线的全流程实战能力。
 考核题目：根据以下微短剧剧本片段，在画布中完成 3 组电影级分镜设计并生成对应动效视频：
 「雨夜霓虹小巷深处，黑衣刀客缓步前行，侧逆冷光割裂水雾，水洼中倒映出追兵的身影。刀客驻足，右手拇指顶开刀谭，刀刃微鸣。」
@@ -104,8 +104,9 @@ def seed_platform_data(db_path: str):
         )
         print("Created certification exam v1.0")
 
-    # 3. Commercial Tasks
+    # 3. Commercial Tasks (覆盖三大业务板块: 新媒体可视化 / 信息流短视频运营 / AI短剧创作; 包含新手带教单与标准商业单)
     tasks = [
+        # --- 业务板块 1: AI 短剧创作 ---
         (
             str(uuid.uuid4()),
             "玄幻修仙爆款短剧 · 前三集高燃分镜编排与出片",
@@ -123,23 +124,18 @@ def seed_platform_data(db_path: str):
             "published",
             0,
             now_iso,
-        ),
-        (
-            str(uuid.uuid4()),
-            "高端新能源汽车 30 秒未来科技概念片",
-            "商业广告",
-            """### 需求说明
-- **品牌调性**：极简、未来主义、硬朗工业美学；
-- **关键镜头**：车身流线侧逆光、智能光幕交互特写、高速弯道动态运镜；
-- **交付格式**：4K 60fps 电影比例画幅。""",
-            680000, # ¥6,800
+            "ai_drama",
+            json.dumps({"format": "9:16", "resolution": "1080P", "duration_seconds": 180, "deliverable_count": 3, "fps": 30, "assets_included": ["连续分镜流", "角色定妆卡", "成片MP4"]}, ensure_ascii=False),
+            "fixed",
+            350000,
+            350000,
+            "milestone",
+            json.dumps([{"stage": "分镜脚本与资产锁定", "percentage": 40, "description": "完成前三集分镜草图与关键角色定妆卡"}, {"stage": "成片终审交付", "percentage": 60, "description": "交付无水印成片及工程包"}], ensure_ascii=False),
+            json.dumps({"scope": "短剧全平台发行与商业播放", "allow_derivative": True, "require_ai_label": True}, ensure_ascii=False),
+            json.dumps(["角色定妆跨镜头面部一致性", "遵守 180 度轴线，无镜头穿帮", "情绪括号对白音画对位偏差≤0.15s"], ensure_ascii=False),
+            json.dumps([{"title": "万界归宗样片参考", "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"}], ensure_ascii=False),
+            "聚星互娱短剧影业",
             "standard",
-            None,
-            None,
-            d14_iso,
-            "published",
-            0,
-            now_iso,
         ),
         (
             str(uuid.uuid4()),
@@ -157,7 +153,78 @@ def seed_platform_data(db_path: str):
             "published",
             0,
             now_iso,
+            "ai_drama",
+            json.dumps({"format": "16:9", "resolution": "4K", "duration_seconds": 120, "deliverable_count": 1, "fps": 25, "assets_included": ["分镜工程", "分轨音频", "成片MP4"]}, ensure_ascii=False),
+            "fixed",
+            240000,
+            240000,
+            "milestone",
+            json.dumps([{"stage": "分镜与机位轴线确认", "percentage": 50, "description": "密室平面站位与机位轴线图"}, {"stage": "成片交付", "percentage": 50, "description": "4K 渲染成片与双声道混音"}], ensure_ascii=False),
+            json.dumps({"scope": "院线网络短片与影节参展", "allow_derivative": false, "require_ai_label": True}, ensure_ascii=False),
+            json.dumps(["严格执行密室空间轴线", "情绪递进符合剪辑节奏律动", "暗部细节噪点克制"], ensure_ascii=False),
+            json.dumps([{"title": "密室光影氛围参考", "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"}], ensure_ascii=False),
+            "黑石映画工作室",
+            "standard",
         ),
+        # --- 业务板块 2: 信息流短视频与账号运营内容 ---
+        (
+            str(uuid.uuid4()),
+            "高端新能源汽车 30 秒未来科技概念片",
+            "商业广告",
+            """### 需求说明
+- **品牌调性**：极简、未来主义、硬朗工业美学；
+- **关键镜头**：车身流线侧逆光、智能光幕交互特写、高速弯道动态运镜；
+- **交付格式**：4K 60fps 电影比例画幅。""",
+            680000, # ¥6,800
+            "pro",
+            None,
+            None,
+            d14_iso,
+            "published",
+            0,
+            now_iso,
+            "short_video_flow",
+            json.dumps({"format": "16:9", "resolution": "4K", "duration_seconds": 30, "deliverable_count": 1, "fps": 60, "assets_included": ["4K 60fps 成片", "分层渲染序列", "音效工程"]}, ensure_ascii=False),
+            "fixed",
+            680000,
+            680000,
+            "milestone",
+            json.dumps([{"stage": "视觉母版与运镜动态样片", "percentage": 40, "description": "车辆漆面光影反差与侧逆光母版"}, {"stage": "高清母带交付", "percentage": 60, "description": "4K 60fps ProRes 终版"}], ensure_ascii=False),
+            json.dumps({"scope": "全球数字媒体与车展大屏投放", "allow_derivative": True, "require_ai_label": false}, ensure_ascii=False),
+            json.dumps(["车身光影流线严丝合缝无畸变", "60fps 高帧率运镜流畅无丢帧卡顿", "工业科技感音效与转场节拍精准合轴"], ensure_ascii=False),
+            json.dumps([{"title": "车身流线参考样片", "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}], ensure_ascii=False),
+            "极光新能源汽车科技",
+            "pro",
+        ),
+        (
+            str(uuid.uuid4()),
+            "美妆爆款口播切片 · 5条日更投放短视频（新手带教单）",
+            "短视频运营",
+            """### 需求说明
+- **交付内容**：5 条 15 秒垂直类美妆短视频，包含痛点切入、质地微距展示、效果前后对比与转化 Hook；
+- **适合对象**：新手与兼职创作者，内含标准分镜脚本模板与配音干音，依模板直接合成出片即可！""",
+            80000, # ¥800
+            "beginner",
+            None,
+            None,
+            d7_iso,
+            "published",
+            0,
+            now_iso,
+            "short_video_flow",
+            json.dumps({"format": "9:16", "resolution": "1080P", "duration_seconds": 15, "deliverable_count": 5, "fps": 30, "assets_included": ["5条短视频MP4", "带货口播字幕包"]}, ensure_ascii=False),
+            "fixed",
+            80000,
+            80000,
+            "one_time",
+            json.dumps([{"stage": "5条成品验收", "percentage": 100, "description": "一次性验收发放"}], ensure_ascii=False),
+            json.dumps({"scope": "抖音/快手平台信息流信息广告", "allow_derivative": false, "require_ai_label": True}, ensure_ascii=False),
+            json.dumps(["前3秒 Hook 黄金吸睛完播率设计", "字幕排版清晰符合信息流规范", "人声音量均衡无破音"], ensure_ascii=False),
+            json.dumps([{"title": "美妆口播切片标准模板", "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"}], ensure_ascii=False),
+            "梵花美妆 MCN 矩阵",
+            "beginner",
+        ),
+        # --- 业务板块 3: 新媒体可视化内容 ---
         (
             str(uuid.uuid4()),
             "国风古韵美妆护肤品宣传片分镜与角色定妆",
@@ -173,13 +240,57 @@ def seed_platform_data(db_path: str):
             "published",
             0,
             now_iso,
+            "visual_content",
+            json.dumps({"format": "16:9", "resolution": "4K", "duration_seconds": 15, "deliverable_count": 1, "fps": 30, "assets_included": ["三视图卡片", "15s动态分镜", "超清主KV图"]}, ensure_ascii=False),
+            "fixed",
+            180000,
+            180000,
+            "one_time",
+            json.dumps([{"stage": "终审交付", "percentage": 100, "description": "三视图与15秒动态分镜"}], ensure_ascii=False),
+            json.dumps({"scope": "天猫旗舰店首页与小红书官方图文", "allow_derivative": True, "require_ai_label": True}, ensure_ascii=False),
+            json.dumps(["符合宋代水墨意境质感", "皮肤材质自然透亮不油腻", "三视图比例严密统一"], ensure_ascii=False),
+            json.dumps([{"title": "宋韵克制美学画风参考", "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"}], ensure_ascii=False),
+            "青黛东方草本护肤",
+            "standard",
+        ),
+        (
+            str(uuid.uuid4()),
+            "国潮茶饮新品发布 · 4套电商主图与小红书KV海报（新手带教单）",
+            "电商视觉",
+            """### 需求说明
+- **需求概述**：某新茶饮品牌夏日新品，需制作 4 套高颜值电商主图与详情页海报；
+- **新手福利**：提供产品真实白底 3D 模型与背景色卡，根据带教提示词库出图交付，适合刚入门的新手创作者快速积累案例！""",
+            50000, # ¥500
+            "beginner",
+            None,
+            None,
+            d7_iso,
+            "published",
+            0,
+            now_iso,
+            "visual_content",
+            json.dumps({"format": "3:4", "resolution": "2K", "duration_seconds": 0, "deliverable_count": 4, "fps": 0, "assets_included": ["4张高分辨率电商主图PNG", "分层PSD工程"]}, ensure_ascii=False),
+            "fixed",
+            50000,
+            50000,
+            "one_time",
+            json.dumps([{"stage": "4套主图交付", "percentage": 100, "description": "海报成稿交付一次性放款"}], ensure_ascii=False),
+            json.dumps({"scope": "电商店铺与社交媒体推广", "allow_derivative": false, "require_ai_label": false}, ensure_ascii=False),
+            json.dumps(["杯体杯身折射质感晶莹剔透", "果肉与水珠细节自然丰富", "文字排版呼吸感良好"], ensure_ascii=False),
+            json.dumps([{"title": "茶饮海报质感参考", "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}], ensure_ascii=False),
+            "山野茶语品牌部",
+            "beginner",
         ),
     ]
 
     for t in tasks:
         exists = cur.execute("SELECT id FROM commercial_tasks WHERE title=?", (t[1],)).fetchone()
         if not exists:
-            cur.execute("INSERT INTO commercial_tasks VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", t)
+            cur.execute(
+                "INSERT INTO commercial_tasks (id,title,category,brief_markdown,bounty_cents,required_level,claimed_by,claim_time,deadline,status,version,created_at,demand_type,deliverable_specs_json,budget_mode,budget_min_cents,budget_max_cents,settlement_mode,milestone_specs_json,copyright_terms_json,acceptance_criteria_json,reference_media_json,client_name,level_tier) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                t
+            )
             print(f"Created commercial task: {t[1]}")
 
     # 4. Academy Courses & Templates

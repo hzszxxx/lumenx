@@ -98,7 +98,7 @@ def create_app(store: CredentialProxyStore | None = None, *, worker_token: str |
         raise RuntimeError("unsupported credential provider")
     worker_token = worker_token or os.getenv("LUMENX_CREDENTIAL_PROXY_TOKEN")
     core_token = core_token or os.getenv("LUMENX_CREDENTIAL_CORE_TOKEN") or worker_token
-    app = FastAPI(title="LumenX Credential Proxy", docs_url=None, redoc_url=None)
+    app = FastAPI(title="影伴 Credential Proxy", docs_url=None, redoc_url=None)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
