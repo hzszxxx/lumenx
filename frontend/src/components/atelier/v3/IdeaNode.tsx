@@ -2,6 +2,7 @@
 import * as React from "react";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { Plus } from "lucide-react";
 import { MiniMarkdown } from "@/components/atelier/v3/MiniMarkdown";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
   x: number;
   y: number;
   onSelect?: (id: string) => void;
+  onAddNextStep?: (id: string) => void;
   /** When true, the shell is overlaying an inline textarea editor — skip
    *  rendering entirely so the editor owns the visual frame. Previously we
    *  kept a chrome-only shell, but that produced a visible "double shell"
@@ -27,7 +29,7 @@ interface Props {
 // float shadow; we lay only a whisper-soft warm-ochre CATEGORY wash over it so
 // the slip reads premium and quiet, never garish. The body sits in calm Inter
 // body text, signed off by a single muted sentence-case line.
-export function IdeaNode({ id, body, selected, x, y, onSelect, editing, onOpenEditor }: Props) {
+export function IdeaNode({ id, body, selected, x, y, onSelect, editing, onOpenEditor, onAddNextStep }: Props) {
   const t = useTranslations("atelier.node");
   // Uplift b6 · long text: bodies past the clamp threshold get an
   // expand/collapse toggle + a char-count caption instead of silently
@@ -60,8 +62,24 @@ export function IdeaNode({ id, body, selected, x, y, onSelect, editing, onOpenEd
         }
       }}
       style={{ transform: `translate(${x}px, ${y}px)` }}
-      className={`group absolute w-[260px] overflow-hidden atelier-node-shell transition-[box-shadow,border-color] duration-200 ease-out ${borderClass}`}
+      className={`group absolute w-[260px] overflow-visible atelier-node-shell transition-[box-shadow,border-color] duration-200 ease-out ${borderClass}`}
     >
+      {/* 边缘悬停快速添加下一步按钮 */}
+      {onAddNextStep && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddNextStep(id);
+          }}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 w-6 h-6 rounded-full bg-primary text-white shadow-lg border border-white/20 flex items-center justify-center cursor-pointer"
+          title="在此节点后添加后续分镜"
+          aria-label="添加下一步任务"
+        >
+          <Plus size={13} className="stroke-[2.5]" />
+        </button>
+      )}
       {/* Warm-ochre category wash — a soft frosted tint laid over the glass
           shell (never replacing its depth gradient). Whisper alpha so it reads
           luxe, not a sticker. pointer-events-none so it never eats clicks. */}
