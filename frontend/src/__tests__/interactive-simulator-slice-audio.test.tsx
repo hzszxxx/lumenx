@@ -10,6 +10,30 @@ import {
 import { interactiveSoundEngine } from "@/lib/interactiveAudio";
 import type { AtelierNode } from "@/lib/atelierTypes";
 
+function createTestNode(partial: Partial<AtelierNode> & { id: string }): AtelierNode {
+  return {
+    project_id: "test-proj",
+    type: "idea",
+    title: "Test Node",
+    prompt: "",
+    status: "idle",
+    x: 0,
+    y: 0,
+    width: 320,
+    height: 180,
+    source_project_id: null,
+    frame_id: null,
+    asset_id: null,
+    video_task_id: null,
+    media_urls: [],
+    data: {},
+    created_by: "tester",
+    created_at: 1000,
+    updated_at: 1000,
+    ...partial,
+  };
+}
+
 describe("Interactive Simulator Slice Cache & Sound Effects", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -19,34 +43,31 @@ describe("Interactive Simulator Slice Cache & Sound Effects", () => {
 
   describe("resolveNodeMediaSlice and Preload Cache", () => {
     it("correctly identifies video and image slices", () => {
-      const videoNode: AtelierNode = {
+      const videoNode = createTestNode({
         id: "node-v1",
         type: "video",
         title: "分支A视频切片",
         media_urls: ["https://example.com/slice_a.mp4"],
-        data: {},
-      };
+      });
       const sliceV = resolveNodeMediaSlice(videoNode);
       expect(sliceV.kind).toBe("video");
       expect(sliceV.url).toBe("https://example.com/slice_a.mp4");
 
-      const imageNode: AtelierNode = {
+      const imageNode = createTestNode({
         id: "node-i1",
         type: "image",
         title: "分支B剧照切片",
         media_urls: ["https://example.com/slice_b.png"],
-        data: {},
-      };
+      });
       const sliceI = resolveNodeMediaSlice(imageNode);
       expect(sliceI.kind).toBe("image");
       expect(sliceI.url).toBe("https://example.com/slice_b.png");
 
-      const textNode: AtelierNode = {
+      const textNode = createTestNode({
         id: "node-t1",
         type: "idea",
         title: "纯文本节点",
-        data: {},
-      };
+      });
       const sliceT = resolveNodeMediaSlice(textNode);
       expect(sliceT.kind).toBe("none");
       expect(sliceT.url).toBeNull();
@@ -90,7 +111,7 @@ describe("Interactive Simulator Slice Cache & Sound Effects", () => {
 
   describe("InteractiveSimulatorModal component", () => {
     const mockNodes: AtelierNode[] = [
-      {
+      createTestNode({
         id: "start-node",
         type: "video",
         title: "开端：雨夜旧宅",
@@ -115,8 +136,8 @@ describe("Interactive Simulator Slice Cache & Sound Effects", () => {
             ],
           },
         },
-      },
-      {
+      }),
+      createTestNode({
         id: "investigate-node",
         type: "image",
         title: "大堂：神秘日记",
@@ -135,8 +156,8 @@ describe("Interactive Simulator Slice Cache & Sound Effects", () => {
             ],
           },
         },
-      },
-      {
+      }),
+      createTestNode({
         id: "garden-bad-end",
         type: "video",
         title: "后花园陷阱（挫败结局）",
@@ -148,8 +169,8 @@ describe("Interactive Simulator Slice Cache & Sound Effects", () => {
             endingType: "bad",
           },
         },
-      },
-      {
+      }),
+      createTestNode({
         id: "victory-end",
         type: "image",
         title: "揭开公馆秘密（终极通关）",
@@ -161,7 +182,7 @@ describe("Interactive Simulator Slice Cache & Sound Effects", () => {
             endingType: "normal",
           },
         },
-      },
+      }),
     ];
 
     it("renders video element, preloads candidate slice and shows countdown", () => {

@@ -133,7 +133,7 @@ export default function StoryboardBatchImportModal({
     a.href = url;
     a.download = "atelier_previz_storyboard_template.csv";
     a.click();
-    URL.revokeObjectURL(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleSubmit = async () => {

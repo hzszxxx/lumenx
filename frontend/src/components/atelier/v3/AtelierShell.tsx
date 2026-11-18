@@ -40,7 +40,7 @@ import {
   resolveAtelierReferenceMedia,
 } from "@/lib/atelierCanvas";
 import { ATELIER_IMAGE_UPLOAD_ACCEPT, ATELIER_UPLOAD_ACCEPT, getAtelierUploadKind } from "@/lib/atelierUploadApi";
-import type { AtelierNode, JsonValue } from "@/lib/atelierTypes";
+import type { AtelierNode, JsonValue, JsonRecord } from "@/lib/atelierTypes";
 import { Sparkles, X, Check, ShieldCheck, Clock, Layers, Coins, Plus, FileText, Gamepad2, Film, Play, Download, Box, SplitSquareVertical, FileSpreadsheet } from "lucide-react";
 import { InteractiveSimulatorModal } from "./InteractiveSimulatorModal";
 import { InteractiveBranchConfig } from "./InteractiveBranchConfig";
@@ -275,13 +275,16 @@ export function resolveNodeRenderAndClay(node: AtelierNode, allNodes: AtelierNod
   }
 
   if (!upstreamRefMedia) {
-    for (const pending of canvasData.pending_reference_nodes) {
-      const srcNode = allNodes.find(n => n.id === pending.source_node_id);
-      if (srcNode) {
-        const srcMedia = resolveAtelierReferenceMedia(srcNode) || srcNode.media_urls?.[0] || (srcNode as any).media_url;
-        if (srcMedia) {
-          upstreamRefMedia = srcMedia;
-          break;
+    const pendingNodes = (canvasData as any).pending_reference_nodes;
+    if (Array.isArray(pendingNodes)) {
+      for (const pending of pendingNodes) {
+        const srcNode = allNodes.find(n => n.id === pending?.source_node_id);
+        if (srcNode) {
+          const srcMedia = resolveAtelierReferenceMedia(srcNode) || srcNode.media_urls?.[0] || (srcNode as any).media_url;
+          if (srcMedia) {
+            upstreamRefMedia = srcMedia;
+            break;
+          }
         }
       }
     }
@@ -829,15 +832,36 @@ export function AtelierShell() {
 
         // If this shot has a clayUrl, create an Image node right above the video node
         if (shot.clayUrl) {
-          const clayAck = await createMediaNode("image", {
-            mediaUrl: shot.clayUrl,
-            filename: `${shot.shotId}_3D白模.jpg`,
+          const clayAck = await createNode({
+            type: "image",
+            title: `${shot.shotId}_3D白模`,
+            prompt: `3D白模分镜参考：${shot.title}`,
+            body: null,
             x: startX + i * 360,
             y: startY - 210,
             width: 260,
             height: 180,
           });
           clayNodeId = clayAck.node_ids[0];
+          if (clayNodeId) {
+            useAtelierStore.setState(state => {
+              if (!state.currentProject) return state;
+              return {
+                currentProject: {
+                  ...state.currentProject,
+                  nodes: state.currentProject.nodes.map(n =>
+                    n.id === clayNodeId
+                      ? {
+                          ...n,
+                          media_urls: [shot.clayUrl!],
+                          data: { ...n.data, clay_url: shot.clayUrl! } as unknown as JsonRecord,
+                        }
+                      : n
+                  ),
+                },
+              };
+            });
+          }
         }
 
         const ack = await createNode({
@@ -1020,7 +1044,7 @@ export function AtelierShell() {
                           isEnding: false,
                           choices: updatedChoices,
                         },
-                      },
+                      } as unknown as JsonRecord,
                     }
                   : n
               ),
@@ -1092,7 +1116,7 @@ export function AtelierShell() {
                           isEnding: false,
                           choices: updatedChoices,
                         },
-                      },
+                      } as unknown as JsonRecord,
                     }
                   : n
               ),
@@ -1797,9 +1821,10 @@ export function AtelierShell() {
                 targetAvailableRect={selectedComposerLayout.availableRect}
                 onOpenWipeCompare={(candidateVideoUrl) => {
                   if (!selectedNode) return;
-                  const firstRefUrl = selectedNode.reference_image_urls?.[0];
-                  const pendingRefSourceId = selectedNode.pending_reference_nodes?.[0]?.source_node_id;
-                  const pendingRefSourceMedia = pendingRefSourceId ? currentProject?.nodes.find(n => n.id === pendingRefSourceId)?.media_url : null;
+                  const nodeAny = selectedNode as any;
+                  const firstRefUrl = nodeAny.reference_image_urls?.[0] || nodeAny.data?.clay_url;
+                  const pendingRefSourceId = nodeAny.pending_reference_nodes?.[0]?.source_node_id;
+                  const pendingRefSourceMedia = pendingRefSourceId ? currentProject?.nodes.find(n => n.id === pendingRefSourceId)?.media_urls?.[0] : null;
                   const clayUrl = firstRefUrl || pendingRefSourceMedia || null;
 
                   if (clayUrl) {

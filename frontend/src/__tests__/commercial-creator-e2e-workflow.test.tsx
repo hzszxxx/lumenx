@@ -18,7 +18,7 @@ vi.mock('@/lib/platformApi', () => ({
     claimTask: vi.fn(),
     deliverTask: vi.fn(),
     reviewTask: vi.fn(),
-    getTaskContract: vi.fn(),
+    taskContract: vi.fn(),
     createTask: vi.fn(),
   },
 }));
@@ -72,20 +72,13 @@ describe('Commercial Creator End-to-End Workflow (Full Lifecycle)', () => {
       contract_id: 'contract-task-e2e-1',
       digest_hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
     });
-    vi.mocked(platformApi.getTaskContract).mockResolvedValue({
+    vi.mocked(platformApi.taskContract).mockResolvedValue({
       id: 'contract-task-e2e-1',
       task_id: 'task-e2e-1',
       creator_id: 'creator-uuid-888',
       contract_type: 'commercial_undertaking_nda',
       status: 'signed',
       digest_hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-      terms_snapshot_json: JSON.stringify({
-        contract_type: 'commercial_undertaking_nda',
-        title: '商业制作承揽与保密协议',
-        milestone_settlement: '40% 分镜确认结算 + 60% 成片验收结算',
-        nda_clause: '严格保密',
-        copyright_clause: '全额放款后商用权归发包方所有',
-      }),
       terms: {
         contract_type: 'commercial_undertaking_nda',
         title: '商业制作承揽与保密协议',
