@@ -198,18 +198,12 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
         return <>{children}</>;
     }
 
-    const childContent = hasMountedChildren ? (
-        <div hidden={state !== "ready"} aria-hidden={state !== "ready"} className={state === "ready" ? "contents" : undefined}>
-            <div key={childrenKey} className="contents">{children}</div>
-        </div>
-    ) : null;
+    // Always render children directly so that visitors can freely browse without being blocked
+    const childContent = <div key={childrenKey} className="contents">{children}</div>;
 
-    if (state === "ready") {
+    if (state !== "login") {
         return <>{childContent}</>;
     }
-
-    const showLogin = state === "login";
-    const showRetry = state === "error";
 
     return (
         <>
@@ -227,10 +221,10 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
                     <div className="space-y-2">
                         <p className="text-xs uppercase tracking-[0.35em] text-primary/80">影伴</p>
                         <h1 id="app-access-title" className="text-2xl font-semibold text-white">
-                            {showLogin ? t("unlockTitle") : t("checkingTitle")}
+                            {t("unlockTitle")}
                         </h1>
                         <p className="text-sm leading-6 text-white/65">
-                            {showLogin ? t("unlockBody") : t("checkingBody")}
+                            {t("unlockBody")}
                         </p>
                     </div>
 
@@ -240,43 +234,27 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
                         </div>
                     ) : null}
 
-                    {showLogin ? (
-                        <form className="mt-6 space-y-4" onSubmit={handleLogin}>
-                            <label className="block text-sm font-medium text-white/80" htmlFor="app-access-token">
-                                {t("tokenLabel")}
-                            </label>
-                            <input
-                                id="app-access-token"
-                                type="password"
-                                value={token}
-                                onChange={event => setToken(event.target.value)}
-                                placeholder={t("tokenPlaceholder")}
-                                autoComplete="off"
-                                className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-primary/70"
-                            />
-                            <button
-                                type="submit"
-                                disabled={loginPending}
-                                className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {loginPending ? t("unlocking") : t("unlock")}
-                            </button>
-                        </form>
-                    ) : null}
-
-                    {state === "checking" ? (
-                        <div className="mt-6 text-sm text-white/55">{t("checkingStatus")}</div>
-                    ) : null}
-
-                    {showRetry ? (
+                    <form className="mt-6 space-y-4" onSubmit={handleLogin}>
+                        <label className="block text-sm font-medium text-white/80" htmlFor="app-access-token">
+                            {t("tokenLabel")}
+                        </label>
+                        <input
+                            id="app-access-token"
+                            type="password"
+                            value={token}
+                            onChange={event => setToken(event.target.value)}
+                            placeholder={t("tokenPlaceholder")}
+                            autoComplete="off"
+                            className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-primary/70"
+                        />
                         <button
-                            type="button"
-                            onClick={() => void checkSession()}
-                            className="mt-6 w-full rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                            type="submit"
+                            disabled={loginPending}
+                            className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {t("retry")}
+                            {loginPending ? t("unlocking") : t("unlock")}
                         </button>
-                    ) : null}
+                    </form>
                     </section>
                 </div>
             </dialog>

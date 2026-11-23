@@ -83,105 +83,137 @@ export default function PlatformPortal() {
     catch { /* store exposes the error */ }
   };
 
-  if (!user) {
-    return (
-      <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8 bg-background">
-        <div className="w-full max-w-md flex flex-col items-center">
-          <div className="mb-6 flex flex-col items-center text-center">
-            <LumenXBranding size="md" />
-            <p className="font-display atelier-display text-[0.875rem] italic text-text-muted tracking-wide mt-2">
-              {tn("brandSlogan")}
+  const isPublicSection = ["academy", "certification", "tasks", "competitions"].includes(section);
+
+  const renderAuthForm = () => (
+    <div className="w-full max-w-md mx-auto my-10 flex flex-col items-center">
+      <div className="mb-6 flex flex-col items-center text-center">
+        <LumenXBranding size="md" />
+        <p className="font-display atelier-display text-[0.875rem] italic text-text-muted tracking-wide mt-2">
+          {tn("brandSlogan")}
+        </p>
+      </div>
+      <div className="glass-panel p-6 sm:p-8 w-full shadow-2xl">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="rounded-xl bg-primary/15 p-3 text-primary">
+            <LogIn size={22} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">
+              {registerMode ? (appAccessUnlocked ? "创建测试账户" : (inviteRequired ? "邀请码注册" : "新用户注册")) : "登录创作者平台"}
+            </h2>
+            <p className="text-xs text-text-secondary mt-0.5">
+              登录后进入个人中心、算力钱包与创作工作台
             </p>
           </div>
-          <div className="glass-panel p-6 sm:p-8 w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="rounded-xl bg-primary/15 p-3 text-primary">
-                <LogIn size={22} />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-foreground">
-                  {registerMode ? (appAccessUnlocked ? "创建测试账户" : (inviteRequired ? "邀请码注册" : "新用户注册")) : "登录创作者平台"}
-                </h2>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  登录后进入 Studio / 画布 和平台业务
-                </p>
-              </div>
-            </div>
-            <form onSubmit={submitAuth} className="space-y-4">
+        </div>
+        <form onSubmit={submitAuth} className="space-y-4">
+          <input
+            className="glass-input w-full"
+            placeholder="用户名"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            className="glass-input w-full"
+            type="password"
+            placeholder="密码（至少 12 位）"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={12}
+            required
+          />
+          {registerMode && (
+            <>
               <input
                 className="glass-input w-full"
-                placeholder="用户名"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
+                type="email"
+                placeholder="邮箱（可选）"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
-              <input
-                className="glass-input w-full"
-                type="password"
-                placeholder="密码（至少 12 位）"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={12}
-                required
-              />
-              {registerMode && (
+              {appAccessUnlocked ? (
+                <p className="text-xs text-text-muted">当前测试会话已解锁，注册时无需再次输入邀请码。</p>
+              ) : inviteRequired ? (
                 <>
                   <input
                     className="glass-input w-full"
-                    type="email"
-                    placeholder="邮箱（可选）"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="邀请码 (必填)"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    minLength={6}
+                    maxLength={64}
+                    required
                   />
-                  {appAccessUnlocked ? (
-                    <p className="text-xs text-text-muted">当前测试会话已解锁，注册时无需再次输入邀请码。</p>
-                  ) : inviteRequired ? (
-                    <>
-                      <input
-                        className="glass-input w-full"
-                        placeholder="邀请码 (必填)"
-                        value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                        minLength={6}
-                        maxLength={64}
-                        required
-                      />
-                      <p className="text-xs text-text-muted">当前平台开启了邀请码限制，请输入有效邀请码完成注册。</p>
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        className="glass-input w-full"
-                        placeholder="邀请码 / 代理码（选填）"
-                        value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                        maxLength={64}
-                      />
-                      <p className="text-xs text-text-muted">当前为开放注册模式。若持有导师或代理商邀请码，输入可绑定分销权益与专属折扣。</p>
-                    </>
-                  )}
+                  <p className="text-xs text-text-muted">当前平台开启了邀请码限制，请输入有效邀请码完成注册。</p>
+                </>
+              ) : (
+                <>
+                  <input
+                    className="glass-input w-full"
+                    placeholder="邀请码 / 代理码（选填）"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    maxLength={64}
+                  />
+                  <p className="text-xs text-text-muted">当前为开放注册模式。若持有导师或代理商邀请码，输入可绑定分销权益与专属折扣。</p>
                 </>
               )}
-              <button
-                className="bg-primary text-foreground rounded-lg px-4 py-3 w-full font-semibold disabled:opacity-50 transition-opacity hover:opacity-95"
-                disabled={loading}
-              >
-                {loading ? "处理中…" : registerMode ? "注册并登录" : "登录"}
-              </button>
-            </form>
-            <button
-              type="button"
-              className="text-sm text-primary mt-4 hover:underline"
-              onClick={() => setRegisterMode((v) => !v)}
-            >
-              {registerMode ? "已有账户？返回登录" : "还没有账户？注册"}
-            </button>
-            {(error || message) && (
-              <p role="status" className={`mt-4 text-sm ${error ? "text-status-failed-fg" : "text-status-success-fg"}`}>
-                {error || message}
-              </p>
-            )}
+            </>
+          )}
+          <button
+            className="bg-primary text-foreground rounded-lg px-4 py-3 w-full font-semibold disabled:opacity-50 transition-opacity hover:opacity-95"
+            disabled={loading}
+          >
+            {loading ? "处理中…" : registerMode ? "注册并登录" : "登录"}
+          </button>
+        </form>
+        <button
+          type="button"
+          className="text-sm text-primary mt-4 hover:underline"
+          onClick={() => setRegisterMode((v) => !v)}
+        >
+          {registerMode ? "已有账户？返回登录" : "还没有账户？注册"}
+        </button>
+        {(error || message) && (
+          <p role="status" className={`mt-4 text-sm ${error ? "text-status-failed-fg" : "text-status-success-fg"}`}>
+            {error || message}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  if (!user && !isPublicSection) {
+    return (
+      <main className="min-h-full p-6 md:p-10 bg-background">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {sections.map(item => {
+              const Icon = item.icon;
+              const isActive = section === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setSection(item.id);
+                    window.location.hash = `#/platform?section=${item.id}`;
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
+                    isActive
+                      ? "bg-primary text-foreground border-primary shadow-sm"
+                      : "glass-panel text-text-secondary hover:text-foreground hover:bg-hover-bg border-glass-border"
+                  }`}
+                >
+                  <Icon size={14} className={isActive ? "text-foreground" : "text-primary"} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
+          {renderAuthForm()}
         </div>
       </main>
     );
@@ -198,14 +230,24 @@ export default function PlatformPortal() {
           <p className="text-text-secondary mt-2">用户、认证、赛事、培训与商业任务统一工作台</p>
         </div>
         <div className="flex gap-2">
-          {user.role === "admin" && (
+          {user?.role === "admin" && (
             <button type="button" onClick={() => { window.location.hash = "#/admin"; }} className="glass-button">
               管理后台
             </button>
           )}
-          <button type="button" onClick={() => void logout()} className="glass-button">
-            退出登录
-          </button>
+          {user ? (
+            <button type="button" onClick={() => void logout()} className="glass-button">
+              退出登录
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setSection("users"); window.location.hash = "#/platform?section=users"; }}
+              className="glass-button !bg-primary !text-white"
+            >
+              登录账号
+            </button>
+          )}
         </div>
       </header>
       <div className="max-w-6xl mx-auto space-y-6">

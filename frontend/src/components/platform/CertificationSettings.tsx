@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, Award, CheckCircle2, Clock, FileText, Send, Sparkles, AlertCircle, ChevronRight, Loader2 } from "lucide-react";
 import { platformApi, type PlatformCertification, type PlatformExam } from "@/lib/platformApi";
+import { usePlatformStore } from "@/store/platformStore";
 
 export default function CertificationSettings() {
   const [cert, setCert] = useState<PlatformCertification | null>(null);
@@ -12,6 +13,7 @@ export default function CertificationSettings() {
   const [projectTitle, setProjectTitle] = useState("");
   const [submissionDesc, setSubmissionDesc] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const { user } = usePlatformStore();
 
   const loadData = async () => {
     setLoading(true);
@@ -35,6 +37,10 @@ export default function CertificationSettings() {
 
   const handleSubmitExam = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setMessage("提交考核申请需要先登录创作者账号，请点击右上角登录。");
+      return;
+    }
     if (!exam) return;
     setSubmitting(true);
     setMessage(null);
@@ -91,6 +97,21 @@ export default function CertificationSettings() {
           </button>
         </div>
       </div>
+
+      {!user && (
+        <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="text-xs text-text-secondary leading-relaxed">
+            💡 <span className="font-semibold text-foreground">访客浏览模式</span>：您当前可以公开查阅创作者认证权益、要求与考题示例。在准备好提交认证作品时，请先登录创作者账号。
+          </div>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = "#/platform?section=users"; }}
+            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 shrink-0"
+          >
+            登录创作者账号
+          </button>
+        </div>
+      )}
 
       {message && (
         <div

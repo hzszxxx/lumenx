@@ -108,6 +108,10 @@ export default function TaskSettings() {
   }, []);
 
   const handleClaim = async (task: PlatformTask) => {
+    if (!user) {
+      setMessage("认领商业任务需要先登录创作者账号，请先登录。");
+      return;
+    }
     setClaimingId(task.id);
     setMessage(null);
     try {
@@ -257,13 +261,34 @@ export default function TaskSettings() {
             </button>
             <button
               type="button"
-              onClick={() => setShowCreateTaskDialog(true)}
+              onClick={() => {
+                if (!user) {
+                  setMessage("发布商业需求需要先登录创作者账号，请先登录。");
+                  return;
+                }
+                setShowCreateTaskDialog(true);
+              }}
               className="bg-primary text-foreground text-xs font-semibold py-1.5 px-3.5 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm shrink-0 self-center cursor-pointer"
             >
               <Plus size={13} /> 发布商业需求
             </button>
           </div>
         </div>
+
+        {!user && (
+          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="text-xs text-text-secondary leading-relaxed">
+              💡 <span className="font-semibold text-foreground">任务广场浏览模式</span>：任何人均可实时查看最新发布的企业短剧与商单需求。认领任务签约或发布商单时需登录创作者账号。
+            </div>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#/platform?section=users"; }}
+              className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 shrink-0"
+            >
+              登录创作者账号
+            </button>
+          </div>
+        )}
 
         {/* 多维筛选区域 (仿 VJshi 矩阵过滤) */}
         <div className="mt-5 space-y-3.5">

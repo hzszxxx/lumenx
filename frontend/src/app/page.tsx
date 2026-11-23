@@ -34,6 +34,7 @@ const ScriptEditorShell = dynamic(() => import("@/components/modules/ScriptEdito
 const AtelierShell = dynamic(() => import("@/components/atelier/v3/AtelierShell"), { ssr: false });
 const PlatformPortal = dynamic(() => import("@/components/platform/PlatformPortal"), { ssr: false });
 const AdminConsole = dynamic(() => import("@/components/platform/AdminConsole"), { ssr: false });
+const AuthModal = dynamic(() => import("@/components/auth/AuthModal"), { ssr: false });
 
 type CreatedSeriesReceipt = { id: string; revision: number; title: string };
 
@@ -730,8 +731,19 @@ export default function Home() {
   const syncProjectList = useProjectStore((state) => state.syncProjectList);
   const fetchSeriesList = useProjectStore((state) => state.fetchSeriesList);
   const platformUser = usePlatformStore((state) => state.user);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalInfo, setAuthModalInfo] = useState<{ title?: string; description?: string; nextAction?: () => void }>({});
   const t = useTranslations("workspace");
   const tc = useTranslations("common");
+
+  const requireAuth = (title: string, description: string, nextAction?: () => void) => {
+    if (platformUser) {
+      nextAction?.();
+      return;
+    }
+    setAuthModalInfo({ title, description, nextAction });
+    setAuthModalOpen(true);
+  };
 
   useEffect(() => {
     if (currentView === "platform" || currentView === "admin") {
@@ -740,14 +752,12 @@ export default function Home() {
     }
     if (!getPlatformToken()) {
       setPlatformAccess("ready");
-      if (window.location.hash !== "#/platform") window.location.hash = "#/platform";
       return;
     }
     let active = true;
     void platformApi.me().then(() => { if (active) setPlatformAccess("ready"); }).catch(() => {
       if (!active) return;
       window.localStorage.removeItem("lumenx_platform_token");
-      window.location.hash = "#/platform";
       setPlatformAccess("ready");
     });
     return () => { active = false; };
@@ -850,6 +860,30 @@ export default function Home() {
         setProjectId(null);
         setSeriesId(null);
         setEpisodeId(null);
+        return;
+      }
+      if (hash === '#/academy' || hash === '#/courses') {
+        setCurrentView('platform');
+        setActiveTab('platform');
+        window.location.hash = '#/platform?section=academy';
+        return;
+      }
+      if (hash === '#/certification') {
+        setCurrentView('platform');
+        setActiveTab('platform');
+        window.location.hash = '#/platform?section=certification';
+        return;
+      }
+      if (hash === '#/tasks') {
+        setCurrentView('platform');
+        setActiveTab('platform');
+        window.location.hash = '#/platform?section=tasks';
+        return;
+      }
+      if (hash === '#/profile' || hash === '#/users') {
+        setCurrentView('platform');
+        setActiveTab('platform');
+        window.location.hash = '#/platform?section=users';
         return;
       }
       if (/^#\/platform(?:\?section=[^&]+)?$/.test(hash)) {
@@ -962,21 +996,28 @@ export default function Home() {
   }, []);
 
   if (currentView === 'atelier') {
-    if (platformAccess === "checking") {
-      return <div className="min-h-screen bg-background text-foreground flex items-center justify-center">正在验证平台账户…</div>;
+    if (!platformUser) {
+      requireAuth("进入创作画布需要登录创作者账号", "登录后即可使用无限节点画板进行剧本分镜与视觉生成", () => {
+        window.location.hash = "#/atelier";
+      });
+      window.location.hash = "#/";
+      return null;
     }
     return <AtelierShell />;
   }
 
   if (currentView === 'platform') {
-    if (!platformUser) {
-      return (
-        <div className="flex h-screen w-full flex-col bg-background overflow-y-auto">
-          <PlatformPortal />
-        </div>
-      );
-    }
-    return <AppShell activeTab="platform" onTabChange={(tab) => setActiveTab(tab)}><PlatformPortal /></AppShell>;
+    return (
+      <AppShell
+        activeTab="platform"
+        onTabChange={(tab) => setActiveTab(tab)}
+        onRequestCreate={() => requireAuth("开始创作需要登录创作者账号", "登录后即可创建短剧与分镜、进入节点画布并生成 AI 视频", () => setIsDialogOpen(true))}
+        onRequestAuth={(t, d) => requireAuth(t || "登录创作者平台", d || "登录后开始创作与认证")}
+        onLogout={() => void handlePlatformLogout()}
+      >
+        <PlatformPortal />
+      </AppShell>
+    );
   }
 
   if (currentView === 'admin') {
@@ -989,11 +1030,25 @@ export default function Home() {
 
   // 项目详情页 — 全屏，无 GlobalSidebar
   if (currentView === 'project' && projectId) {
+    if (!platformUser) {
+      requireAuth("进入项目创作需要登录创作者账号", "登录后即可查看和编辑该项目的分镜、提示词与视频生成", () => {
+        window.location.hash = `#/project/${projectId}`;
+      });
+      window.location.hash = "#/";
+      return null;
+    }
     return <ProjectClient id={projectId} initialStep={projectStep} />;
   }
 
   // 系列集数编辑 — 全屏，BreadcrumbBar 内嵌在 ProjectClient
   if (currentView === 'series-episode' && seriesId && episodeId) {
+    if (!platformUser) {
+      requireAuth("编辑剧集需要登录创作者账号", "登录后即可编辑该集的分镜剧本与视觉效果", () => {
+        window.location.hash = `#/series/${seriesId}/episode/${episodeId}`;
+      });
+      window.location.hash = "#/";
+      return null;
+    }
     return <EpisodeBreadcrumbWrapper seriesId={seriesId} episodeId={episodeId} />;
   }
 
@@ -1001,6 +1056,31 @@ export default function Home() {
   if (currentView === 'series' && seriesId) {
     return <SeriesDetailPage seriesId={seriesId} />;
   }
+
+  const handleOpenCreateProject = (series?: { id: string; title: string }) => {
+    requireAuth("开始创作需要登录创作者账号", "登录后即可创建短剧与分镜、进入节点画布并生成 AI 视频", () => {
+      setDialogSeries(series || null);
+      setIsDialogOpen(true);
+    });
+  };
+
+  const handleOpenCreateSeries = () => {
+    requireAuth("创建短剧需要登录创作者账号", "登录后即可创建剧集系列并管理分镜", () => {
+      setIsSeriesDialogOpen(true);
+    });
+  };
+
+  const handleOpenImportFile = () => {
+    requireAuth("导入分镜需要登录创作者账号", "登录后即可上传并智能拆解分镜脚本", () => {
+      setIsImportDialogOpen(true);
+    });
+  };
+
+  const handleOpenImportPackage = () => {
+    requireAuth("导入项目需要登录创作者账号", "登录后即可导入工程文件包并继续创作", () => {
+      setIsPackageImportOpen(true);
+    });
+  };
 
   // Filter standalone projects (not belonging to any series)
   const standaloneProjects = projects.filter((p) => !p.series_id);
@@ -1093,7 +1173,7 @@ export default function Home() {
               {tc("sync")}
             </button>
             <button
-              onClick={() => setIsImportDialogOpen(true)}
+              onClick={handleOpenImportFile}
               disabled={!online}
               title={!online ? tc("offlineTooltip") : undefined}
               className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
@@ -1102,7 +1182,7 @@ export default function Home() {
               {t("importFile")}
             </button>
             <button
-              onClick={() => setIsPackageImportOpen(true)}
+              onClick={handleOpenImportPackage}
               disabled={!online}
               title={!online ? tc("offlineTooltip") : undefined}
               className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
@@ -1128,14 +1208,14 @@ export default function Home() {
                   className="absolute right-0 top-full mt-1 w-48 bg-elevated border border-glass-border rounded-xl shadow-xl z-20 overflow-hidden"
                 >
                   <button
-                    onClick={() => { setIsSeriesDialogOpen(true); setShowCreateDropdown(false); }}
+                    onClick={() => { handleOpenCreateSeries(); setShowCreateDropdown(false); }}
                     className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-hover-bg transition-colors flex items-center gap-2"
                   >
                     <Library size={16} className="text-primary" />
                     {t("newSeries")}
                   </button>
                   <button
-                    onClick={() => { setIsDialogOpen(true); setShowCreateDropdown(false); }}
+                    onClick={() => { handleOpenCreateProject(); setShowCreateDropdown(false); }}
                     className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-hover-bg transition-colors flex items-center gap-2"
                   >
                     <FileText size={16} className="text-text-muted" />
@@ -1233,14 +1313,14 @@ export default function Home() {
                   </p>
                   <div className="flex gap-3 mt-2">
                     <button
-                      onClick={() => setIsSeriesDialogOpen(true)}
+                      onClick={handleOpenCreateSeries}
                       className="bg-primary hover:bg-primary/90 text-on-accent px-5 py-2.5 rounded-[10px] font-semibold flex items-center gap-2 transition-all text-[0.8125rem] shadow-[var(--glow-primary)]"
                     >
                       <Plus size={14} />
                       {t("createSeries")}
                     </button>
                     <button
-                      onClick={() => setIsDialogOpen(true)}
+                      onClick={() => handleOpenCreateProject()}
                       className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold"
                     >
                       <FileText size={14} />
@@ -1422,12 +1502,29 @@ export default function Home() {
       <div className="atelier-page-bloom" aria-hidden="true" />
       <div className="atelier-page-grain" aria-hidden="true" />
 
-      {/* AppShell with GlobalSidebar + content */}
+      {/* AppShell with TopNavbar + GlobalSidebar + content */}
       <div className="relative z-10 flex-1 overflow-hidden">
-        <AppShell activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => void handlePlatformLogout()}>
+        <AppShell
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          onRequestCreate={() => handleOpenCreateProject()}
+          onRequestAuth={(t, d) => requireAuth(t || "登录创作者平台", d || "登录后开始创作与认证")}
+          onLogout={() => void handlePlatformLogout()}
+        >
           {renderContent()}
         </AppShell>
       </div>
+
+      {/* Global Auth Modal for on-demand login prompts */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        title={authModalInfo.title}
+        description={authModalInfo.description}
+        onSuccess={() => {
+          authModalInfo.nextAction?.();
+        }}
+      />
 
       {/* Create Project Dialog */}
       <CreateProjectDialog

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { GraduationCap, Play, FileBox, CheckCircle2, Video, Sparkles, ExternalLink, ChevronRight, Loader2 } from "lucide-react";
 import { platformApi, type PlatformCourse, type PlatformTemplate } from "@/lib/platformApi";
+import { usePlatformStore } from "@/store/platformStore";
 
 export default function AcademySettings() {
   const [courses, setCourses] = useState<PlatformCourse[]>([]);
@@ -12,6 +13,7 @@ export default function AcademySettings() {
   const [playingCourse, setPlayingCourse] = useState<PlatformCourse | null>(null);
   const [forkingId, setForkingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const { user } = usePlatformStore();
 
   const loadData = async () => {
     setLoading(true);
@@ -34,6 +36,10 @@ export default function AcademySettings() {
   }, []);
 
   const handleFork = async (tmpl: PlatformTemplate) => {
+    if (!user) {
+      setMessage("克隆模板到工作区需要登录创作者账号，请先登录。");
+      return;
+    }
     setForkingId(tmpl.id);
     setMessage(null);
     try {
@@ -70,6 +76,21 @@ export default function AcademySettings() {
             刷新资源
           </button>
         </div>
+
+        {!user && (
+          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="text-xs text-text-secondary leading-relaxed">
+              💡 <span className="font-semibold text-foreground">公开学习模式</span>：所有人均可直接学习官方实战课程。若需将工程模板克隆到工作区实操，请先登录创作者账号。
+            </div>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#/platform?section=users"; }}
+              className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 shrink-0"
+            >
+              登录创作者账号
+            </button>
+          </div>
+        )}
 
         {/* Tab switch */}
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-glass-border">
