@@ -554,7 +554,7 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
               <button
                 type="submit"
                 disabled={submitting}
-                className="bg-primary text-foreground font-semibold px-5 py-2 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                className="bg-primary text-white font-semibold px-5 py-2 rounded-xl hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
               >
                 {submitting ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
                 立即托管赏金并发布 (¥{bountyYuan})

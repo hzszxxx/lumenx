@@ -99,7 +99,7 @@ export default function AcademySettings() {
             onClick={() => setActiveTab("courses")}
             className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-all ${
               activeTab === "courses"
-                ? "bg-primary text-foreground shadow-sm"
+                ? "bg-primary text-white shadow-sm"
                 : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
             }`}
           >
@@ -110,7 +110,7 @@ export default function AcademySettings() {
             onClick={() => setActiveTab("templates")}
             className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-all ${
               activeTab === "templates"
-                ? "bg-primary text-foreground shadow-sm"
+                ? "bg-primary text-white shadow-sm"
                 : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
             }`}
           >
@@ -177,7 +177,7 @@ export default function AcademySettings() {
                     <button
                       type="button"
                       onClick={() => setPlayingCourse(course)}
-                      className="bg-primary text-foreground text-xs px-3.5 py-1.5 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm"
+                      className="bg-primary text-white text-xs px-3.5 py-1.5 rounded-lg font-medium hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm"
                     >
                       <Play size={12} fill="currentColor" />
                       开始学习

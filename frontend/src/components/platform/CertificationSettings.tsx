@@ -278,7 +278,7 @@ export default function CertificationSettings() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="bg-primary text-foreground text-xs px-5 py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                    className="bg-primary text-white text-xs px-5 py-2.5 rounded-lg font-medium hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                   >
                     {submitting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                     提交认证考核

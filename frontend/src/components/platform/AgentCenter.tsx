@@ -281,7 +281,7 @@ export default function AgentCenter() {
             <button
               type="button"
               onClick={() => setActiveTab("purchase")}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-foreground hover:bg-primary/90 transition shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary-hover transition shadow-sm flex items-center gap-1.5"
             >
               <Plus size={15} />
               批采学员注册码
@@ -378,7 +378,7 @@ export default function AgentCenter() {
           onClick={() => setActiveTab("invites")}
           className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
             activeTab === "invites"
-              ? "bg-primary text-foreground font-semibold shadow-sm"
+              ? "bg-primary text-white font-semibold shadow-sm"
               : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
           }`}
         >
@@ -389,7 +389,7 @@ export default function AgentCenter() {
           onClick={() => setActiveTab("students")}
           className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
             activeTab === "students"
-              ? "bg-primary text-foreground font-semibold shadow-sm"
+              ? "bg-primary text-white font-semibold shadow-sm"
               : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
           }`}
         >
@@ -400,7 +400,7 @@ export default function AgentCenter() {
           onClick={() => setActiveTab("commissions")}
           className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
             activeTab === "commissions"
-              ? "bg-primary text-foreground font-semibold shadow-sm"
+              ? "bg-primary text-white font-semibold shadow-sm"
               : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
           }`}
         >
@@ -411,7 +411,7 @@ export default function AgentCenter() {
           onClick={() => setActiveTab("batches")}
           className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
             activeTab === "batches"
-              ? "bg-primary text-foreground font-semibold shadow-sm"
+              ? "bg-primary text-white font-semibold shadow-sm"
               : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
           }`}
         >
@@ -422,7 +422,7 @@ export default function AgentCenter() {
           onClick={() => setActiveTab("purchase")}
           className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
             activeTab === "purchase"
-              ? "bg-primary text-foreground font-semibold shadow-sm"
+              ? "bg-primary text-white font-semibold shadow-sm"
               : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
           }`}
         >
@@ -433,7 +433,7 @@ export default function AgentCenter() {
           onClick={() => setActiveTab("profile")}
           className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
             activeTab === "profile"
-              ? "bg-primary text-foreground font-semibold shadow-sm"
+              ? "bg-primary text-white font-semibold shadow-sm"
               : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
           }`}
         >
@@ -557,7 +557,7 @@ export default function AgentCenter() {
                               <button
                                 type="button"
                                 onClick={() => void handleSaveInviteNote(item.id)}
-                                className="p-1 rounded bg-primary text-foreground hover:bg-primary/80"
+                                className="p-1 rounded bg-primary text-white hover:bg-primary-hover"
                               >
                                 <Check size={12} />
                               </button>
@@ -882,7 +882,7 @@ export default function AgentCenter() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground">{pkg.label}</span>
                     {pkg.popular && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary text-foreground">推荐</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary text-white font-medium">推荐</span>
                     )}
                   </div>
                   <p className="text-lg font-mono font-bold text-primary mt-2">{pkg.unit}</p>
@@ -961,7 +961,7 @@ export default function AgentCenter() {
             <button
               type="submit"
               disabled={purchasing}
-              className="w-full py-3 rounded-xl bg-primary text-foreground font-semibold text-sm hover:bg-primary/90 transition shadow-md disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-hover transition shadow-md disabled:opacity-50"
             >
               {purchasing ? "正在生成邀请码..." : `确认采购并出码 (总计 ¥${priceInfo.totalYuan})`}
             </button>
@@ -1055,7 +1055,7 @@ export default function AgentCenter() {
             <button
               type="submit"
               disabled={updatingProfile}
-              className="w-full py-2.5 rounded-xl bg-primary text-foreground font-semibold text-xs hover:bg-primary/90 transition shadow-sm disabled:opacity-50"
+              className="w-full py-2.5 rounded-xl bg-primary text-white font-semibold text-xs hover:bg-primary-hover transition shadow-sm disabled:opacity-50"
             >
               {updatingProfile ? "保存中..." : "保存资质与信息"}
             </button>

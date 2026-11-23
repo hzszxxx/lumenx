@@ -283,7 +283,7 @@ export default function SkillSettings() {
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
-              className="bg-primary text-foreground rounded-lg px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+              className="bg-primary text-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-primary-hover transition-opacity"
               onClick={() => void create()}
             >
               保存并发布 Skill 草稿
@@ -376,7 +376,7 @@ export default function SkillSettings() {
                           type="button"
                           disabled={busyId === item.id}
                           onClick={() => void toggleSkill(item, true)}
-                          className="bg-primary text-foreground text-xs px-3.5 py-1.5 rounded-lg font-medium hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
+                          className="bg-primary text-white text-xs px-3.5 py-1.5 rounded-lg font-medium hover:bg-primary-hover transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
                           title="点击开启激活"
                         >
                           {busyId === item.id ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}

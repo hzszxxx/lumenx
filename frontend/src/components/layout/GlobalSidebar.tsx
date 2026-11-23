@@ -29,9 +29,15 @@ export const GLOBAL_NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: s
 ];
 
 const PLATFORM_SUBNAV = [
-  ["users", "用户管理"], ["compute", "算力与凭证"], ["skills", "视频 Skill"], ["xiangongyun", "仙宫云 H3"],
+  ["academy", "课程"],
+  ["certification", "创作者认证"],
+  ["tasks", "任务市场"],
+  ["competitions", "赛事活动"],
+  ["users", "用户与中心"],
+  ["wallet", "收益与钱包"],
+  ["compute", "算力与凭证"],
+  ["skills", "视频 Skill"],
   ["agent", "渠道代理"],
-  ["competitions", "赛事活动"], ["certification", "创作者认证"], ["tasks", "商业任务"], ["wallet", "收益与钱包"], ["academy", "培训学院"],
 ] as const;
 
 const APP_VERSION = "v0.2.0";
@@ -111,7 +117,7 @@ export default function GlobalSidebar({
 
   return (
     <aside
-      className="w-52 flex-shrink-0 h-full hidden md:flex flex-col border-r border-glass-border bg-surface/60 backdrop-blur-xl"
+      className="w-52 flex-shrink-0 h-full hidden md:flex flex-col border-r border-glass-border bg-surface-inset backdrop-blur-xl"
       data-tauri-drag-region
     >
       {/* Traffic Light inset for Tauri desktop */}

@@ -22,16 +22,16 @@ import { Building2, Wallet } from "lucide-react";
 type Section = "users" | "compute" | "skills" | "xiangongyun" | "agent" | "competitions" | "certification" | "tasks" | "wallet" | "academy";
 
 const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
+  { id: "academy", label: "课程", icon: GraduationCap },
+  { id: "certification", label: "创作者认证", icon: ShieldCheck },
+  { id: "tasks", label: "任务市场", icon: BriefcaseBusiness },
+  { id: "competitions", label: "赛事活动", icon: Trophy },
   { id: "users", label: "用户管理", icon: Users },
+  { id: "wallet", label: "收益与钱包", icon: Wallet },
   { id: "compute", label: "算力与凭证", icon: KeyRound },
   { id: "skills", label: "我的视频 Skill", icon: Sparkles },
   { id: "xiangongyun", label: "仙宫云 H3", icon: Cpu },
   { id: "agent", label: "渠道代理", icon: Building2 },
-  { id: "competitions", label: "赛事活动", icon: Trophy },
-  { id: "certification", label: "创作者认证", icon: ShieldCheck },
-  { id: "tasks", label: "商业任务", icon: BriefcaseBusiness },
-  { id: "wallet", label: "收益与钱包", icon: Wallet },
-  { id: "academy", label: "培训学院", icon: GraduationCap },
 ];
 
 export default function PlatformPortal() {
@@ -93,7 +93,7 @@ export default function PlatformPortal() {
           {tn("brandSlogan")}
         </p>
       </div>
-      <div className="glass-panel p-6 sm:p-8 w-full shadow-2xl">
+      <div className="bg-surface border border-glass-border rounded-2xl p-6 sm:p-8 w-full shadow-2xl">
         <div className="flex items-center gap-3 mb-6">
           <div className="rounded-xl bg-primary/15 p-3 text-primary">
             <LogIn size={22} />
@@ -163,7 +163,7 @@ export default function PlatformPortal() {
             </>
           )}
           <button
-            className="bg-primary text-foreground rounded-lg px-4 py-3 w-full font-semibold disabled:opacity-50 transition-opacity hover:opacity-95"
+            className="bg-primary text-white rounded-lg px-4 py-3 w-full font-semibold disabled:opacity-50 transition-opacity hover:opacity-95"
             disabled={loading}
           >
             {loading ? "处理中…" : registerMode ? "注册并登录" : "登录"}
@@ -203,11 +203,11 @@ export default function PlatformPortal() {
                   }}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
                     isActive
-                      ? "bg-primary text-foreground border-primary shadow-sm"
+                      ? "bg-primary text-white border-primary shadow-sm"
                       : "glass-panel text-text-secondary hover:text-foreground hover:bg-hover-bg border-glass-border"
                   }`}
                 >
-                  <Icon size={14} className={isActive ? "text-foreground" : "text-primary"} />
+                  <Icon size={14} className={isActive ? "text-white" : "text-primary"} />
                   <span>{item.label}</span>
                 </button>
               );
@@ -266,11 +266,11 @@ export default function PlatformPortal() {
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
                   isActive
-                    ? "bg-primary text-foreground border-primary shadow-sm"
+                    ? "bg-primary text-white border-primary shadow-sm"
                     : "glass-panel text-text-secondary hover:text-foreground hover:bg-hover-bg border-glass-border"
                 }`}
               >
-                <Icon size={14} className={isActive ? "text-foreground" : "text-primary"} />
+                <Icon size={14} className={isActive ? "text-white" : "text-primary"} />
                 <span>{item.label}</span>
               </button>
             );

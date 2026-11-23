@@ -161,7 +161,7 @@ export default function ContractViewerDialog({ task, onClose }: ContractViewerDi
           <button
             type="button"
             onClick={onClose}
-            className="bg-primary text-foreground text-xs font-semibold px-5 py-2 rounded-xl hover:opacity-90 transition-opacity"
+            className="bg-primary text-white text-xs font-semibold px-5 py-2 rounded-xl hover:bg-primary-hover transition-opacity"
           >
             完成查看
           </button>

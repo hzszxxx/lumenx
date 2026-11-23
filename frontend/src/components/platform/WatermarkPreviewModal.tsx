@@ -184,7 +184,7 @@ export function WatermarkPreviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="bg-primary text-foreground font-semibold px-4 py-2 rounded-xl text-xs hover:opacity-90 transition-opacity cursor-pointer"
+            className="bg-primary text-white font-semibold px-4 py-2 rounded-xl text-xs hover:bg-primary-hover transition-opacity cursor-pointer"
           >
             确定并返回交付
           </button>

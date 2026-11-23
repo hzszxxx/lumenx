@@ -268,7 +268,7 @@ export default function TaskSettings() {
                 }
                 setShowCreateTaskDialog(true);
               }}
-              className="bg-primary text-foreground text-xs font-semibold py-1.5 px-3.5 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm shrink-0 self-center cursor-pointer"
+              className="bg-primary text-white text-xs font-semibold py-1.5 px-3.5 rounded-lg hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm shrink-0 self-center cursor-pointer"
             >
               <Plus size={13} /> 发布商业需求
             </button>
@@ -308,7 +308,7 @@ export default function TaskSettings() {
                   onClick={() => setSelectedStatusTab(id as typeof selectedStatusTab)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs ${
                     selectedStatusTab === id
-                      ? "bg-primary text-foreground shadow-sm font-semibold"
+                      ? "bg-primary text-white shadow-sm font-semibold"
                       : "text-text-secondary hover:text-foreground hover:bg-hover-bg border border-glass-border/40"
                   }`}
                 >
@@ -329,11 +329,11 @@ export default function TaskSettings() {
                   onClick={() => setSelectedDemandType(id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all text-xs ${
                     selectedDemandType === id
-                      ? "bg-primary text-foreground shadow-sm font-semibold"
+                      ? "bg-primary text-white shadow-sm font-semibold"
                       : "text-text-secondary hover:text-foreground hover:bg-hover-bg border border-glass-border/40"
                   }`}
                 >
-                  <Icon size={13} className={selectedDemandType === id ? "text-foreground" : "text-text-muted"} />
+                  <Icon size={13} className={selectedDemandType === id ? "text-white" : "text-text-muted"} />
                   {label}
                 </button>
               ))}
@@ -351,7 +351,7 @@ export default function TaskSettings() {
                   onClick={() => setSelectedLevelTier(id)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs ${
                     selectedLevelTier === id
-                      ? "bg-primary text-foreground shadow-sm font-semibold"
+                      ? "bg-primary text-white shadow-sm font-semibold"
                       : "text-text-secondary hover:text-foreground hover:bg-hover-bg border border-glass-border/40"
                   }`}
                 >
@@ -372,7 +372,7 @@ export default function TaskSettings() {
                   onClick={() => setSelectedSettlement(id)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs ${
                     selectedSettlement === id
-                      ? "bg-primary text-foreground shadow-sm font-semibold"
+                      ? "bg-primary text-white shadow-sm font-semibold"
                       : "text-text-secondary hover:text-foreground hover:bg-hover-bg border border-glass-border/40"
                   }`}
                 >
@@ -584,7 +584,7 @@ export default function TaskSettings() {
                           type="button"
                           disabled={claimingId === task.id}
                           onClick={() => setSigningContractTask(task)}
-                          className="bg-primary text-foreground text-xs px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                          className="bg-primary text-white text-xs px-4 py-2 rounded-lg font-medium hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                         >
                           {claimingId === task.id ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -732,7 +732,7 @@ export default function TaskSettings() {
                                 type="button"
                                 disabled={isSubmittingDelivery || !watermarkConfirmed}
                                 onClick={() => void handleDeliver(task)}
-                                className="bg-primary text-foreground text-xs px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                className="bg-primary text-white text-xs px-4 py-2 rounded-lg font-medium hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                               >
                                 {isSubmittingDelivery ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
                                 确认提交交付审核

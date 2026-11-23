@@ -195,7 +195,7 @@ export default function ContractSignDialog({
             type="button"
             onClick={() => void onConfirm()}
             disabled={isSigning}
-            className="bg-primary text-foreground font-semibold px-6 py-2.5 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2 text-xs shadow-md cursor-pointer disabled:opacity-50"
+            className="bg-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-primary-hover transition-opacity flex items-center gap-2 text-xs shadow-md cursor-pointer disabled:opacity-50"
           >
             {isSigning ? (
               <>

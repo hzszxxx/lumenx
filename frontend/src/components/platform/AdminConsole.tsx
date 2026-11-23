@@ -612,7 +612,7 @@ export default function AdminConsole() {
                           </button>
                           <button
                             type="submit"
-                            className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-foreground hover:bg-primary/90"
+                            className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary-hover"
                           >
                             保存配置
                           </button>
@@ -675,7 +675,7 @@ export default function AdminConsole() {
                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 shrink-0 ${
                       registrationInviteRequired
                         ? "bg-surface border border-glass-border text-foreground hover:bg-hover-bg"
-                        : "bg-primary text-foreground hover:bg-primary/90 shadow-sm"
+                        : "bg-primary text-white hover:bg-primary-hover shadow-sm"
                     }`}
                   >
                     {updatingSetting ? (

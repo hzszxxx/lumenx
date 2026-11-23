@@ -43,7 +43,7 @@ export default function UserSettings() {
               <button
                 type="button"
                 onClick={() => { window.location.hash = "#/admin"; }}
-                className="bg-primary text-foreground text-xs px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm"
+                className="bg-primary text-white text-xs px-4 py-2 rounded-lg font-medium hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm"
               >
                 <LayoutDashboard size={14} />
                 进入管理后台

@@ -96,7 +96,7 @@ export default function CompetitionSettings() {
               onClick={() => setFilter(tab.id)}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
                 filter === tab.id
-                  ? "bg-primary text-foreground shadow-sm"
+                  ? "bg-primary text-white shadow-sm"
                   : "text-text-secondary hover:text-foreground hover:bg-hover-bg"
               }`}
             >
@@ -198,7 +198,7 @@ export default function CompetitionSettings() {
                         type="button"
                         disabled={enrollingId === comp.id}
                         onClick={() => void handleEnroll(comp)}
-                        className="bg-primary text-foreground text-xs px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                        className="bg-primary text-white text-xs px-4 py-2 rounded-lg font-medium hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                       >
                         {enrollingId === comp.id ? (
                           <Loader2 size={13} className="animate-spin" />

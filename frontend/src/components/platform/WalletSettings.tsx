@@ -169,7 +169,7 @@ export default function WalletSettings() {
             <button
               type="button"
               onClick={() => setShowConvertModal(true)}
-              className="bg-primary text-foreground text-xs font-semibold px-4 py-2 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="bg-primary text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Cpu size={14} /> 收益兑换算力 (+20%补贴)
             </button>
@@ -341,7 +341,7 @@ export default function WalletSettings() {
                 <button
                   type="submit"
                   disabled={converting || convertYuan <= 0 || convertYuan > balanceCents / 100}
-                  className="bg-primary text-foreground font-semibold px-5 py-2 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="bg-primary text-white font-semibold px-5 py-2 rounded-xl hover:bg-primary-hover transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {converting ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
                   确认兑换到账
