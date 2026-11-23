@@ -27,7 +27,7 @@ export default function AuthModal({
   const [inviteCode, setInviteCode] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { login, register, loading, error: storeError } = usePlatformStore();
+  const { login, register, loading, error: storeError, devLogin } = usePlatformStore();
 
   if (!isOpen) return null;
 
@@ -56,9 +56,9 @@ export default function AuthModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-md animate-fade-in"
     >
-      <div className="relative w-full max-w-md rounded-2xl border border-glass-border bg-surface/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+      <div className="relative w-full max-w-md rounded-2xl border border-glass-border bg-surface p-6 sm:p-8 shadow-2xl">
         {/* 关闭按钮 */}
         <button
           type="button"
@@ -82,7 +82,7 @@ export default function AuthModal({
 
         {/* 错误提示 */}
         {currentError && (
-          <div role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <div role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-200">
             {currentError}
           </div>
         )}
@@ -90,12 +90,12 @@ export default function AuthModal({
         {/* 表单 */}
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">用户名</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1">用户名</label>
             <input
               type="text"
               required
               autoFocus
-              className="glass-input w-full text-sm"
+              className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
               placeholder="请输入用户名"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -103,11 +103,11 @@ export default function AuthModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">密码</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1">密码</label>
             <input
               type="password"
               required
-              className="glass-input w-full text-sm"
+              className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
               placeholder="请输入密码"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -117,10 +117,10 @@ export default function AuthModal({
           {isRegister && (
             <>
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">电子邮箱（选填）</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">电子邮箱（选填）</label>
                 <input
                   type="email"
-                  className="glass-input w-full text-sm"
+                  className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
                   placeholder="用于找回凭据"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -128,10 +128,10 @@ export default function AuthModal({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">邀请码（选填）</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">邀请码（选填）</label>
                 <input
                   type="text"
-                  className="glass-input w-full text-sm"
+                  className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
                   placeholder="如有内测邀请码请输入"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
@@ -143,7 +143,7 @@ export default function AuthModal({
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 rounded-xl bg-primary py-2.5 px-4 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full mt-2 rounded-xl bg-primary py-2.5 px-4 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-primary-hover transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
               <span className="inline-block animate-spin mr-1">⏳</span>
@@ -182,6 +182,39 @@ export default function AuthModal({
             </span>
           )}
         </div>
+
+        {/* 本地开发模式快捷免密通道（仅在开发模式生效，便于 T3 内置预览及自动化验收） */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-4 pt-3 border-t border-dashed border-amber-500/30 bg-amber-500/5 rounded-xl p-3 text-center">
+            <div className="text-[11px] font-medium text-amber-500 flex items-center justify-center gap-1 mb-2">
+              <Sparkles size={12} /> 本地开发快捷免密登录
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (devLogin) await devLogin("admin");
+                  onSuccess?.();
+                  onClose();
+                }}
+                className="flex-1 py-1.5 px-2 text-xs rounded-lg bg-surface hover:bg-hover-bg border border-glass-border text-foreground hover:border-primary/50 transition-colors"
+              >
+                管理员 (Admin)
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (devLogin) await devLogin("creator");
+                  onSuccess?.();
+                  onClose();
+                }}
+                className="flex-1 py-1.5 px-2 text-xs rounded-lg bg-surface hover:bg-hover-bg border border-glass-border text-foreground hover:border-primary/50 transition-colors"
+              >
+                创作者 (Creator)
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

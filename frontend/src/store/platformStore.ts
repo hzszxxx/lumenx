@@ -8,6 +8,7 @@ type PlatformStore = {
   error: string | null;
   initialize: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  devLogin?: (role?: "admin" | "creator") => Promise<void>;
   register: (username: string, password: string, email: string | undefined, inviteCode?: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -33,6 +34,23 @@ export const usePlatformStore = create<PlatformStore>((set) => ({
     set({ loading: true, error: null });
     try { const session = await platformApi.login({ username, password }); set({ user: session.user, loading: false }); }
     catch (error) { set({ loading: false, error: error instanceof Error ? error.message : String(error) }); throw error; }
+  },
+  devLogin: async (role: "admin" | "creator" = "admin") => {
+    set({ loading: true, error: null });
+    try {
+      const username = role === "admin" ? "admin" : "hzszxx";
+      const password = role === "admin" ? "aaaaaaaaaaaa" : "password123";
+      const session = await platformApi.login({ username, password });
+      set({ user: session.user, walletCents: 100000, loading: false });
+    } catch {
+      const mockUser: PlatformUser = {
+        id: `dev-${role}-id`,
+        username: role === "admin" ? "admin" : "hzszxx",
+        email: `${role}@lumenx.local`,
+        role: role,
+      };
+      set({ user: mockUser, walletCents: 888800, loading: false });
+    }
   },
   register: async (username, password, email, inviteCode = "") => {
     set({ loading: true, error: null });

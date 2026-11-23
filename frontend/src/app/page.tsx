@@ -770,6 +770,17 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Support ?dev_login=admin or ?dev_login=creator for instant automated auth in development & T3 Preview
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const devLoginParam = params.get("dev_login");
+      if (devLoginParam) {
+        void usePlatformStore.getState().devLogin?.(devLoginParam === "creator" ? "creator" : "admin");
+      }
+    }
+  }, []);
+
   // Hydrate the persisted gallery/list view preference (client-only to avoid
   // an SSR/CSR mismatch — default stays "gallery" on first paint).
   useEffect(() => {
