@@ -25,9 +25,7 @@ import { toast } from "@/store/toastStore";
 import { rovingKeyDown } from "@/lib/a11y";
 import { Image as ImageIcon, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
-import LumenXBranding from "@/components/layout/LumenXBranding";
-import UpdateChecker from "./UpdateChecker";
-type SettingsCategory = "general" | "models" | "prompts" | "apikeys" | "storage" | "about";
+type SettingsCategory = "general" | "models" | "prompts" | "apikeys" | "storage";
 import {
   FormRow,
   FieldLabel,
@@ -394,18 +392,6 @@ export default function SettingsPage() {
     return !!owner && isCurrentRuntimeEnvironment(owner.key, owner.generation);
   }, []);
 
-  // Self-healing lazy load: auto-run the system check when the About tab
-  // becomes active and we don't yet have a successful result. Driven off a
-  // tab-transition ref so it fires once per entry (no render thrash) and is
-  // not retried endlessly while the result is missing.
-  const prevActiveRef = useRef<SettingsCategory | null>(null);
-  useEffect(() => {
-    const enteredAbout = active === "about" && prevActiveRef.current !== "about";
-    prevActiveRef.current = active;
-    if (active === "about" && !systemChecked && !systemLoading && enteredAbout) {
-      loadSystem();
-    }
-  }, [active, systemChecked, systemLoading, loadSystem]);
 
   const saveConfig = async (validateProviders: boolean) => {
     if (savingGenerationRef.current !== null || !mountedRef.current) return;
@@ -1159,81 +1145,6 @@ export default function SettingsPage() {
     </Section>
   );
 
-  const renderAbout = () => {
-    const ff = system?.ffmpeg;
-    const aboutRows: { k: string; v: string; tone?: "ok" | "warn" }[] = [
-      { k: t("aboutAppVersion"), v: `影伴 Studio ${APP_VERSION}` },
-      { k: t("aboutBackendApi"), v: API_URL },
-      { k: t("aboutDataDir"), v: dataDir || "—" },
-      { k: t("logDirLabel"), v: logDir || "—" },
-    ];
-    return (
-      <Section id="about" title={t("secAboutTitle")}>
-        {/* Line B brand signature block — teal-glow logo, serif name, amber tagline */}
-        <div className="flex flex-col items-start gap-3 pb-6 mb-6 border-b border-glass-border">
-          <LumenXBranding size="md" showSlogan={false} />
-          <p className="font-display atelier-display text-base italic text-accent leading-snug">
-            “Render Noise into Narrative”
-          </p>
-          <div className="font-mono text-[0.625rem] tracking-[0.08em] text-text-muted uppercase">
-            VERSION {APP_VERSION.replace(/^v/, "")} · BUILD 20260613
-          </div>
-          <p className="text-[0.78125rem] text-text-secondary leading-relaxed max-w-md">
-            {t("aboutTagline")}
-          </p>
-        </div>
-
-        {/* Check for updates — compares APP_VERSION against latest GitHub release */}
-        <div className="mb-6">
-          <UpdateChecker />
-        </div>
-
-        {/* Technical info table */}
-        <div className="font-mono text-[0.59375rem] uppercase tracking-[0.1em] text-text-muted mb-3">
-          {t("aboutTechInfo")}
-        </div>
-        <div className="space-y-0">
-          {aboutRows.map((r) => (
-            <div key={r.k} className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[0.78125rem] gap-3">
-              <span className="text-text-secondary shrink-0">{r.k}</span>
-              <span className="font-mono text-[0.71875rem] text-foreground truncate text-right">{r.v}</span>
-            </div>
-          ))}
-          {/* FFmpeg row with live detection */}
-          <div className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[0.78125rem] gap-3">
-            <span className="text-text-secondary shrink-0">FFmpeg</span>
-            <span className="font-mono text-[0.71875rem] text-right truncate">
-              {systemLoading ? (
-                <span className="inline-flex items-center gap-1.5 text-text-muted">
-                  <Loader2 size={12} className="animate-spin" /> {t("ffmpegChecking")}
-                </span>
-              ) : ff ? (
-                ff.available ? (
-                  <span className="text-emerald-400" title={ff.message}>{t("ffmpegAvailable")}</span>
-                ) : (
-                  <span className="text-amber-400" title={ff.message}>{t("ffmpegMissing")}</span>
-                )
-              ) : (
-                <span className="text-text-muted">{t("ffmpegUnknown")}</span>
-              )}
-            </span>
-          </div>
-        </div>
-        <div className="flex justify-end pt-4">
-          <button
-            type="button"
-            onClick={loadSystem}
-            disabled={systemLoading}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-glass-border bg-surface text-text-secondary hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            {systemLoading ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />}
-            {t("recheck")}
-          </button>
-        </div>
-      </Section>
-    );
-  };
-
   const renderActive = () => {
     switch (active) {
       case "general":
@@ -1246,8 +1157,6 @@ export default function SettingsPage() {
         return renderApiKeys();
       case "storage":
         return renderStorage();
-      case "about":
-        return renderAbout();
       default:
         return null;
     }
@@ -1259,7 +1168,6 @@ export default function SettingsPage() {
     prompts: t("eyebrowPrompts"),
     apikeys: t("eyebrowApikeys"),
     storage: t("eyebrowStorage"),
-    about: t("eyebrowAbout"),
   };
 
   // 横向 Tab 短标签（取代竖向 SettingsSidebar；与全局品牌侧栏轴向正交，不再撞脸）。
@@ -1269,7 +1177,6 @@ export default function SettingsPage() {
     { id: "prompts", label: t("eyebrowPrompts") },
     { id: "apikeys", label: t("eyebrowApikeys") },
     { id: "storage", label: t("tabStorage") },
-    { id: "about", label: t("eyebrowAbout") },
   ];
 
   return (
