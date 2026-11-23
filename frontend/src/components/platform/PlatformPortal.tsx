@@ -22,11 +22,11 @@ import { Building2, Wallet } from "lucide-react";
 type Section = "users" | "compute" | "skills" | "xiangongyun" | "agent" | "competitions" | "certification" | "tasks" | "wallet" | "academy";
 
 const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
-  { id: "academy", label: "课程", icon: GraduationCap },
-  { id: "certification", label: "创作者认证", icon: ShieldCheck },
+  { id: "academy", label: "课程培训", icon: GraduationCap },
+  { id: "certification", label: "考核认证", icon: ShieldCheck },
   { id: "tasks", label: "任务市场", icon: BriefcaseBusiness },
   { id: "competitions", label: "赛事活动", icon: Trophy },
-  { id: "users", label: "用户管理", icon: Users },
+  { id: "users", label: "个人中心", icon: UserRound },
   { id: "wallet", label: "收益与钱包", icon: Wallet },
   { id: "compute", label: "算力与凭证", icon: KeyRound },
   { id: "skills", label: "我的视频 Skill", icon: Sparkles },

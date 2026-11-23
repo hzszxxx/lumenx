@@ -29,11 +29,11 @@ export const GLOBAL_NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: s
 ];
 
 const PLATFORM_SUBNAV = [
-  ["academy", "课程"],
-  ["certification", "创作者认证"],
+  ["academy", "课程培训"],
+  ["certification", "考核认证"],
   ["tasks", "任务市场"],
   ["competitions", "赛事活动"],
-  ["users", "用户与中心"],
+  ["users", "个人中心"],
   ["wallet", "收益与钱包"],
   ["compute", "算力与凭证"],
   ["skills", "视频 Skill"],

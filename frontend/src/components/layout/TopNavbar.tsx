@@ -84,10 +84,10 @@ export default function TopNavbar({
   };
 
   const navItems: Array<{ id: TopNavSection; label: string; icon: typeof LayoutGrid }> = [
-    { id: "workspace", label: "创作工作区", icon: LayoutGrid },
-    { id: "academy", label: "课程", icon: GraduationCap },
-    { id: "certification", label: "认证", icon: ShieldCheck },
+    { id: "academy", label: "课程培训", icon: GraduationCap },
+    { id: "certification", label: "考核认证", icon: ShieldCheck },
     { id: "tasks", label: "任务市场", icon: BriefcaseBusiness },
+    { id: "workspace", label: "创作工作区", icon: LayoutGrid },
     { id: "competitions", label: "赛事活动", icon: Trophy },
     { id: "profile", label: "个人中心", icon: UserRound },
   ];
