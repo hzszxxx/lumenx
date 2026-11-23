@@ -92,7 +92,13 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
     }, [applySession]);
 
     useEffect(() => {
-        setIsAdminConsolePath(window.location.pathname === "/admin");
+        const updateIsAdmin = () => {
+            const path = window.location.pathname;
+            const hash = window.location.hash;
+            setIsAdminConsolePath(path === "/admin" || path.endsWith("/admin.html") || hash === "#/admin");
+        };
+        updateIsAdmin();
+        window.addEventListener("hashchange", updateIsAdmin);
         mountedRef.current = true;
         const cleanupInterceptors = installAppAccessAxiosInterceptors();
         const handleExpired = (event: Event) => {
@@ -128,6 +134,7 @@ export default function AppAccessGate({ children }: AppAccessGateProps) {
             loginAbortRef.current?.abort();
             cleanupInterceptors();
             window.removeEventListener(APP_ACCESS_SESSION_EXPIRED_EVENT, handleExpired);
+            window.removeEventListener("hashchange", updateIsAdmin);
         };
     }, [checkSession]);
 

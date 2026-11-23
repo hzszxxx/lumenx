@@ -273,7 +273,11 @@ export default function AdminConsole() {
               type="button"
               className="w-full glass-button justify-start"
               onClick={() => {
-                window.location.href = "/#/platform";
+                if (window.location.pathname.endsWith("/admin.html") || window.location.pathname === "/admin") {
+                  window.location.href = "/static/index.html#/platform";
+                } else {
+                  window.location.hash = "#/platform";
+                }
               }}
             >
               <Users size={16} />返回平台

@@ -18,6 +18,25 @@ export default function RootLayout({
             __html: `(function(){try{var P=["atelier-dark","bridge-dark","brand-dark","atelier-light","brand-light"];var raw=localStorage.getItem("lumenx-settings");var d=JSON.parse(raw||"{}");var v=d.version||0;var t=d.state&&d.state.theme;if(v<2&&t==="atelier-dark"){t="atelier-light";}document.documentElement.className=(P.indexOf(t)>=0)?t:"atelier-light";}catch(e){document.documentElement.className="atelier-light";}})();`,
           }}
         />
+        {/* Automatic recovery when static chunks are updated on deployment */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              function handleChunkError(msg) {
+                if (/Loading chunk [^ ]+ failed|Failed to fetch dynamically imported module/i.test(msg)) {
+                  var last = sessionStorage.getItem('chunk_reload_ts');
+                  var now = Date.now();
+                  if (!last || now - parseInt(last, 10) > 8000) {
+                    sessionStorage.setItem('chunk_reload_ts', String(now));
+                    window.location.reload();
+                  }
+                }
+              }
+              window.addEventListener('error', function(e) { handleChunkError(e && e.message); });
+              window.addEventListener('unhandledrejection', function(e) { var r = e && e.reason; handleChunkError((r && r.message) || String(r)); });
+            })();`,
+          }}
+        />
         {/* Desktop app: compact font-size for embedded windows (Tauri / pywebview).
             Detection covers: Tauri protocol, Tauri global, pywebview global,
             and the production static/index.html served by backend (pywebview). */}
