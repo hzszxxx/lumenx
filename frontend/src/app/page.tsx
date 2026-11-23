@@ -19,7 +19,7 @@ import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { clearPlatformToken, getPlatformToken, platformApi } from "@/lib/platformApi";
 import { usePlatformStore } from "@/store/platformStore";
-import { requireActiveRuntimeEnvironment } from "@/lib/runtimeEnvironment";
+import { getRuntimeEnvironment, requireActiveRuntimeEnvironment, subscribeRuntimeEnvironment } from "@/lib/runtimeEnvironment";
 import { useTranslations } from "next-intl";
 import TauriMenuListener from "@/components/layout/TauriMenuListener";
 
@@ -763,10 +763,24 @@ export default function Home() {
     return () => { active = false; };
   }, [currentView]);
 
-  // Sync projects and series from backend on mount
+  // Sync projects and series from backend once runtime environment is active
   useEffect(() => {
-    syncProjects();
-    void syncSeries();
+    let synced = false;
+    const runSync = () => {
+      if (synced) return;
+      synced = true;
+      syncProjects();
+      void syncSeries();
+    };
+
+    if (getRuntimeEnvironment()) {
+      runSync();
+      return;
+    }
+    const unsubscribe = subscribeRuntimeEnvironment(() => {
+      if (getRuntimeEnvironment()) runSync();
+    });
+    return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
