@@ -746,21 +746,24 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (currentView === "platform" || currentView === "admin") {
-      setPlatformAccess("ready");
-      return;
-    }
     if (!getPlatformToken()) {
       setPlatformAccess("ready");
       return;
     }
     let active = true;
-    void platformApi.me().then(() => { if (active) setPlatformAccess("ready"); }).catch(() => {
-      if (!active) return;
-      window.localStorage.removeItem("lumenx_platform_token");
-      setPlatformAccess("ready");
-    });
-    return () => { active = false; };
+    void usePlatformStore
+      .getState()
+      .initialize()
+      .then(() => {
+        if (active) setPlatformAccess("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setPlatformAccess("ready");
+      });
+    return () => {
+      active = false;
+    };
   }, [currentView]);
 
   // Sync projects and series from backend once runtime environment is active
@@ -880,9 +883,10 @@ export default function Home() {
 
   const handlePlatformLogout = async () => {
     try {
-      await platformApi.logout();
-    } finally {
+      await usePlatformStore.getState().logout();
+    } catch {
       clearPlatformToken();
+    } finally {
       window.location.hash = "#/platform";
     }
   };
