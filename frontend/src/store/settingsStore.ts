@@ -5,7 +5,7 @@ export type Locale = 'zh' | 'en';
 
 /**
  * 5 预设主题（Tasty Sam 主题系统）。
- * 3 暗（atelier-dark 默认 / bridge-dark / brand-dark）+ 2 亮（atelier-light / brand-light）。
+ * 3 暗（atelier-dark / bridge-dark / brand-dark）+ 2 亮（atelier-light 默认 / brand-light）。
  * 与 globals.css 的 html.<id> block、Providers/layout 切换逻辑一一对应。
  */
 export type ThemePreset =
@@ -23,7 +23,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     'brand-light',
 ];
 
-export const DEFAULT_THEME: ThemePreset = 'atelier-dark';
+export const DEFAULT_THEME: ThemePreset = 'atelier-light';
 
 interface SettingsStore {
     locale: Locale;
@@ -48,14 +48,16 @@ export const useSettingsStore = create<SettingsStore>()(
         }),
         {
             name: 'lumenx-settings',
-            version: 1,
-            // v0→v1：旧版只有 'dark' | 'light'。按产品决策，统一升级到新默认
-            // atelier-dark（不保留旧观感）。非法/缺失值同样回落默认。
+            version: 2,
+            // v1→v2：默认主题更新为 'atelier-light'（画布 亮）。旧版若是默认 atelier-dark 或非法值则平滑升级。
             migrate: (persisted: unknown, version: number) => {
                 const state = (persisted ?? {}) as Partial<SettingsStore>;
                 const animations = typeof state.animations === 'boolean' ? state.animations : true;
-                if (version < 1 || !THEME_PRESETS.includes(state.theme as ThemePreset)) {
-                    return { ...state, theme: DEFAULT_THEME, animations } as SettingsStore;
+                if (version < 2 || !THEME_PRESETS.includes(state.theme as ThemePreset)) {
+                    const theme = (version === 1 && state.theme && state.theme !== 'atelier-dark')
+                        ? state.theme
+                        : DEFAULT_THEME;
+                    return { ...state, theme, animations } as SettingsStore;
                 }
                 return { ...state, animations } as SettingsStore;
             },

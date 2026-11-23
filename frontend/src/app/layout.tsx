@@ -9,13 +9,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh" className="atelier-dark" suppressHydrationWarning>
+    <html lang="zh" className="atelier-light" suppressHydrationWarning>
       <head>
         <title>YingBan Studio</title>
         <meta name="description" content="AI-Native Motion Comic Creation Platform" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var P=["atelier-dark","bridge-dark","brand-dark","atelier-light","brand-light"];var d=JSON.parse(localStorage.getItem("lumenx-settings")||"{}");var t=d.state&&d.state.theme;document.documentElement.className=P.indexOf(t)>=0?t:"atelier-dark";}catch(e){document.documentElement.className="atelier-dark";}})();`,
+            __html: `(function(){try{var P=["atelier-dark","bridge-dark","brand-dark","atelier-light","brand-light"];var raw=localStorage.getItem("lumenx-settings");var d=JSON.parse(raw||"{}");var v=d.version||0;var t=d.state&&d.state.theme;if(v<2&&t==="atelier-dark"){t="atelier-light";}document.documentElement.className=(P.indexOf(t)>=0)?t:"atelier-light";}catch(e){document.documentElement.className="atelier-light";}})();`,
           }}
         />
         {/* Desktop app: compact font-size for embedded windows (Tauri / pywebview).

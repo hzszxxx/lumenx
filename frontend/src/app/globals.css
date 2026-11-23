@@ -8,12 +8,11 @@
 /* ─── Theme: 5-preset token system (Tasty Sam) ───
    架构：seed (品牌 DNA) → semantic (语义角色) → component (组件级)。
    命名 100% 对齐组件用的 Tailwind 语义类（bg-surface/text-foreground/...）。
-   默认 :root === atelier-dark。落地选择器用 html.<id>（与 Providers/layout 一致）。
+   默认 :root === atelier-light。落地选择器用 html.<id>（与 Providers/layout 一致）。
    每个 block 额外保留 --foreground-rgb / --background-*-rgb（body 渐变在用，
    tokens.css 未含，故在此补齐）。 */
 
-/* ===== 主题 1 · atelier-dark · Full Atelier（★ 默认）===== */
-:root,
+/* ===== 主题 1 · atelier-dark · Full Atelier ===== */
 html.atelier-dark {
   color-scheme: dark;
 
@@ -251,7 +250,8 @@ html.brand-dark {
   --logo-filter:  none;
 }
 
-/* ===== 主题 4 · atelier-light · 暖亮 Atelier ===== */
+/* ===== 主题 4 · atelier-light · 暖亮 Atelier（★ 默认）===== */
+:root,
 html.atelier-light {
   color-scheme: light;
 

@@ -46,6 +46,6 @@ describe('settingsStore', () => {
             'atelier-light',
             'brand-light',
         ]);
-        expect(DEFAULT_THEME).toBe('atelier-dark');
+        expect(DEFAULT_THEME).toBe('atelier-light');
     });
 });

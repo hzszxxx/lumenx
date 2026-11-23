@@ -31,7 +31,7 @@ export default function LumenXBranding({ size = "md", className }: LumenXBrandin
   const theme = useSettingsStore((s) => s.theme);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const activeTheme: ThemePreset = mounted ? theme : "atelier-dark";
+  const activeTheme: ThemePreset = mounted ? theme : "atelier-light";
   const logoSrc = publicAssetPath(LOGO_SRC[activeTheme] ?? "/yingban-logo.png");
 
   return (
