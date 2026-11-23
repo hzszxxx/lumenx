@@ -1013,13 +1013,6 @@ export default function Home() {
   }, []);
 
   if (currentView === 'atelier') {
-    if (!platformUser) {
-      requireAuth("进入创作画布需要登录创作者账号", "登录后即可使用无限节点画板进行剧本分镜与视觉生成", () => {
-        window.location.hash = "#/atelier";
-      });
-      window.location.hash = "#/";
-      return null;
-    }
     return <AtelierShell />;
   }
 
@@ -1048,11 +1041,21 @@ export default function Home() {
   // 项目详情页 — 全屏，无 GlobalSidebar
   if (currentView === 'project' && projectId) {
     if (!platformUser) {
-      requireAuth("进入项目创作需要登录创作者账号", "登录后即可查看和编辑该项目的分镜、提示词与视频生成", () => {
-        window.location.hash = `#/project/${projectId}`;
-      });
-      window.location.hash = "#/";
-      return null;
+      return (
+        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
+          <h2 className="text-xl font-bold mb-2">查看项目需要登录创作者账号</h2>
+          <p className="text-sm text-text-secondary mb-6">登录后即可查看和编辑该项目的分镜、提示词与视频生成</p>
+          <button
+            type="button"
+            onClick={() => requireAuth("进入项目创作需要登录创作者账号", "登录后即可查看和编辑该项目的分镜、提示词与视频生成", () => {
+              window.location.hash = `#/project/${projectId}`;
+            })}
+            className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-xl shadow-sm hover:bg-primary-hover"
+          >
+            立即登录
+          </button>
+        </div>
+      );
     }
     return <ProjectClient id={projectId} initialStep={projectStep} />;
   }
@@ -1060,11 +1063,21 @@ export default function Home() {
   // 系列集数编辑 — 全屏，BreadcrumbBar 内嵌在 ProjectClient
   if (currentView === 'series-episode' && seriesId && episodeId) {
     if (!platformUser) {
-      requireAuth("编辑剧集需要登录创作者账号", "登录后即可编辑该集的分镜剧本与视觉效果", () => {
-        window.location.hash = `#/series/${seriesId}/episode/${episodeId}`;
-      });
-      window.location.hash = "#/";
-      return null;
+      return (
+        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
+          <h2 className="text-xl font-bold mb-2">编辑剧集需要登录创作者账号</h2>
+          <p className="text-sm text-text-secondary mb-6">登录后即可编辑该集的分镜剧本与视觉效果</p>
+          <button
+            type="button"
+            onClick={() => requireAuth("编辑剧集需要登录创作者账号", "登录后即可编辑该集的分镜剧本与视觉效果", () => {
+              window.location.hash = `#/series/${seriesId}/episode/${episodeId}`;
+            })}
+            className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-xl shadow-sm hover:bg-primary-hover"
+          >
+            立即登录
+          </button>
+        </div>
+      );
     }
     return <EpisodeBreadcrumbWrapper seriesId={seriesId} episodeId={episodeId} />;
   }
