@@ -854,8 +854,28 @@ export default function Home() {
     }
   };
 
-  const syncAll = async () => {
-    await Promise.all([syncProjects(), syncSeries()]);
+  const syncAll = async (manual = false) => {
+    setIsSyncing(true);
+    try {
+      await Promise.all([syncProjects(), syncSeries()]);
+      if (manual) {
+        const pCount = useProjectStore.getState().projects.length;
+        const sCount = useProjectStore.getState().seriesList.length;
+        if (pCount > 0 || sCount > 0) {
+          toast.success("云端同步完成", {
+            body: `已获取 ${pCount} 个独立项目，${sCount} 个剧集系列`,
+            autoCloseMs: 3000,
+          });
+        } else {
+          toast.info("云端同步完成", {
+            body: "服务器当前暂无项目记录。点击「创建独立项目」或「创建系列」开始创作吧！",
+            autoCloseMs: 4000,
+          });
+        }
+      }
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handlePlatformLogout = async () => {
@@ -1208,13 +1228,13 @@ export default function Home() {
           </div>
           <div className="flex items-center flex-wrap gap-2.5 md:pb-1">
             <button
-              onClick={syncAll}
+              onClick={() => void syncAll(true)}
               disabled={isSyncing || !online}
               title={!online ? tc("offlineTooltip") : undefined}
               className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
             >
-              <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
-              {tc("sync")}
+              <RefreshCw size={14} className={isSyncing ? "animate-spin text-primary" : ""} />
+              {isSyncing ? "同步中…" : tc("sync")}
             </button>
             <button
               onClick={handleOpenImportFile}
@@ -1374,12 +1394,12 @@ export default function Home() {
                 </div>
               </div>
               <button
-                onClick={syncAll}
+                onClick={() => void syncAll(true)}
                 disabled={isSyncing}
                 className="mt-5 glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
               >
-                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
-                {t("syncFromBackend")}
+                <RefreshCw size={14} className={isSyncing ? "animate-spin text-primary" : ""} />
+                {isSyncing ? "正在同步云端数据…" : t("syncFromBackend")}
               </button>
             </motion.div>
           ) : wsFiltering && wsVisibleCount === 0 ? (
