@@ -19,19 +19,19 @@ interface GlobalSidebarProps {
 // Shared global nav model (workspace/library/playground + settings). Reused by
 // the desktop GlobalSidebar (below) and the mobile BottomTabBar (md:hidden).
 export const GLOBAL_NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: string }[] = [
-  { id: "workspace", icon: LayoutGrid, hash: "#/" },
+  { id: "platform", icon: Users, hash: "#/platform?section=tasks" },
+  { id: "workspace", icon: LayoutGrid, hash: "#/workspace" },
   { id: "library", icon: Layers, hash: "#/library" },
   { id: "editor", icon: FileText, hash: "#/studio/editor" },
   { id: "playground", icon: Wand2, hash: "#/playground" },
   { id: "atelier", icon: Workflow, hash: "#/atelier" },
-  { id: "platform", icon: Users, hash: "#/platform" },
   { id: "settings", icon: Settings, hash: "#/settings" },
 ];
 
 const PLATFORM_SUBNAV = [
+  ["tasks", "任务市场"],
   ["academy", "课程培训"],
   ["certification", "考核认证"],
-  ["tasks", "任务市场"],
   ["competitions", "赛事活动"],
   ["users", "个人中心"],
   ["wallet", "收益与钱包"],
@@ -97,13 +97,14 @@ export default function GlobalSidebar({
   showBrand = false,
 }: GlobalSidebarProps) {
   const t = useTranslations("nav");
-  const [currentPlatformSection, setCurrentPlatformSection] = useState("users");
+  const [currentPlatformSection, setCurrentPlatformSection] = useState("tasks");
 
   useEffect(() => {
     const syncPlatformSection = () => {
       const match = window.location.hash.match(/^#\/platform\?section=([^&]+)/);
       if (match) setCurrentPlatformSection(match[1]);
-      else if (window.location.hash.startsWith("#/platform")) setCurrentPlatformSection("users");
+      else if (window.location.hash === "#/tasks" || !window.location.hash || window.location.hash === "#/" || window.location.hash === "#") setCurrentPlatformSection("tasks");
+      else if (window.location.hash.startsWith("#/platform")) setCurrentPlatformSection("tasks");
     };
     syncPlatformSection();
     window.addEventListener("hashchange", syncPlatformSection);
@@ -126,7 +127,7 @@ export default function GlobalSidebar({
       {showBrand && (
         <button
           type="button"
-          onClick={() => handleNav("workspace", "#/")}
+          onClick={() => handleNav("platform", "#/platform?section=tasks")}
           aria-label={t("workspaceAria")}
           className="text-left px-4 pt-5 pb-4 border-b border-glass-border hover:opacity-90 transition-opacity"
         >

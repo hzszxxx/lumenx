@@ -221,7 +221,7 @@ export default function SeriesDetailPage({ seriesId }: SeriesDetailPageProps) {
   }, [seriesId, view, acceptSeriesSnapshot, runEpisodeRequest]);
 
   const handleBackToHome = () => {
-    window.location.hash = "";
+    window.location.hash = "#/workspace";
   };
 
   const handleTitleSave = async (retry = false) => {

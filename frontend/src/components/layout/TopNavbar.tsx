@@ -35,7 +35,7 @@ export default function TopNavbar({
   onRequestAuth,
   onLogout,
 }: TopNavbarProps) {
-  const [currentSection, setCurrentSection] = useState<TopNavSection>("workspace");
+  const [currentSection, setCurrentSection] = useState<TopNavSection>("tasks");
   const { user } = usePlatformStore();
 
   useEffect(() => {
@@ -47,12 +47,12 @@ export default function TopNavbar({
         setCurrentSection("competitions");
       } else if (hash.startsWith("#/certification") || hash.includes("section=certification")) {
         setCurrentSection("certification");
-      } else if (hash.startsWith("#/tasks") || hash.includes("section=tasks")) {
-        setCurrentSection("tasks");
+      } else if (hash.startsWith("#/workspace") || hash.startsWith("#/project") || hash.startsWith("#/series") || hash.startsWith("#/library") || hash.startsWith("#/studio/editor")) {
+        setCurrentSection("workspace");
       } else if (hash.startsWith("#/profile") || hash.includes("section=users") || hash.includes("section=wallet")) {
         setCurrentSection("profile");
-      } else if (hash === "#/" || hash.startsWith("#/project") || hash.startsWith("#/series")) {
-        setCurrentSection("workspace");
+      } else {
+        setCurrentSection("tasks");
       }
     };
     syncHash();
@@ -64,7 +64,7 @@ export default function TopNavbar({
     setCurrentSection(section);
     if (section === "workspace") {
       onTabChange("workspace");
-      window.location.hash = "#/";
+      window.location.hash = "#/workspace";
     } else if (section === "academy") {
       onTabChange("platform");
       window.location.hash = "#/platform?section=academy";
@@ -84,9 +84,9 @@ export default function TopNavbar({
   };
 
   const navItems: Array<{ id: TopNavSection; label: string; icon: typeof LayoutGrid }> = [
+    { id: "tasks", label: "任务市场", icon: BriefcaseBusiness },
     { id: "academy", label: "课程培训", icon: GraduationCap },
     { id: "certification", label: "考核认证", icon: ShieldCheck },
-    { id: "tasks", label: "任务市场", icon: BriefcaseBusiness },
     { id: "workspace", label: "创作工作区", icon: LayoutGrid },
     { id: "competitions", label: "赛事活动", icon: Trophy },
     { id: "profile", label: "个人中心", icon: UserRound },
@@ -98,7 +98,7 @@ export default function TopNavbar({
       <div className="flex items-center gap-6">
         <button
           type="button"
-          onClick={() => handleNavClick("workspace")}
+          onClick={() => handleNavClick("tasks")}
           className="flex items-center gap-2 text-left hover:opacity-90 transition-opacity focus:outline-none"
         >
           <LumenXBranding size="xs" showSlogan={false} />

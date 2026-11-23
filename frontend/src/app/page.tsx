@@ -712,8 +712,8 @@ export default function Home() {
   const [isPackageImportOpen, setIsPackageImportOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
-  const [currentView, setCurrentView] = useState<'home' | 'project' | 'series' | 'series-episode' | 'library' | 'settings' | 'playground' | 'atelier' | 'platform' | 'admin' | 'studio/editor' | 'project-editor'>('home');
-  const [activeTab, setActiveTab] = useState<GlobalTab>("workspace");
+  const [currentView, setCurrentView] = useState<'home' | 'project' | 'series' | 'series-episode' | 'library' | 'settings' | 'playground' | 'atelier' | 'platform' | 'admin' | 'studio/editor' | 'project-editor'>('platform');
+  const [activeTab, setActiveTab] = useState<GlobalTab>("platform");
   const [platformAccess, setPlatformAccess] = useState<"checking" | "ready">("checking");
   const [wsSearch, setWsSearch] = useState("");
   const online = useOnline();
@@ -1037,9 +1037,18 @@ export default function Home() {
         history.replaceState(null, '', '#/');
         return;
       }
-      // Default: workspace
-      setCurrentView('home');
-      setActiveTab('workspace');
+      // Explicit workspace view
+      if (hash === '#/workspace') {
+        setCurrentView('home');
+        setActiveTab('workspace');
+        setProjectId(null);
+        setSeriesId(null);
+        setEpisodeId(null);
+        return;
+      }
+      // Default: 任务市场 (PlatformPortal > tasks)
+      setCurrentView('platform');
+      setActiveTab('platform');
       setProjectId(null);
       setSeriesId(null);
       setEpisodeId(null);
@@ -1052,20 +1061,6 @@ export default function Home() {
 
   if (currentView === 'atelier') {
     return <AtelierShell />;
-  }
-
-  if (currentView === 'platform') {
-    return (
-      <AppShell
-        activeTab="platform"
-        onTabChange={(tab) => setActiveTab(tab)}
-        onRequestCreate={() => requireAuth("开始创作需要登录创作者账号", "登录后即可创建短剧与分镜、进入节点画布并生成 AI 视频", () => setIsDialogOpen(true))}
-        onRequestAuth={(t, d) => requireAuth(t || "登录创作者平台", d || "登录后开始创作与认证")}
-        onLogout={() => void handlePlatformLogout()}
-      >
-        <PlatformPortal />
-      </AppShell>
-    );
   }
 
   if (currentView === 'admin') {
@@ -1167,6 +1162,9 @@ export default function Home() {
 
   // Determine content based on activeTab
   const renderContent = () => {
+    if (currentView === 'platform') {
+      return <PlatformPortal />;
+    }
     if (currentView === 'library') {
       return <AssetLibraryPage />;
     }

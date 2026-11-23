@@ -38,7 +38,7 @@ export default function PlatformPortal() {
   const tn = useTranslations("nav");
   const locale = useLocale();
   const isZh = locale.startsWith("zh");
-  const [section, setSection] = useState<Section>("users");
+  const [section, setSection] = useState<Section>("tasks");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -64,7 +64,21 @@ export default function PlatformPortal() {
   useEffect(() => {
     const syncSection = () => {
       const match = window.location.hash.match(/^#\/platform\?section=([^&]+)/);
-      if (match && sections.some(item => item.id === match[1])) setSection(match[1] as Section);
+      if (match && sections.some(item => item.id === match[1])) {
+        setSection(match[1] as Section);
+      } else if (window.location.hash === "#/tasks" || !window.location.hash || window.location.hash === "#/" || window.location.hash === "#") {
+        setSection("tasks");
+      } else if (window.location.hash === "#/academy" || window.location.hash === "#/courses") {
+        setSection("academy");
+      } else if (window.location.hash === "#/competitions" || window.location.hash === "#/events") {
+        setSection("competitions");
+      } else if (window.location.hash === "#/certification") {
+        setSection("certification");
+      } else if (window.location.hash === "#/profile" || window.location.hash === "#/users") {
+        setSection("users");
+      } else if (window.location.hash.startsWith("#/platform")) {
+        setSection("tasks");
+      }
     };
     syncSection(); window.addEventListener("hashchange", syncSection);
     return () => window.removeEventListener("hashchange", syncSection);
