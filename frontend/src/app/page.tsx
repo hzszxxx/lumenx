@@ -868,6 +868,12 @@ export default function Home() {
         window.location.hash = '#/platform?section=academy';
         return;
       }
+      if (hash === '#/competitions' || hash === '#/events') {
+        setCurrentView('platform');
+        setActiveTab('platform');
+        window.location.hash = '#/platform?section=competitions';
+        return;
+      }
       if (hash === '#/certification') {
         setCurrentView('platform');
         setActiveTab('platform');

@@ -6,6 +6,7 @@ import {
   GraduationCap,
   ShieldCheck,
   BriefcaseBusiness,
+  Trophy,
   UserRound,
   LogIn,
   LogOut,
@@ -25,7 +26,7 @@ interface TopNavbarProps {
   onLogout?: () => void;
 }
 
-export type TopNavSection = "workspace" | "academy" | "certification" | "tasks" | "profile";
+export type TopNavSection = "workspace" | "academy" | "competitions" | "certification" | "tasks" | "profile";
 
 export default function TopNavbar({
   activeTab,
@@ -42,6 +43,8 @@ export default function TopNavbar({
       const hash = window.location.hash || "#/";
       if (hash.startsWith("#/academy") || hash.includes("section=academy")) {
         setCurrentSection("academy");
+      } else if (hash.startsWith("#/competitions") || hash.includes("section=competitions")) {
+        setCurrentSection("competitions");
       } else if (hash.startsWith("#/certification") || hash.includes("section=certification")) {
         setCurrentSection("certification");
       } else if (hash.startsWith("#/tasks") || hash.includes("section=tasks")) {
@@ -65,6 +68,9 @@ export default function TopNavbar({
     } else if (section === "academy") {
       onTabChange("platform");
       window.location.hash = "#/platform?section=academy";
+    } else if (section === "competitions") {
+      onTabChange("platform");
+      window.location.hash = "#/platform?section=competitions";
     } else if (section === "certification") {
       onTabChange("platform");
       window.location.hash = "#/platform?section=certification";
@@ -79,7 +85,8 @@ export default function TopNavbar({
 
   const navItems: Array<{ id: TopNavSection; label: string; icon: typeof LayoutGrid }> = [
     { id: "workspace", label: "创作工作区", icon: LayoutGrid },
-    { id: "academy", label: "课程", icon: GraduationCap },
+    { id: "academy", label: "培训学院", icon: GraduationCap },
+    { id: "competitions", label: "赛事活动", icon: Trophy },
     { id: "certification", label: "认证", icon: ShieldCheck },
     { id: "tasks", label: "任务市场", icon: BriefcaseBusiness },
     { id: "profile", label: "个人中心", icon: UserRound },
