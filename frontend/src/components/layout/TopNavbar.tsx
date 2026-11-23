@@ -101,7 +101,7 @@ export default function TopNavbar({
           onClick={() => handleNavClick("workspace")}
           className="flex items-center gap-2 text-left hover:opacity-90 transition-opacity focus:outline-none"
         >
-          <LumenXBranding size="sm" showSlogan={false} />
+          <LumenXBranding size="xs" showSlogan={false} />
         </button>
 
         {/* 顶部主导航菜单项 */}

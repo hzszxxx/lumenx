@@ -13,6 +13,7 @@ interface GlobalSidebarProps {
   activeTab: GlobalTab;
   onTabChange: (tab: GlobalTab) => void;
   onLogout?: () => void;
+  showBrand?: boolean;
 }
 
 // Shared global nav model (workspace/library/playground + settings). Reused by
@@ -83,7 +84,12 @@ function NavButton({
  * 资产库/设置改走横向筛选后，竖向只剩这一条栏，故恢复完整品牌呈现。
  * 结构对所有主题统一，视觉身份由语义 token 切换（zero-leak）。
  */
-export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: GlobalSidebarProps) {
+export default function GlobalSidebar({
+  activeTab,
+  onTabChange,
+  onLogout,
+  showBrand = false,
+}: GlobalSidebarProps) {
   const t = useTranslations("nav");
   const [currentPlatformSection, setCurrentPlatformSection] = useState("users");
 
@@ -111,20 +117,22 @@ export default function GlobalSidebar({ activeTab, onTabChange, onLogout }: Glob
       {/* Traffic Light inset for Tauri desktop */}
       {isTauri() && <div className="tauri-titlebar-inset" />}
       {/* Brand lockup — Logo + LUMENX + Slogan, click → workspace */}
-      <button
-        type="button"
-        onClick={() => handleNav("workspace", "#/")}
-        aria-label={t("workspaceAria")}
-        className="text-left px-4 pt-5 pb-4 border-b border-glass-border hover:opacity-90 transition-opacity"
-      >
-        <LumenXBranding size="md" showSlogan={false} />
-        <p className="font-display atelier-display text-[0.75rem] italic text-text-muted tracking-wide leading-snug mt-2.5">
-          {t("brandSlogan")}
-        </p>
-      </button>
+      {showBrand && (
+        <button
+          type="button"
+          onClick={() => handleNav("workspace", "#/")}
+          aria-label={t("workspaceAria")}
+          className="text-left px-4 pt-5 pb-4 border-b border-glass-border hover:opacity-90 transition-opacity"
+        >
+          <LumenXBranding size="md" showSlogan={false} />
+          <p className="font-display atelier-display text-[0.75rem] italic text-text-muted tracking-wide leading-snug mt-2.5">
+            {t("brandSlogan")}
+          </p>
+        </button>
+      )}
 
       {/* Primary navigation */}
-      <nav className="flex-1 flex flex-col gap-0.5 p-2.5" aria-label={t("mainNavAria")}>
+      <nav className={clsx("flex-1 flex flex-col gap-0.5 p-2.5", !showBrand && "pt-3")} aria-label={t("mainNavAria")}>
         {GLOBAL_NAV_ITEMS.filter((item) => item.id !== "settings").map((item) => (
           <div key={item.id}>
             <NavButton active={activeTab === item.id} label={t(item.id)} icon={item.icon} onClick={() => handleNav(item.id, item.hash)} />

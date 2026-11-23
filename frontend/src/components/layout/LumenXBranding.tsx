@@ -5,8 +5,9 @@ import { useSettingsStore, type ThemePreset } from "@/store/settingsStore";
 import { publicAssetPath } from "@/lib/publicAsset";
 
 interface LumenXBrandingProps {
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   showSlogan?: boolean;
+  className?: string;
 }
 
 // Logo 变体按主题映射
@@ -18,8 +19,15 @@ const LOGO_SRC: Record<ThemePreset, string> = {
   "brand-light": "/yingban-logo.png",
 };
 
-export default function LumenXBranding({ size = "md" }: LumenXBrandingProps) {
-  const logoSize = size === "sm" ? "w-24 h-24" : size === "lg" ? "w-44 h-44" : "w-36 h-36";
+export default function LumenXBranding({ size = "md", className }: LumenXBrandingProps) {
+  const logoSize =
+    size === "xs"
+      ? "w-9 h-9"
+      : size === "sm"
+      ? "w-24 h-24"
+      : size === "lg"
+      ? "w-44 h-44"
+      : "w-36 h-36";
   const theme = useSettingsStore((s) => s.theme);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -27,7 +35,7 @@ export default function LumenXBranding({ size = "md" }: LumenXBrandingProps) {
   const logoSrc = publicAssetPath(LOGO_SRC[activeTheme] ?? "/yingban-logo.png");
 
   return (
-    <div className="flex justify-center">
+    <div className={`flex justify-center ${className ?? ""}`}>
       <img
         src={logoSrc}
         alt="影伴"
