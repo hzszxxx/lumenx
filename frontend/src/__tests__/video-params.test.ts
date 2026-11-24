@@ -193,6 +193,28 @@ describe('Vidu Q3 模型参数', () => {
     });
 });
 
+// ── 仙宫云 H3 参数 ───────────────────────────────────────────────────────
+
+describe('仙宫云 H3 模型参数', () => {
+    const xgy = I2V_MODELS.find(m => m.id === 'xiangongyun-h3-i2v')!;
+
+    it('存在于 I2V_MODELS 中且带有 slider 时长', () => {
+        expect(xgy).toBeDefined();
+        expect(xgy.duration.type).toBe('slider');
+        if (xgy.duration.type === 'slider') {
+            expect(xgy.duration.min).toBe(3);
+            expect(xgy.duration.max).toBe(15);
+            expect(xgy.duration.default).toBe(5);
+        }
+    });
+
+    it('支持 audio 与 768p 分辨率', () => {
+        expect(xgy.params.audio).toEqual({ default: true });
+        expect(xgy.params.resolution?.options).toContain('768p');
+        expect(xgy.params.resolution?.default).toBe('768p');
+    });
+});
+
 // ── GRID_COLS_CLASS 映射 ───────────────────────────────────────────────
 
 describe('GRID_COLS_CLASS', () => {

@@ -61,6 +61,7 @@ describe('model catalog selectors', () => {
         expect(GLOBAL_I2V_MODELS.map((model) => model.id)).toEqual([
             'happyhorse-1.1-i2v',
             'kling-v3-i2v',
+            'xiangongyun-h3-i2v',
             'pixverse/pixverse-v6-video',
             'seedance-2.0-i2v',
             'pixverse-c1-i2v',
