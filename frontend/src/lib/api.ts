@@ -12,6 +12,22 @@ import { parseSeriesEpisodeReceipt, type CreateSeriesEpisodeRequest } from "@/li
 
 export { API_URL } from "@/lib/apiUrl";
 
+if (typeof window !== "undefined") {
+    axios.interceptors.request.use((config) => {
+        const token = window.localStorage.getItem("lumenx_platform_token");
+        if (token && config.headers) {
+            if (typeof (config.headers as any).set === "function") {
+                if (!(config.headers as any).has("Authorization") && !(config.headers as any).has("authorization")) {
+                    (config.headers as any).set("Authorization", `Bearer ${token}`);
+                }
+            } else if (!config.headers["Authorization"] && !config.headers["authorization"]) {
+                config.headers["Authorization"] = `Bearer ${token}`;
+            }
+        }
+        return config;
+    });
+}
+
 export type ProviderMode = "dashscope" | "vendor";
 
 export type ComputeStage = "draft" | "final" | "post";
