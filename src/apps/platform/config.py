@@ -3,6 +3,12 @@
 from dataclasses import dataclass
 import os
 from pathlib import Path
+if os.environ.get("LUMENX_TEST_ISOLATED") != "1":
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
 
 
 def _bool_env(name: str, default: bool = False) -> bool:

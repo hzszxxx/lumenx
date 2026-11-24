@@ -8,9 +8,15 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
+if os.environ.get("LUMENX_TEST_ISOLATED") != "1":
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
 
 from .media_upload import DEFAULT_MAX_BYTES
 from .models import AtelierNodeUploadReceipt, AtelierProject
@@ -138,17 +144,25 @@ class UploadReceiptReadback(BaseModel):
 
 
 @router.get("/projects", response_model=list[AtelierProject])
-def list_projects(request: Request) -> list[AtelierProject]:
+def list_projects(
+    request: Request,
+    all: bool = Query(False, description="When true and user is admin, return all atelier projects across the platform"),
+) -> list[AtelierProject]:
     all_projects = _call_service(lambda: _service(request).list_projects())
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="atelier") if platform else set()
-        return [
-            p for p in all_projects
-            if (p.owner_user_id == user_id or p.id in bound_ids)
-        ]
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin" and all:
+            return all_projects
+        elif user:
+            user_id = user["id"]
+            bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="atelier")
+            return [
+                p for p in all_projects
+                if (p.owner_user_id == user_id or p.id in bound_ids)
+            ]
+        else:
+            return []
     return all_projects
 
 
@@ -177,12 +191,15 @@ def create_project(
 def get_project(project_id: str, request: Request) -> AtelierProject:
     project = _call_service(lambda: _service(request).get_project(project_id))
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if platform else False
-        if project.owner_user_id != user_id and not bound:
-            raise HTTPException(status_code=404, detail="Atelier project not found")
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin":
+            pass
+        else:
+            user_id = user["id"] if user else None
+            bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if (platform and user_id) else False
+            if not user or (project.owner_user_id != user_id and not bound):
+                raise HTTPException(status_code=404, detail="Atelier project not found")
     return project
 
 
@@ -307,12 +324,15 @@ def delete_project(
 ) -> dict[str, bool]:
     project = _call_service(lambda: _service(request).get_project(project_id))
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if platform else False
-        if project.owner_user_id != user_id and not bound:
-            raise HTTPException(status_code=404, detail="Atelier project not found")
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin":
+            pass
+        else:
+            user_id = user["id"] if user else None
+            bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if (platform and user_id) else False
+            if not user or (project.owner_user_id != user_id and not bound):
+                raise HTTPException(status_code=404, detail="Atelier project not found")
     _call_service(
         lambda: _service(request).delete_project(
             project_id,

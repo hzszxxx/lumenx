@@ -42,6 +42,12 @@ import tempfile
 import threading
 from pathlib import Path
 from urllib.parse import quote
+if os.environ.get("LUMENX_TEST_ISOLATED") != "1":
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
 from src.lumenx_service_identity import LUMENX_PROTOCOL_VERSION, LUMENX_SERVICE_NAME
 from .models import (
     DialogueAudioOptions,
@@ -189,11 +195,13 @@ def check_project_access(project_id: str, request: Request, pipeline: Any) -> Sc
     if not script:
         raise HTTPException(status_code=404, detail="Project not found")
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=project_id) if platform else False
-        if script.owner_user_id != user_id and not bound:
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin":
+            return script
+        user_id = user["id"] if user else None
+        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=project_id) if (platform and user_id) else False
+        if not user or (script.owner_user_id != user_id and not bound):
             raise HTTPException(status_code=404, detail="Project not found")
     return script
 
@@ -203,11 +211,13 @@ def check_series_access(series_id: str, request: Request, pipeline: Any) -> Seri
     if not series:
         raise HTTPException(status_code=404, detail="Series not found")
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=series_id) if platform else False
-        if series.owner_user_id != user_id and not bound:
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin":
+            return series
+        user_id = user["id"] if user else None
+        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=series_id) if (platform and user_id) else False
+        if not user or (series.owner_user_id != user_id and not bound):
             raise HTTPException(status_code=404, detail="Series not found")
     return series
 
@@ -1837,18 +1847,27 @@ async def extract_preview(
 
 
 @router.get("/projects/", response_model=List[dict])
-def list_projects(request: Request, active_pipeline: Any = Depends(get_pipeline)):
+def list_projects(
+    request: Request,
+    all: bool = Query(False, description="When true and user is admin, return all projects across the platform"),
+    active_pipeline: Any = Depends(get_pipeline),
+):
     """Lists all projects from backend storage."""
     scripts = active_pipeline.read_committed_projects()
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="studio") if platform else set()
-        scripts = [
-            s for s in scripts
-            if (getattr(s, "owner_user_id", None) == user_id or s.id in bound_ids)
-        ]
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin" and all:
+            return signed_response(scripts, runtime=active_pipeline)
+        elif user:
+            user_id = user["id"]
+            bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="studio")
+            scripts = [
+                s for s in scripts
+                if (getattr(s, "owner_user_id", None) == user_id or s.id in bound_ids)
+            ]
+        else:
+            scripts = []
     return signed_response(scripts, runtime=active_pipeline)
 
 
@@ -2042,19 +2061,25 @@ def create_series(request: CreateSeriesRequest,
 @router.get("/series")
 def list_series(
     request: Request,
+    all: bool = Query(False, description="When true and user is admin, return all series across the platform"),
     pipeline: Any = Depends(get_pipeline),
 ):
     """List all Series."""
     series_list = pipeline.read_committed_series()
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="studio") if platform else set()
-        series_list = [
-            s for s in series_list
-            if (getattr(s, "owner_user_id", None) == user_id or s.id in bound_ids)
-        ]
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin" and all:
+            return signed_response(series_list, runtime=pipeline)
+        elif user:
+            user_id = user["id"]
+            bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="studio")
+            series_list = [
+                s for s in series_list
+                if (getattr(s, "owner_user_id", None) == user_id or s.id in bound_ids)
+            ]
+        else:
+            series_list = []
     return signed_response(series_list, runtime=pipeline)
 
 
@@ -2068,12 +2093,15 @@ def get_series(series_id: str,
     if not series:
         raise HTTPException(status_code=404, detail="Series not found")
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=series_id) if platform else False
-        if series.owner_user_id != user_id and not bound:
-            raise HTTPException(status_code=404, detail="Series not found")
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin":
+            pass
+        else:
+            user_id = user["id"] if user else None
+            bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=series_id) if (platform and user_id) else False
+            if not user or (series.owner_user_id != user_id and not bound):
+                raise HTTPException(status_code=404, detail="Series not found")
     # Include episode summaries
     result = series.model_dump()
     result["episodes"] = [
@@ -3104,12 +3132,15 @@ def get_project(script_id: str,
     if not script:
         raise HTTPException(status_code=404, detail="Project not found")
     user = get_request_user(request)
-    if user and user.get("role") != "admin":
-        user_id = user["id"]
-        platform = getattr(request.app.state, "platform_service", None)
-        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=script_id) if platform else False
-        if script.owner_user_id != user_id and not bound:
-            raise HTTPException(status_code=404, detail="Project not found")
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        if user and user.get("role") == "admin":
+            pass
+        else:
+            user_id = user["id"] if user else None
+            bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=script_id) if (platform and user_id) else False
+            if not user or (script.owner_user_id != user_id and not bound):
+                raise HTTPException(status_code=404, detail="Project not found")
 
     payload = script.model_dump()
     # These versions describe the same detached capture as the merged assets.

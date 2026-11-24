@@ -94,17 +94,26 @@ def test_studio_multiuser_workspace_isolation(tmp_path, monkeypatch):
         list_a2 = client.get("/projects/", headers={"Authorization": f"Bearer {token_a}"})
         assert [p["id"] for p in list_a2.json()] == [proj_a_id]
 
-        # 9. Admin sees both Project A and Project B
+        # 9. Admin with all=True sees both Project A and Project B
+        list_admin_all = client.get("/projects/?all=true", headers={"Authorization": f"Bearer {admin_token}"})
+        admin_all_ids = [p["id"] for p in list_admin_all.json()]
+        assert proj_a_id in admin_all_ids
+        assert proj_b_id in admin_all_ids
+
+        # Admin in personal workspace (without all=True) does not see User A or User B projects
         list_admin = client.get("/projects/", headers={"Authorization": f"Bearer {admin_token}"})
         admin_ids = [p["id"] for p in list_admin.json()]
-        assert proj_a_id in admin_ids
-        assert proj_b_id in admin_ids
+        assert proj_a_id not in admin_ids
+        assert proj_b_id not in admin_ids
 
-        # 10. Standalone / local unauthenticated mode sees all projects
+        # 10. When platform is enabled, unauthenticated request returns empty list
         list_anon = client.get("/projects/")
-        anon_ids = [p["id"] for p in list_anon.json()]
-        assert proj_a_id in anon_ids
-        assert proj_b_id in anon_ids
+        assert list_anon.status_code == 200
+        assert list_anon.json() == []
+
+        # Unauthenticated request cannot get Project A (404)
+        get_anon = client.get(f"/projects/{proj_a_id}")
+        assert get_anon.status_code == 404
 
 
 def test_series_multiuser_workspace_isolation(tmp_path, monkeypatch):
@@ -153,9 +162,17 @@ def test_series_multiuser_workspace_isolation(tmp_path, monkeypatch):
         )
         assert proj_b.status_code == 404
 
-        # 7. Admin sees Series A
+        # 7. Admin sees Series A with all=True
+        list_admin_all = client.get("/series?all=true", headers={"Authorization": f"Bearer {admin_token}"})
+        assert series_a_id in [s["id"] for s in list_admin_all.json()]
+
+        # Admin in personal workspace does not see Series A
         list_admin = client.get("/series", headers={"Authorization": f"Bearer {admin_token}"})
-        assert series_a_id in [s["id"] for s in list_admin.json()]
+        assert series_a_id not in [s["id"] for s in list_admin.json()]
+
+        # 8. Unauthenticated request returns empty list and 404 on get
+        assert client.get("/series").json() == []
+        assert client.get(f"/series/{series_a_id}").status_code == 404
 
 
 def test_atelier_multiuser_workspace_isolation(tmp_path, monkeypatch):
@@ -215,14 +232,47 @@ def test_atelier_multiuser_workspace_isolation(tmp_path, monkeypatch):
         list_a2 = client.get("/atelier/projects", headers={"Authorization": f"Bearer {token_a}"})
         assert [p["id"] for p in list_a2.json()] == [atelier_a_id]
 
-        # 8. Admin sees both
+        # 8. Admin sees both with all=True
+        list_admin_all = client.get("/atelier/projects?all=true", headers={"Authorization": f"Bearer {admin_token}"})
+        admin_all_ids = [p["id"] for p in list_admin_all.json()]
+        assert atelier_a_id in admin_all_ids
+        assert atelier_b_id in admin_all_ids
+
+        # Admin in personal workspace does not see User A or User B projects
         list_admin = client.get("/atelier/projects", headers={"Authorization": f"Bearer {admin_token}"})
         admin_ids = [p["id"] for p in list_admin.json()]
-        assert atelier_a_id in admin_ids
-        assert atelier_b_id in admin_ids
+        assert atelier_a_id not in admin_ids
+        assert atelier_b_id not in admin_ids
 
-        # 9. Anonymous / local mode sees both
+        # 9. Anonymous / unauthenticated request returns empty list and 404 on get
         list_anon = client.get("/atelier/projects")
-        anon_ids = [p["id"] for p in list_anon.json()]
-        assert atelier_a_id in anon_ids
-        assert atelier_b_id in anon_ids
+        assert list_anon.json() == []
+        assert client.get(f"/atelier/projects/{atelier_a_id}").status_code == 404
+
+
+def test_standalone_single_user_mode(tmp_path, monkeypatch):
+    monkeypatch.delenv("LUMENX_PLATFORM_ENABLED", raising=False)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    app = api.create_app(
+        data_dir=data_dir,
+        load_config=False,
+        recover_orphan_tasks=False,
+    )
+
+    with TestClient(app) as client:
+        # In standalone single-user mode, project creation and listing works without auth
+        res = client.post(
+            "/projects?skip_analysis=true",
+            json={"title": "Standalone Project", "text": "Content", "workflow_mode": "r2v"},
+        )
+        assert res.status_code == 200
+        proj_id = res.json()["id"]
+
+        list_res = client.get("/projects/")
+        assert list_res.status_code == 200
+        ids = [p["id"] for p in list_res.json()]
+        assert proj_id in ids
+
+        get_res = client.get(f"/projects/{proj_id}")
+        assert get_res.status_code == 200
