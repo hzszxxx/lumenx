@@ -16,6 +16,7 @@ import AcademySettings from "@/components/platform/AcademySettings";
 import UserSettings from "@/components/platform/UserSettings";
 import AgentCenter from "@/components/platform/AgentCenter";
 import WalletSettings from "@/components/platform/WalletSettings";
+import PlatformFooter from "@/components/platform/PlatformFooter";
 import LumenXBranding from "@/components/layout/LumenXBranding";
 import { Building2, Wallet } from "lucide-react";
 
@@ -206,48 +207,127 @@ export default function PlatformPortal() {
   // 公共门户频道（任务市场、课程培训、考核认证、赛事活动）全宽沉浸展示，无内部冗余标题
   if (section === "tasks") {
     return (
-      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
-        <div className="max-w-7xl mx-auto">
-          <TaskSettings />
-        </div>
-      </main>
+      <div className="min-h-full flex flex-col justify-between bg-background">
+        <main className="py-6 md:py-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <TaskSettings />
+          </div>
+        </main>
+        <PlatformFooter />
+      </div>
     );
   }
 
   if (section === "academy") {
     return (
-      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
-        <div className="max-w-7xl mx-auto">
-          <AcademySettings />
-        </div>
-      </main>
+      <div className="min-h-full flex flex-col justify-between bg-background">
+        <main className="py-6 md:py-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <AcademySettings />
+          </div>
+        </main>
+        <PlatformFooter />
+      </div>
     );
   }
 
   if (section === "certification") {
     return (
-      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
-        <div className="max-w-7xl mx-auto">
-          <CertificationSettings />
-        </div>
-      </main>
+      <div className="min-h-full flex flex-col justify-between bg-background">
+        <main className="py-6 md:py-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <CertificationSettings />
+          </div>
+        </main>
+        <PlatformFooter />
+      </div>
     );
   }
 
   if (section === "competitions") {
     return (
-      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
-        <div className="max-w-7xl mx-auto">
-          <CompetitionSettings />
-        </div>
-      </main>
+      <div className="min-h-full flex flex-col justify-between bg-background">
+        <main className="py-6 md:py-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <CompetitionSettings />
+          </div>
+        </main>
+        <PlatformFooter />
+      </div>
     );
   }
 
   if (!user && !isPublicSection) {
     return (
-      <main className="min-h-full p-6 md:p-10 bg-background">
+      <div className="min-h-full flex flex-col justify-between bg-background">
+        <main className="p-6 md:p-10">
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+              {accountSections.map(item => {
+                const Icon = item.icon;
+                const isActive = section === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSection(item.id);
+                      window.location.hash = `#/platform?section=${item.id}`;
+                    }}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
+                      isActive
+                        ? "bg-primary text-white border-primary shadow-sm"
+                        : "glass-panel text-text-secondary hover:text-foreground hover:bg-hover-bg border-glass-border"
+                    }`}
+                  >
+                    <Icon size={14} className={isActive ? "text-white" : "text-primary"} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {renderAuthForm()}
+          </div>
+        </main>
+        <PlatformFooter />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-full flex flex-col justify-between bg-background">
+      <main className="p-6 md:p-10">
+        <header className="max-w-6xl mx-auto mb-8 flex items-start justify-between gap-6">
+          <div>
+            <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">
+              {isZh ? "创作者中心 · 账户与资产" : "Creator Center · Account & Assets"}
+            </p>
+            <h1 className="text-3xl font-display text-foreground mt-2">个人与资产管理</h1>
+            <p className="text-text-secondary mt-1 text-sm">个人资料、签约认证、算力钱包与渠道代理设置</p>
+          </div>
+          <div className="flex gap-2">
+            {user?.role === "admin" && (
+              <button type="button" onClick={() => { window.location.hash = "#/admin"; }} className="glass-button">
+                管理后台
+              </button>
+            )}
+            {user ? (
+              <button type="button" onClick={() => void logout()} className="glass-button">
+                退出登录
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setSection("users"); window.location.hash = "#/platform?section=users"; }}
+                className="glass-button !bg-primary !text-white"
+              >
+                登录账号
+              </button>
+            )}
+          </div>
+        </header>
         <div className="max-w-6xl mx-auto space-y-6">
+          {/* Account Sub-sections Pills */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
             {accountSections.map(item => {
               const Icon = item.icon;
@@ -272,81 +352,20 @@ export default function PlatformPortal() {
               );
             })}
           </div>
-          {renderAuthForm()}
+
+          {/* Section View */}
+          <div>
+            {section === "users" && <UserSettings />}
+            {section === "compute" && <ComputeSettings />}
+            {section === "skills" && <SkillSettings />}
+            {section === "xiangongyun" && <XiangongyunSettings />}
+            {section === "agent" && <AgentCenter />}
+            {section === "wallet" && <WalletSettings />}
+          </div>
         </div>
       </main>
-    );
-  }
-
-  return (
-    <main className="min-h-full p-6 md:p-10 bg-background">
-      <header className="max-w-6xl mx-auto mb-8 flex items-start justify-between gap-6">
-        <div>
-          <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">
-            {isZh ? "创作者中心 · 账户与资产" : "Creator Center · Account & Assets"}
-          </p>
-          <h1 className="text-3xl font-display text-foreground mt-2">个人与资产管理</h1>
-          <p className="text-text-secondary mt-1 text-sm">个人资料、签约认证、算力钱包与渠道代理设置</p>
-        </div>
-        <div className="flex gap-2">
-          {user?.role === "admin" && (
-            <button type="button" onClick={() => { window.location.hash = "#/admin"; }} className="glass-button">
-              管理后台
-            </button>
-          )}
-          {user ? (
-            <button type="button" onClick={() => void logout()} className="glass-button">
-              退出登录
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => { setSection("users"); window.location.hash = "#/platform?section=users"; }}
-              className="glass-button !bg-primary !text-white"
-            >
-              登录账号
-            </button>
-          )}
-        </div>
-      </header>
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Account Sub-sections Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {accountSections.map(item => {
-            const Icon = item.icon;
-            const isActive = section === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setSection(item.id);
-                  window.location.hash = `#/platform?section=${item.id}`;
-                }}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
-                  isActive
-                    ? "bg-primary text-white border-primary shadow-sm"
-                    : "glass-panel text-text-secondary hover:text-foreground hover:bg-hover-bg border-glass-border"
-                }`}
-              >
-                <Icon size={14} className={isActive ? "text-white" : "text-primary"} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Section View */}
-        <div>
-          {section === "users" && <UserSettings />}
-          {section === "compute" && <ComputeSettings />}
-          {section === "skills" && <SkillSettings />}
-          {section === "xiangongyun" && <XiangongyunSettings />}
-          {section === "agent" && <AgentCenter />}
-          {section === "wallet" && <WalletSettings />}
-        </div>
-      </div>
-    </main>
+      <PlatformFooter />
+    </div>
   );
 }
 
