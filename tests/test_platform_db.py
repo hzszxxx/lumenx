@@ -18,6 +18,7 @@ def test_migrate_creates_isolated_schema_with_sqlite_safety(tmp_path):
         "021_agent_commissions.sql", "022_platform_system_settings.sql",
         "023_user_registration_source.sql", "024_structured_commercial_demands.sql",
         "025_commercial_contracts.sql", "026_seed_default_commercial_tasks.sql",
+        "027_seed_platform_education_and_events.sql",
     ]
     assert migrate(db_path) == expected
     assert migrate(db_path) == []
