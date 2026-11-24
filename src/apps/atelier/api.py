@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 import tempfile
@@ -40,6 +41,22 @@ from .upload_commands import (
 )
 
 router = APIRouter(tags=["atelier"])
+logger = logging.getLogger(__name__)
+
+
+def get_request_user(request: Request) -> dict[str, Any] | None:
+    user = getattr(request.state, "platform_user", None)
+    if user is not None:
+        return user
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        authorization = request.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            try:
+                return platform.authenticate(authorization[7:].strip())
+            except Exception:
+                return None
+    return None
 
 
 class CreateAtelierProjectRequest(BaseModel):
@@ -122,23 +139,51 @@ class UploadReceiptReadback(BaseModel):
 
 @router.get("/projects", response_model=list[AtelierProject])
 def list_projects(request: Request) -> list[AtelierProject]:
-    return _call_service(lambda: _service(request).list_projects())
+    all_projects = _call_service(lambda: _service(request).list_projects())
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="atelier") if platform else set()
+        return [
+            p for p in all_projects
+            if (p.owner_user_id == user_id or p.id in bound_ids)
+        ]
+    return all_projects
 
 
 @router.post("/projects", response_model=AtelierProject)
 def create_project(
     payload: CreateAtelierProjectRequest, request: Request
 ) -> AtelierProject:
-    return _call_service(
-        lambda: _service(request).create_project(
-            **payload.model_dump(exclude_unset=True)
-        )
+    user = get_request_user(request)
+    owner_user_id = user["id"] if user else None
+    params = payload.model_dump(exclude_unset=True)
+    params["owner_user_id"] = owner_user_id
+    project = _call_service(
+        lambda: _service(request).create_project(**params)
     )
+    if user:
+        platform = getattr(request.app.state, "platform_service", None)
+        if platform:
+            try:
+                platform.record_project_owner(user_id=user["id"], product="atelier", project_id=project.id)
+            except Exception as e:
+                logger.warning(f"Failed to record atelier project owner: {e}")
+    return project
 
 
 @router.get("/projects/{project_id}", response_model=AtelierProject)
 def get_project(project_id: str, request: Request) -> AtelierProject:
-    return _call_service(lambda: _service(request).get_project(project_id))
+    project = _call_service(lambda: _service(request).get_project(project_id))
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if platform else False
+        if project.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Atelier project not found")
+    return project
 
 
 @router.get("/projects/{project_id}/uploads/receipts/{client_request_id}", response_model=UploadReceiptReadback)
@@ -237,6 +282,14 @@ def preflight_sequence_route(
 def update_project(
     project_id: str, payload: UpdateAtelierProjectRequest, request: Request
 ) -> AtelierProject:
+    project = _call_service(lambda: _service(request).get_project(project_id))
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if platform else False
+        if project.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Atelier project not found")
     values = payload.model_dump(exclude_unset=True)
     expected_revision = values.pop("expected_revision")
     return _call_service(
@@ -252,6 +305,14 @@ def update_project(
 def delete_project(
     project_id: str, payload: DeleteAtelierProjectRequest, request: Request
 ) -> dict[str, bool]:
+    project = _call_service(lambda: _service(request).get_project(project_id))
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="atelier", project_id=project_id) if platform else False
+        if project.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Atelier project not found")
     _call_service(
         lambda: _service(request).delete_project(
             project_id,

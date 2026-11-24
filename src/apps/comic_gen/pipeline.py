@@ -884,7 +884,7 @@ class ComicGenPipeline:
         if repaired:
             self._save_data()
 
-    def create_project(self, title: str, text: str, skip_analysis: bool = False, workflow_mode: str = "i2v_legacy", series_id: Optional[str] = None) -> Script:
+    def create_project(self, title: str, text: str, skip_analysis: bool = False, workflow_mode: str = "i2v_legacy", series_id: Optional[str] = None, owner_user_id: Optional[str] = None) -> Script:
         """Step 1: Parse novel and create project.
 
         When `series_id` is provided the new project is bound as the next
@@ -912,9 +912,11 @@ class ComicGenPipeline:
                     raise ValueError("Series not found")
                 existing = self.get_series_episodes(series_id)
                 max_ep = max([ep.episode_number for ep in existing if ep.episode_number] or [0])
+                script.owner_user_id = owner_user_id or series.owner_user_id
                 self.scripts[script.id] = script
                 self.add_episode_to_series(series_id, script.id, episode_number=max_ep + 1)
             else:
+                script.owner_user_id = owner_user_id
                 self.scripts[script.id] = script
                 self._save_data()
         return script
@@ -7354,7 +7356,7 @@ class ComicGenPipeline:
             self._save_data()
             return self._committed_project_asset_response(script_id, asset_type, new_asset.id)
 
-    def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v", production_mode: str = "linear") -> Series:
+    def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v", production_mode: str = "linear", owner_user_id: Optional[str] = None) -> Series:
         """Create a new Series."""
         with self._save_lock:
             series = Series(
@@ -7365,6 +7367,7 @@ class ComicGenPipeline:
                 content_mode=content_mode,
                 default_generation_mode=default_generation_mode,
                 production_mode=production_mode or "linear",
+                owner_user_id=owner_user_id,
                 created_at=time.time(),
                 updated_at=time.time(),
             )
@@ -7488,6 +7491,7 @@ class ComicGenPipeline:
             script.default_generation_mode = series.default_generation_mode
             script.series_id = series_id
             script.episode_number = number
+            script.owner_user_id = series.owner_user_id
             receipt = SeriesEpisodeCreationReceipt(
                 series_id=series_id, client_request_id=request.client_request_id,
                 request_fingerprint=fingerprint, episode_id=script.id,
@@ -7954,7 +7958,7 @@ class ComicGenPipeline:
             return result
 
     def create_series_from_import(self, title: str, text: str, episodes_data: List[Dict],
-                                   description: str = "", *, import_id: str = "") -> Dict:
+                                   description: str = "", *, import_id: str = "", owner_user_id: Optional[str] = None) -> Dict:
         """Create a Series with Episodes from import data.
         episodes_data: list of dicts with episode_number, title, start_marker, end_marker."""
         with self._save_lock:
@@ -7972,6 +7976,7 @@ class ComicGenPipeline:
             if not episodes_data:
                 raise ValueError("An import needs at least one episode")
             series = Series(id=str(uuid.uuid4()), title=title, description=description,
+                            owner_user_id=owner_user_id,
                             created_at=time.time(), updated_at=time.time())
             episode_texts = self._split_text_by_markers(text, episodes_data)
             # Create Episode (Script) for each chunk
@@ -7986,6 +7991,7 @@ class ComicGenPipeline:
                 script = self.script_processor.create_draft_script(ep_title, ep_text)
                 script.series_id = series.id
                 script.episode_number = episode_number
+                script.owner_user_id = owner_user_id
                 drafts.append(script)
 
                 series.episode_ids.append(script.id)

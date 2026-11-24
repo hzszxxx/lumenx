@@ -870,6 +870,7 @@ class PromptConfig(BaseModel):
 
 class Script(BaseModel):
     id: str = Field(..., description="Unique identifier for the script project")
+    owner_user_id: Optional[str] = Field(None, description="Platform user ID of the owner")
     asset_image_request_scope_id: Optional[AssetImageServerId] = Field(
         None, description="Dormant server scope incarnation; only assigned at future admission",
     )
@@ -1041,6 +1042,7 @@ class Script(BaseModel):
 class Series(BaseModel):
     """A Series groups multiple Episodes with shared assets and configuration."""
     id: str = Field(..., description="Unique identifier for the series")
+    owner_user_id: Optional[str] = Field(None, description="Platform user ID of the owner")
     asset_image_request_scope_id: Optional[AssetImageServerId] = Field(
         None, description="Dormant server scope incarnation; only assigned at future admission",
     )

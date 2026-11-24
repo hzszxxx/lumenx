@@ -449,6 +449,40 @@ class PlatformService:
             ).fetchone()
         return row is not None
 
+    def record_project_owner(self, *, user_id: str, product: str, project_id: str, storage_id: str | None = None) -> dict[str, Any]:
+        """Record initial project ownership binding without requiring admin privileges."""
+        if product not in {"studio", "atelier"}:
+            raise PlatformError("invalid_project_product", "project binding product is invalid", 422)
+        if not user_id.strip() or not project_id.strip():
+            raise PlatformError("invalid_project_binding", "user_id and project_id are required", 422)
+        timestamp = now()
+        with connect(self.path) as c:
+            if not c.execute("SELECT 1 FROM platform_users WHERE id=? AND is_active=1", (user_id,)).fetchone():
+                return {}
+            existing = c.execute(
+                "SELECT id,storage_id FROM platform_project_bindings WHERE user_id=? AND product=? AND project_id=? AND status='active'",
+                (user_id, product, project_id),
+            ).fetchone()
+            if existing:
+                return {"id": existing[0], "user_id": user_id, "product": product, "project_id": project_id, "status": "active", "idempotent_replay": True}
+            binding_id = uid()
+            c.execute(
+                "INSERT INTO platform_project_bindings(id,user_id,product,project_id,storage_id,status,created_by,created_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,NULL)",
+                (binding_id, user_id, product, project_id, storage_id, "active", user_id, timestamp),
+            )
+            self._audit(c, user_id, "project.owner_recorded", "project_binding", binding_id, {"user_id": user_id, "product": product, "project_id": project_id, "storage_id": storage_id})
+        return {"id": binding_id, "user_id": user_id, "product": product, "project_id": project_id, "status": "active", "idempotent_replay": False}
+
+    def get_user_bound_project_ids(self, *, user_id: str, product: str) -> set[str]:
+        if product not in {"studio", "atelier"}:
+            return set()
+        with connect(self.path) as c:
+            rows = c.execute(
+                "SELECT project_id FROM platform_project_bindings WHERE user_id=? AND product=? AND status='active'",
+                (user_id, product),
+            ).fetchall()
+        return {row[0] for row in rows}
+
     def xiangongyun_verify(self, actor: dict[str, Any], access_token: str, *, idempotency_key: str) -> dict[str, Any]:
         if not access_token or len(access_token.strip()) < 16:
             raise PlatformError("invalid_xiangongyun_token", "仙宫云 Access Token 无效", 422)

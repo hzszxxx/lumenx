@@ -1208,6 +1208,7 @@ class AtelierImportProvenance(BaseModel):
 
 class AtelierProject(BaseModel):
     id: str = Field(..., description="Unique Atelier project ID")
+    owner_user_id: str | None = Field(None, description="Platform user ID of the owner")
     title: str = Field(..., description="Canvas project title")
     description: str = Field("", description="Canvas project description")
     source_project_id: str | None = Field(None, description="Optional Studio project ID used as a seed")

@@ -122,6 +122,7 @@ class AtelierService:
         title: str,
         description: str = "",
         source_project_id: str | None | _Omitted = _OMITTED,
+        owner_user_id: str | None = None,
     ) -> AtelierProject:
         title = _validate_required_text(title, "title")
         description = _validate_required_text(description, "description")
@@ -136,6 +137,7 @@ class AtelierService:
             title=title,
             description=description,
             source_project_id=source,
+            owner_user_id=owner_user_id,
             created_at=now,
             updated_at=now,
         )

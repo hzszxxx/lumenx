@@ -50,6 +50,7 @@ from .models import (
     ProviderBackend,
     ProviderRoutingConfig,
     Script,
+    Series,
     StoryboardFrame,
     VideoTask,
 )
@@ -166,6 +167,49 @@ def _environment_response(status_code: int, code: str, detail: str) -> JSONRespo
         status_code=status_code,
         headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
     )
+
+
+def get_request_user(request: Request) -> Optional[dict]:
+    user = getattr(request.state, "platform_user", None)
+    if user is not None:
+        return user
+    platform = getattr(request.app.state, "platform_service", None)
+    if platform is not None:
+        authorization = request.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            try:
+                return platform.authenticate(authorization[7:].strip())
+            except Exception:
+                return None
+    return None
+
+
+def check_project_access(project_id: str, request: Request, pipeline: Any) -> Script:
+    script = pipeline.get_script(project_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="Project not found")
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=project_id) if platform else False
+        if script.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Project not found")
+    return script
+
+
+def check_series_access(series_id: str, request: Request, pipeline: Any) -> Series:
+    series = pipeline.get_series(series_id)
+    if not series:
+        raise HTTPException(status_code=404, detail="Series not found")
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=series_id) if platform else False
+        if series.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Series not found")
+    return series
 
 
 def _storage_error_json(exc: StorageError) -> JSONResponse:
@@ -1659,6 +1703,7 @@ class CreateProjectRequest(BaseModel):
 @router.post("/projects", response_model=Script)
 async def create_project(
     request: CreateProjectRequest,
+    http_request: Request,
     skip_analysis: bool = False,
     active_pipeline: Any = Depends(get_pipeline),
 ):
@@ -1668,15 +1713,26 @@ async def create_project(
     of that series; omitting it keeps the standalone-project behavior
     unchanged.
     """
+    if request.series_id:
+        check_series_access(request.series_id, http_request, active_pipeline)
+    user = get_request_user(http_request)
+    owner_user_id = user["id"] if user else None
     # Run in thread pool to avoid blocking event loop during LLM analysis (Python 3.8 compatible)
     loop = asyncio.get_event_loop()
     try:
         result = await loop.run_in_executor(
             None,  # Use default executor
-            partial(active_pipeline.create_project, request.title, request.text, skip_analysis, request.workflow_mode, request.series_id)
+            partial(active_pipeline.create_project, request.title, request.text, skip_analysis, request.workflow_mode, request.series_id, owner_user_id)
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    if user:
+        platform = getattr(http_request.app.state, "platform_service", None)
+        if platform:
+            try:
+                platform.record_project_owner(user_id=user["id"], product="studio", project_id=result.id)
+            except Exception as e:
+                logger.warning(f"Failed to record project owner binding: {e}")
     return signed_response(result, runtime=active_pipeline)
 
 
@@ -1698,6 +1754,7 @@ class UpdateScriptTextRequest(BaseModel):
 def update_script_text(
     script_id: str,
     request: UpdateScriptTextRequest,
+    http_request: Request,
     active_pipeline: Any = Depends(get_pipeline),
 ):
     """Persist `original_text` without re-parsing entities.
@@ -1706,6 +1763,7 @@ def update_script_text(
     without triggering an LLM round-trip. Heavy reparse stays bound to the
     explicit "提取实体" CTA.
     """
+    check_project_access(script_id, http_request, active_pipeline)
     try:
         script = active_pipeline.update_script_text(
             script_id, request.text, expected_revision=request.expected_revision,
@@ -1719,9 +1777,11 @@ def update_script_text(
 async def reparse_project(
     script_id: str,
     request: ReparseProjectRequest,
+    http_request: Request,
     active_pipeline: Any = Depends(get_pipeline),
 ):
     """Re-parses the text for an existing project, replacing all entities."""
+    check_project_access(script_id, http_request, active_pipeline)
     from .pipeline import ProjectGenerationError
 
     try:
@@ -1748,9 +1808,11 @@ async def reparse_project(
 async def extract_preview(
     script_id: str,
     request: ExtractPreviewRequest,
+    http_request: Request,
     active_pipeline: Any = Depends(get_pipeline),
 ):
     """Dry-run entity extraction — returns entities without saving."""
+    check_project_access(script_id, http_request, active_pipeline)
     from .pipeline import ProjectGenerationError
 
     try:
@@ -1775,9 +1837,18 @@ async def extract_preview(
 
 
 @router.get("/projects/", response_model=List[dict])
-def list_projects(active_pipeline: Any = Depends(get_pipeline)):
+def list_projects(request: Request, active_pipeline: Any = Depends(get_pipeline)):
     """Lists all projects from backend storage."""
     scripts = active_pipeline.read_committed_projects()
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="studio") if platform else set()
+        scripts = [
+            s for s in scripts
+            if (getattr(s, "owner_user_id", None) == user_id or s.id in bound_ids)
+        ]
     return signed_response(scripts, runtime=active_pipeline)
 
 
@@ -1943,9 +2014,12 @@ class UpdateSeriesRequest(BaseModel):
 
 @router.post("/series")
 def create_series(request: CreateSeriesRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Create a new Series."""
+    user = get_request_user(http_request)
+    owner_user_id = user["id"] if user else None
     series = pipeline.create_series(
         request.title,
         request.description,
@@ -1953,27 +2027,53 @@ def create_series(request: CreateSeriesRequest,
         request.content_mode,
         request.default_generation_mode,
         request.production_mode,
+        owner_user_id=owner_user_id,
     )
+    if user:
+        platform = getattr(http_request.app.state, "platform_service", None)
+        if platform:
+            try:
+                platform.record_project_owner(user_id=user["id"], product="studio", project_id=series.id)
+            except Exception as e:
+                logger.warning(f"Failed to record series owner binding: {e}")
     return signed_response(series, runtime=pipeline)
 
 
 @router.get("/series")
 def list_series(
+    request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """List all Series."""
     series_list = pipeline.read_committed_series()
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound_ids = platform.get_user_bound_project_ids(user_id=user_id, product="studio") if platform else set()
+        series_list = [
+            s for s in series_list
+            if (getattr(s, "owner_user_id", None) == user_id or s.id in bound_ids)
+        ]
     return signed_response(series_list, runtime=pipeline)
 
 
 @router.get("/series/{series_id}")
 def get_series(series_id: str,
+    request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Get Series details including assets and episode list."""
     series, episodes = pipeline.read_committed_series_view(series_id)
     if not series:
         raise HTTPException(status_code=404, detail="Series not found")
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=series_id) if platform else False
+        if series.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Series not found")
     # Include episode summaries
     result = series.model_dump()
     result["episodes"] = [
@@ -1991,11 +2091,13 @@ def get_series(series_id: str,
 
 @router.put("/series/{series_id}")
 def update_series(series_id: str, request: UpdateSeriesRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Update Series fields. Uses `exclude_unset=True` so explicitly-null
     values (e.g. `{"art_direction": null}` to clear baseline) are honored,
     while fields the client didn't send remain untouched."""
+    check_series_access(series_id, http_request, pipeline)
     try:
         updates = request.model_dump(exclude_unset=True, exclude={"expected_revision"})
         series = pipeline.update_series(series_id, updates, expected_revision=request.expected_revision)
@@ -2006,9 +2108,11 @@ def update_series(series_id: str, request: UpdateSeriesRequest,
 
 @router.delete("/series/{series_id}")
 def delete_series(series_id: str,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Delete a Series and disassociate its episodes."""
+    check_series_access(series_id, http_request, pipeline)
     try:
         pipeline.delete_series(series_id)
         return {"status": "deleted"}
@@ -2023,18 +2127,31 @@ class AddEpisodeRequest(BaseModel):
 
 @router.post("/series/{series_id}/episode_requests", response_model=SeriesEpisodeCreationReceipt)
 def create_series_episode(series_id: str, request: CreateSeriesEpisodeRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
+    check_series_access(series_id, http_request, pipeline)
     try:
-        return pipeline.create_series_episode(series_id, request)
+        receipt = pipeline.create_series_episode(series_id, request)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    series = pipeline.get_series(series_id)
+    if series and series.owner_user_id:
+        platform = getattr(http_request.app.state, "platform_service", None)
+        if platform:
+            try:
+                platform.record_project_owner(user_id=series.owner_user_id, product="studio", project_id=receipt.episode_id)
+            except Exception as e:
+                logger.warning(f"Failed to record episode owner binding: {e}")
+    return receipt
 
 
 @router.get("/series/{series_id}/episode_requests/{client_request_id}", response_model=SeriesEpisodeCreationReceipt)
 def read_series_episode_creation(series_id: str, client_request_id: str,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
+    check_series_access(series_id, http_request, pipeline)
     try:
         return pipeline.read_series_episode_creation(series_id, client_request_id)
     except ValueError as exc:
@@ -2043,9 +2160,12 @@ def read_series_episode_creation(series_id: str, client_request_id: str,
 
 @router.post("/series/{series_id}/episodes")
 def add_episode_to_series(series_id: str, request: AddEpisodeRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Add an existing project as an episode to a Series."""
+    check_series_access(series_id, http_request, pipeline)
+    check_project_access(request.script_id, http_request, pipeline)
     try:
         series = pipeline.add_episode_to_series(series_id, request.script_id, request.episode_number)
         return signed_response(series, runtime=pipeline)
@@ -2055,9 +2175,11 @@ def add_episode_to_series(series_id: str, request: AddEpisodeRequest,
 
 @router.delete("/series/{series_id}/episodes/{script_id}")
 def remove_episode_from_series(series_id: str, script_id: str,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Remove an episode from a Series (does not delete the project)."""
+    check_series_access(series_id, http_request, pipeline)
     try:
         series = pipeline.remove_episode_from_series(series_id, script_id)
         return signed_response(series, runtime=pipeline)
@@ -2067,9 +2189,11 @@ def remove_episode_from_series(series_id: str, script_id: str,
 
 @router.get("/series/{series_id}/episodes")
 def get_series_episodes(series_id: str,
+    request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Get all episodes in a Series."""
+    check_series_access(series_id, request, pipeline)
     try:
         series, episodes = pipeline.read_committed_series_view(series_id)
         if series is None:
@@ -2584,9 +2708,12 @@ async def import_file_preview(
 
 @router.post("/series/import/confirm")
 async def import_file_confirm(request: ConfirmImportRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Confirm the episode split and create Series + Episodes."""
+    user = get_request_user(http_request)
+    owner_user_id = user["id"] if user else None
     try:
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
@@ -2598,8 +2725,24 @@ async def import_file_confirm(request: ConfirmImportRequest,
                 request.episodes,
                 request.description,
                 import_id=request.import_id,
+                owner_user_id=owner_user_id,
             )
         )
+        if user:
+            platform = getattr(http_request.app.state, "platform_service", None)
+            if platform:
+                series_data = result.get("series", {})
+                if series_data.get("id"):
+                    try:
+                        platform.record_project_owner(user_id=user["id"], product="studio", project_id=series_data["id"])
+                    except Exception as e:
+                        logger.warning(f"Failed to record series owner binding: {e}")
+                for ep in result.get("episodes", []):
+                    if ep.get("id"):
+                        try:
+                            platform.record_project_owner(user_id=user["id"], product="studio", project_id=ep["id"])
+                        except Exception as e:
+                            logger.warning(f"Failed to record episode owner binding: {e}")
         return signed_response(result, runtime=pipeline)
     except ImportPreviewUnavailable as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
@@ -2942,6 +3085,7 @@ def test_api_key(payload: TestKeyRequest, request: Request):
 
 @router.get("/projects/{script_id}")
 def get_project(script_id: str,
+    request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Retrieves a project by ID. When the project belongs to a
@@ -2959,6 +3103,13 @@ def get_project(script_id: str,
     script, series, lib = pipeline.read_committed_project_view(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="Project not found")
+    user = get_request_user(request)
+    if user and user.get("role") != "admin":
+        user_id = user["id"]
+        platform = getattr(request.app.state, "platform_service", None)
+        bound = platform.is_project_bound(user_id=user_id, product="studio", project_id=script_id) if platform else False
+        if script.owner_user_id != user_id and not bound:
+            raise HTTPException(status_code=404, detail="Project not found")
 
     payload = script.model_dump()
     # These versions describe the same detached capture as the merged assets.
@@ -3034,13 +3185,11 @@ def get_project(script_id: str,
 
 @router.delete("/projects/{script_id}")
 def delete_project(script_id: str,
+    request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Deletes a project by ID. WARNING: This permanently removes the project from backend storage."""
-    script = pipeline.get_script(script_id)
-    if not script:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
+    check_project_access(script_id, request, pipeline)
     deleted = pipeline.delete_project(script_id)
     return {"status": "deleted", "id": script_id, "title": deleted.title}
 
