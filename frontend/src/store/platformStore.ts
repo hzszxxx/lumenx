@@ -14,6 +14,12 @@ type PlatformStore = {
   clearError: () => void;
 };
 
+function notifyUserChanged(user: PlatformUser | null) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("lumenx:user_changed", { detail: user }));
+  }
+}
+
 export const usePlatformStore = create<PlatformStore>((set) => ({
   user: null,
   walletCents: 0,
@@ -28,12 +34,16 @@ export const usePlatformStore = create<PlatformStore>((set) => ({
     } catch (error) {
       clearPlatformToken();
       set({ user: null, loading: false, error: error instanceof Error ? error.message : String(error) });
+      notifyUserChanged(null);
     }
   },
   login: async (username, password) => {
     set({ loading: true, error: null });
-    try { const session = await platformApi.login({ username, password }); set({ user: session.user, loading: false }); }
-    catch (error) { set({ loading: false, error: error instanceof Error ? error.message : String(error) }); throw error; }
+    try {
+      const session = await platformApi.login({ username, password });
+      set({ user: session.user, loading: false });
+      notifyUserChanged(session.user);
+    } catch (error) { set({ loading: false, error: error instanceof Error ? error.message : String(error) }); throw error; }
   },
   devLogin: async (role: "admin" | "creator" = "admin") => {
     set({ loading: true, error: null });
@@ -42,6 +52,7 @@ export const usePlatformStore = create<PlatformStore>((set) => ({
       const password = role === "admin" ? "aaaaaaaaaaaa" : "password123";
       const session = await platformApi.login({ username, password });
       set({ user: session.user, walletCents: 100000, loading: false });
+      notifyUserChanged(session.user);
     } catch {
       const mockUser: PlatformUser = {
         id: `dev-${role}-id`,
@@ -50,14 +61,23 @@ export const usePlatformStore = create<PlatformStore>((set) => ({
         role: role,
       };
       set({ user: mockUser, walletCents: 888800, loading: false });
+      notifyUserChanged(mockUser);
     }
   },
   register: async (username, password, email, inviteCode = "") => {
     set({ loading: true, error: null });
-    try { await platformApi.register({ username, password, email, invite_code: inviteCode }); const session = await platformApi.login({ username, password }); set({ user: session.user, loading: false }); }
-    catch (error) { set({ loading: false, error: error instanceof Error ? error.message : String(error) }); throw error; }
+    try {
+      await platformApi.register({ username, password, email, invite_code: inviteCode });
+      const session = await platformApi.login({ username, password });
+      set({ user: session.user, loading: false });
+      notifyUserChanged(session.user);
+    } catch (error) { set({ loading: false, error: error instanceof Error ? error.message : String(error) }); throw error; }
   },
-  logout: async () => { await platformApi.logout(); set({ user: null, walletCents: 0 }); },
+  logout: async () => {
+    await platformApi.logout();
+    set({ user: null, walletCents: 0 });
+    notifyUserChanged(null);
+  },
   clearError: () => set({ error: null }),
 }));
 

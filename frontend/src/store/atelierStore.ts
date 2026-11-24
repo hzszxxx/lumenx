@@ -1529,3 +1529,26 @@ subscribeRuntimeEnvironment(() => {
     failures.clear();
     useAtelierStore.setState(emptyState());
 });
+
+export function resetAtelierStoreForUserSwitch(): void {
+    navigation += 1;
+    mutation += 1;
+    loadingToken = ++serial;
+    listRequest = null;
+    ensureRequest = null;
+    createRequest = null;
+    navigationRequest = null;
+    readTokens.clear();
+    generationCreates.clear();
+    generationActions.clear();
+    agentStarts.clear();
+    agentLoopStarts.clear();
+    agentActions.clear();
+    exportJobs.clear();
+    exportCreates.clear();
+    exportDeletes.clear();
+    writes.clear();
+    writeQueues.clear();
+    failures.clear();
+    useAtelierStore.setState(emptyState());
+}

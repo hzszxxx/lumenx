@@ -6,7 +6,8 @@ import {
   Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
   Zap, Film, Sparkles, Search, Clock, MoreVertical, Gamepad2,
 } from "lucide-react";
-import { useProjectStore, Project } from "@/store/projectStore";
+import { useProjectStore, Project, resetProjectStoreForUserSwitch } from "@/store/projectStore";
+import { resetAtelierStoreForUserSwitch } from "@/store/atelierStore";
 import { toast } from "@/store/toastStore";
 import { useOnline } from "@/lib/useOnline";
 import { rovingKeyDown } from "@/lib/a11y";
@@ -755,7 +756,11 @@ export default function Home() {
       .getState()
       .initialize()
       .then(() => {
-        if (active) setPlatformAccess("ready");
+        if (active) {
+          setPlatformAccess("ready");
+          void syncProjects();
+          void syncSeries();
+        }
       })
       .catch(() => {
         if (!active) return;
@@ -765,6 +770,17 @@ export default function Home() {
       active = false;
     };
   }, [currentView]);
+
+  useEffect(() => {
+    const handleUserChanged = () => {
+      resetProjectStoreForUserSwitch();
+      resetAtelierStoreForUserSwitch();
+      void syncProjects();
+      void syncSeries();
+    };
+    window.addEventListener("lumenx:user_changed", handleUserChanged);
+    return () => window.removeEventListener("lumenx:user_changed", handleUserChanged);
+  }, []);
 
   // Sync projects and series from backend once runtime environment is active
   useEffect(() => {

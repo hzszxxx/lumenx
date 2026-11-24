@@ -1107,3 +1107,22 @@ export function resetProjectStoreHydrationForTests(): void {
         projectEnvironmentActivationRequest = 0;
     }
 }
+
+export function resetProjectStoreForUserSwitch(): void {
+    projectSelectionRequest += 1;
+    seriesListRequest += 1;
+    useProjectStore.setState({
+        projects: [],
+        currentProject: null,
+        readWatermarks: {},
+        generatingTasks: [],
+        runningOps: {},
+        currentSeries: null,
+        seriesList: [],
+        pendingExtraction: null,
+        pendingExtractionScript: null,
+        pendingExtractionOwner: null,
+        isAnalyzing: false,
+        isLoading: false,
+    });
+}
