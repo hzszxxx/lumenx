@@ -509,6 +509,23 @@ class MuleRunLoginSession:
                 return False
             return result.returncode == 0
 
+    def cancel(self) -> bool:
+        """Cancel only the active login subprocess without closing the session permanently."""
+        with self._lock:
+            if self._closed:
+                return False
+            process = self.process
+            self.process = None
+            if process is None or process.poll() is not None:
+                return False
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+            return True
+
     def close(self) -> None:
         """Terminate only this session's owned subprocess."""
         with self._lock:

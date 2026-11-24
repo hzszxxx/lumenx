@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
-import { Save, Loader2, ChevronDown, ChevronRight, FolderOpen, WifiOff, Copy, Check } from "lucide-react";
+import { Save, Loader2, ChevronDown, ChevronRight, FolderOpen, WifiOff, Copy, Check, ExternalLink, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { isLocalDeployment } from "@/lib/transport";
 import { api, type EnvConfigPayload, type ProviderMode, API_URL } from "@/lib/api";
 import {
   environmentLocalStorageKey,
@@ -538,6 +539,8 @@ export default function SettingsPage() {
     mulerunLoginGenerationRef.current += 1;
     clearMulerunLoginTimers();
     setMulerunLoginRunning(false);
+    void api.cancelMulerunLogin().catch(() => {});
+    toast.info("已取消 MuleRun 登录等待");
   }, [clearMulerunLoginTimers, setMulerunLoginRunning]);
 
   const getErrorDetail = (error: unknown): string | null => {
@@ -548,6 +551,10 @@ export default function SettingsPage() {
 
   const startMulerunLogin = useCallback(async () => {
     if (mulerunLoginActiveRef.current) return;
+    if (!isLocalDeployment()) {
+      toast.warning("网页端无需启动 CLI 登录，请直接在下方填写 MULEROUTER_API_KEY");
+      return;
+    }
     const environment = getRuntimeEnvironment();
     if (!environment) {
       toast.error(t("loginFailed"));
@@ -953,33 +960,71 @@ export default function SettingsPage() {
             <div className="mb-3 p-3 rounded-lg bg-surface-inset border border-glass-border text-xs text-text-secondary leading-relaxed">
               💡 推荐直接在下方填入 <strong className="text-foreground">MULEROUTER_API_KEY</strong>（支持 Bearer Token 或 MuleRouter 凭证），免装 CLI 即可调用 Seedance 2.0 视频生成与 GPT-Image-2 图像模型。
             </div>
-            {!config.MULEROUTER_API_KEY && !config.MULERUN_CLI_LOGGED_IN && (
-              <button
-                type="button"
-                onClick={startMulerunLogin}
-                disabled={mulerunLoginActive}
-                className="w-full py-2.5 rounded-lg bg-primary text-on-accent text-sm font-medium hover:bg-primary-hover transition-colors mb-3 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {mulerunLoginActive && <Loader2 size={15} className="animate-spin" />}
-                {mulerunLoginActive ? "正在等待 MuleRun 登录…" : t("mulerunLogin")}
-              </button>
-            )}
-            {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex items-center gap-2 text-sm text-emerald-400">
-                  <Check size={16} />
-                  {t("mulerunLoggedIn")}
+
+            {mulerunLoginActive ? (
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex-1 py-2 px-3 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-medium flex items-center justify-center gap-2">
+                  <Loader2 size={14} className="animate-spin shrink-0 text-primary" />
+                  <span>正在等待 MuleRun 登录授权...</span>
                 </div>
                 <button
                   type="button"
-                  onClick={startMulerunLogin}
-                  disabled={mulerunLoginActive}
-                  className="text-xs text-text-secondary hover:text-foreground transition-colors underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={cancelMulerunLogin}
+                  className="px-3 py-2 rounded-lg border border-glass-border bg-surface-inset hover:bg-hover-bg text-xs text-text-secondary hover:text-foreground transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
                 >
-                  {t("reLogin")}
+                  <X size={14} />
+                  <span>取消等待</span>
                 </button>
               </div>
+            ) : !isLocalDeployment() ? (
+              <div className="mb-3 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-text-secondary flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-medium text-foreground">网页直连模式（免安装 CLI）</div>
+                  <div className="text-[0.6875rem] text-text-muted">
+                    云端运行无需在服务器执行命令行登录，直接填入 Key 即可完成对接。
+                  </div>
+                </div>
+                <a
+                  href="https://mulerouter.ai"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors flex items-center gap-1"
+                >
+                  <span>获取 Key</span>
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+            ) : (
+              <>
+                {!config.MULEROUTER_API_KEY && !config.MULERUN_CLI_LOGGED_IN && (
+                  <button
+                    type="button"
+                    onClick={startMulerunLogin}
+                    disabled={mulerunLoginActive}
+                    className="w-full py-2.5 rounded-lg bg-primary text-on-accent text-sm font-medium hover:bg-primary-hover transition-colors mb-3 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {t("mulerunLogin")}
+                  </button>
+                )}
+                {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-sm text-emerald-400">
+                      <Check size={16} />
+                      {t("mulerunLoggedIn")}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={startMulerunLogin}
+                      disabled={mulerunLoginActive}
+                      className="text-xs text-text-secondary hover:text-foreground transition-colors underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {t("reLogin")}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
+
             <FieldLabel>MULEROUTER_API_KEY</FieldLabel>
             <KeyField
               value={config.MULEROUTER_API_KEY}

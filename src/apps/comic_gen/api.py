@@ -6122,6 +6122,15 @@ def trigger_mulerun_login(request: Request):
         raise HTTPException(status_code=503, detail="无法启动当前环境的 MuleRun 登录，请重试") from None
 
 
+@router.post("/config/mulerun-login/cancel")
+def cancel_mulerun_login(request: Request):
+    """Cancel any active CLI login subprocess without closing the session permanently."""
+    session = _mulerun_login_session(request)
+    if session is not None:
+        session.cancel()
+    return {"status": "ok", "message": "已取消当前登录"}
+
+
 # Credential-like env fields that must never be returned in plaintext.
 SECRET_FIELDS = {
     "DASHSCOPE_API_KEY",

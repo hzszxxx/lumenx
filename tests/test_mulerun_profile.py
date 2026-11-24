@@ -344,6 +344,48 @@ def test_login_session_start_uses_devnull_and_close_owns_child(tmp_path):
     session.close()
 
 
+def test_login_session_cancel_terminates_child_without_closing_session(tmp_path):
+    class FakeProcess:
+        def __init__(self):
+            self.terminated = False
+            self.waits = 0
+
+        def poll(self):
+            return None if not self.terminated else 0
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout=None):
+            self.waits += 1
+            return 0
+
+        def kill(self):
+            pass
+
+    first_process = FakeProcess()
+    second_process = FakeProcess()
+    procs = [second_process, first_process]
+
+    def fake_popen(*args, **kwargs):
+        return procs.pop()
+
+    session = MuleRunLoginSession(
+        tmp_path / "profile",
+        {"MULERUN_BASE_URL": "https://owned.example", "MULERUN_SITE": "cn"},
+        popen_factory=fake_popen,
+    )
+
+    assert session.start() is True
+    assert session.cancel() is True
+    assert first_process.terminated is True
+    # Session is not closed, so subsequent start can still run
+    assert session.start() is True
+    assert second_process.poll() is None
+    session.close()
+    assert second_process.terminated is True
+
+
 def test_login_session_copies_env_immutably(tmp_path):
     captured = {}
     env = {"MULERUN_BASE_URL": "https://before.example"}

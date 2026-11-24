@@ -14,6 +14,13 @@ export const isTauri = (): boolean => {
     return typeof window !== 'undefined' && '__TAURI__' in window;
 };
 
+// Detect if running in local desktop or local development environment
+export const isLocalDeployment = (): boolean => {
+    if (typeof window === 'undefined') return true;
+    const h = window.location.hostname;
+    return isTauri() || h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0';
+};
+
 interface ApiResponse<T = unknown> {
     data: T;
     status: number;
