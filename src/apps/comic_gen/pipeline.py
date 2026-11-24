@@ -206,6 +206,7 @@ class ComicGenPipeline:
         self._kling_model = None
         self._vidu_model = None
         self._mulerouter_video_model = None
+        self._xiangongyun_model = None
         self.provider_recovery_runtime = None
         self.provider_runtime_selector = None
         self._provider_credential_store = ProviderCredentialStore(
@@ -3591,6 +3592,8 @@ class ComicGenPipeline:
                     model = "viduq3-pro-r2v"
                 elif model and model.startswith("seedance"):
                     model = "seedance-2.0-r2v"
+                elif model and (model.startswith("xiangongyun") or model.startswith("h3")):
+                    model = "xiangongyun-h3-r2v"
                 else:
                     model = "wan2.7-r2v"
 
@@ -6064,8 +6067,37 @@ class ComicGenPipeline:
                 or model_name_lower.startswith("vidu/vidu")
             )
             use_mulerouter = backend == "mulerouter" and model_name_lower.startswith("seedance")
+            use_xiangongyun = (
+                model_name_lower.startswith("xiangongyun")
+                or model_name_lower.startswith("h3-")
+                or model_name_lower.startswith("h3/")
+                or "xiangongyun" in model_name_lower
+            )
 
-            if use_mulerouter:
+            if use_xiangongyun:
+                if video_env is not None:
+                    from ...models.xiangongyun import XiangongyunH3Model
+                    active_model = XiangongyunH3Model({"output_root": str(self.data_dir)}, env=video_env)
+                else:
+                    if self._xiangongyun_model is None:
+                        from ...models.xiangongyun import XiangongyunH3Model
+                        self._xiangongyun_model = XiangongyunH3Model({"output_root": str(self.data_dir)})
+                    active_model = self._xiangongyun_model
+                active_model.generate(
+                    prompt=request.prompt,
+                    output_path=output_path,
+                    img_url=img_url,
+                    img_path=img_path,
+                    duration=request.duration,
+                    model=request.model,
+                    resolution=request.resolution,
+                    aspect_ratio=request.ratio or "16:9",
+                    seed=request.seed,
+                    audio=request.generate_audio if request.generate_audio is not None else True,
+                    generation_mode=request.generation_mode,
+                    ref_image_urls=request.reference_image_urls if request.generation_mode == "r2v" else None,
+                )
+            elif use_mulerouter:
                 if video_env is not None:
                     from ...models.mulerouter import MuleRouterVideoModel
                     active_model = MuleRouterVideoModel({"output_root": str(self.data_dir)}, env=video_env)

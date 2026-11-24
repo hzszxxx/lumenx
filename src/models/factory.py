@@ -19,5 +19,11 @@ class ModelFactory:
         elif model_name in ('seedance', 'seedance-2.0'):
             from .mulerouter import MuleRouterVideoModel
             return MuleRouterVideoModel(config.get('model') or {}, env=runtime_env)
+        elif (
+            model_name in ('xiangongyun', 'xiangongyun-h3', 'h3', 'xiangongyun-h3-i2v', 'xiangongyun-h3-r2v')
+            or (isinstance(model_name, str) and (model_name.startswith('xiangongyun') or model_name.startswith('h3-') or model_name.startswith('h3/')))
+        ):
+            from .xiangongyun import XiangongyunH3Model
+            return XiangongyunH3Model(config.get('model') or {}, env=runtime_env)
         else:
             raise ValueError(f"Unknown model: {model_name}")

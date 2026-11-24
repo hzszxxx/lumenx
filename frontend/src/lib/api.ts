@@ -12,7 +12,7 @@ import { parseSeriesEpisodeReceipt, type CreateSeriesEpisodeRequest } from "@/li
 
 export { API_URL } from "@/lib/apiUrl";
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && axios?.interceptors?.request) {
     axios.interceptors.request.use((config) => {
         const token = window.localStorage.getItem("lumenx_platform_token");
         if (token && config.headers) {
