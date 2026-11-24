@@ -192,7 +192,29 @@ export default function SettingsPage() {
   const t = useTranslations("settings");
   const { locale, theme, animations, setLocale, setTheme, setAnimations } = useSettingsStore();
 
-  const [active, setActive] = useState<SettingsCategory>("general");
+  const [active, setActive] = useState<SettingsCategory>(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+      if (hash.includes("tab=apikeys") || hash.includes("category=apikeys")) return "apikeys";
+      if (hash.includes("tab=models")) return "models";
+      if (hash.includes("tab=prompts")) return "prompts";
+      if (hash.includes("tab=storage")) return "storage";
+    }
+    return "general";
+  });
+
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash;
+      if (hash.includes("tab=apikeys") || hash.includes("category=apikeys")) setActive("apikeys");
+      else if (hash.includes("tab=models")) setActive("models");
+      else if (hash.includes("tab=prompts")) setActive("prompts");
+      else if (hash.includes("tab=storage")) setActive("storage");
+      else if (hash.includes("tab=general")) setActive("general");
+    };
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
   const [runtimeEnvironment, setRuntimeEnvironment] = useState(() => getRuntimeEnvironment());
 
   // ── API Config ──

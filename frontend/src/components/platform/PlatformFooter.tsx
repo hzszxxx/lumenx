@@ -144,9 +144,13 @@ export default function PlatformFooter() {
                 </button>
               </li>
               <li>
-                <span className="text-text-muted flex items-center gap-1">
-                  <ChevronRight size={11} className="text-text-muted" /> 张导镜头控制矩阵
-                </span>
+                <button
+                  type="button"
+                  onClick={() => navigateTo("#/settings?tab=apikeys")}
+                  className="hover:text-primary transition-colors flex items-center gap-1 font-medium text-foreground/90"
+                >
+                  <ChevronRight size={11} className="text-primary" /> 系统设置与 API-Key 对接
+                </button>
               </li>
             </ul>
           </div>

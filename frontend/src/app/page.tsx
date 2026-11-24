@@ -1009,7 +1009,7 @@ export default function Home() {
         setEpisodeId(null);
         return;
       }
-      if (hash === '#/settings') {
+      if (hash === '#/settings' || hash.startsWith('#/settings?') || hash.startsWith('#/settings/')) {
         setCurrentView('settings');
         setActiveTab('settings');
         setProjectId(null);

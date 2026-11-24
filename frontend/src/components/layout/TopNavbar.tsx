@@ -12,6 +12,7 @@ import {
   LogOut,
   Plus,
   LayoutGrid,
+  Settings,
 } from "lucide-react";
 import clsx from "clsx";
 import LumenXBranding from "./LumenXBranding";
@@ -26,7 +27,7 @@ interface TopNavbarProps {
   onLogout?: () => void;
 }
 
-export type TopNavSection = "workspace" | "academy" | "competitions" | "certification" | "tasks" | "profile";
+export type TopNavSection = "workspace" | "academy" | "competitions" | "certification" | "tasks" | "profile" | "settings";
 
 export default function TopNavbar({
   activeTab,
@@ -41,7 +42,9 @@ export default function TopNavbar({
   useEffect(() => {
     const syncHash = () => {
       const hash = window.location.hash || "#/";
-      if (hash.startsWith("#/academy") || hash.includes("section=academy")) {
+      if (hash.startsWith("#/settings")) {
+        setCurrentSection("settings");
+      } else if (hash.startsWith("#/academy") || hash.includes("section=academy")) {
         setCurrentSection("academy");
       } else if (hash.startsWith("#/competitions") || hash.includes("section=competitions")) {
         setCurrentSection("competitions");
@@ -49,7 +52,7 @@ export default function TopNavbar({
         setCurrentSection("certification");
       } else if (hash.startsWith("#/workspace") || hash.startsWith("#/project") || hash.startsWith("#/series") || hash.startsWith("#/library") || hash.startsWith("#/studio/editor")) {
         setCurrentSection("workspace");
-      } else if (hash.startsWith("#/profile") || hash.includes("section=users") || hash.includes("section=wallet")) {
+      } else if (hash.startsWith("#/profile") || hash.includes("section=users") || hash.includes("section=wallet") || hash.includes("section=compute")) {
         setCurrentSection("profile");
       } else {
         setCurrentSection("tasks");
@@ -65,6 +68,9 @@ export default function TopNavbar({
     if (section === "workspace") {
       onTabChange("workspace");
       window.location.hash = "#/workspace";
+    } else if (section === "settings") {
+      onTabChange("settings");
+      window.location.hash = "#/settings";
     } else if (section === "academy") {
       onTabChange("platform");
       window.location.hash = "#/platform?section=academy";
@@ -132,8 +138,8 @@ export default function TopNavbar({
         </nav>
       </div>
 
-      {/* 右侧：开始创作按钮 & 用户登录状态 */}
-      <div className="flex items-center gap-3">
+      {/* 右侧：开始创作按钮、设置入口 & 用户登录状态 */}
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* 高亮开始创作按钮 */}
         <button
           type="button"
@@ -152,6 +158,22 @@ export default function TopNavbar({
         >
           <Plus size={15} />
           <span>开始创作</span>
+        </button>
+
+        {/* 系统设置 / API-Key 对接入口 */}
+        <button
+          type="button"
+          onClick={() => handleNavClick("settings")}
+          className={clsx(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-colors",
+            activeTab === "settings" || currentSection === "settings"
+              ? "bg-primary/15 text-primary border-primary/40 font-semibold"
+              : "border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg"
+          )}
+          title="系统设置与 API-Key 对接"
+        >
+          <Settings size={15} className="text-primary" />
+          <span className="hidden sm:inline">设置 / API-Key</span>
         </button>
 
         {/* 用户态 */}
