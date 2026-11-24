@@ -557,7 +557,7 @@ export default function SettingsPage() {
     }
     const environment = getRuntimeEnvironment();
     if (!environment) {
-      toast.error(t("loginFailed"));
+      toast.error("当前运行环境未就绪，无法发起 MuleRun 登录");
       return;
     }
 
@@ -615,10 +615,10 @@ export default function SettingsPage() {
           return;
         }
         finishMulerunLogin(generation);
-        toast.error(t("loginFailed"));
+        toast.error("MuleRun 登录等待超时。网页端请直接在下方填写 MULEROUTER_API_KEY，免装 CLI 即可调用");
       }, 120000);
     } catch (error: unknown) {
-      if (stillCurrent()) toast.error(getErrorDetail(error) || t("loginFailed"));
+      if (stillCurrent()) toast.error(getErrorDetail(error) || "MuleRun 登录启动失败，网页端建议直接在下方配置 API Key");
       finishMulerunLogin(generation);
     }
   }, [clearMulerunLoginTimers, finishMulerunLogin, setMulerunLoginRunning, t]);
