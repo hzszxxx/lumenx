@@ -2635,6 +2635,9 @@ class EnvConfig(ProviderRoutingConfig):
     endpoint_overrides: Dict[str, str] = Field(default_factory=dict)
 
 
+_MASK_CHAR = "\u2022"
+
+
 def _normalize_provider_mode(value: Optional[str]) -> str:
     normalized = (value or "").strip().lower()
     if normalized in (ProviderBackend.DASHSCOPE.value, ProviderBackend.VENDOR.value):
@@ -2814,6 +2817,126 @@ def update_env_config(config: EnvConfig, request: Request):
     except Exception as e:
         logger.exception("Failed to save environment configuration")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class TestKeyRequest(BaseModel):
+    provider: str = "dashscope"
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+@router.post("/config/test-key")
+def test_api_key(payload: TestKeyRequest, request: Request):
+    """Test validity of a provider API key against the provider's API.
+
+    If api_key is omitted or masked (contains bullet sentinel), resolves the
+    currently configured runtime environment key.
+    """
+    provider = (payload.provider or "dashscope").strip().lower()
+    env = request.app.state.runtime_environment.snapshot() if hasattr(request.app.state, "runtime_environment") else os.environ
+
+    if provider == "dashscope":
+        candidate_key = (payload.api_key or "").strip()
+        if not candidate_key or _MASK_CHAR in candidate_key or "*" in candidate_key:
+            candidate_key = (env.get("DASHSCOPE_API_KEY", "") or "").strip()
+
+        if not candidate_key:
+            return {
+                "success": False,
+                "message": "未检测到 API Key，请先输入密钥或保存后再测试",
+            }
+
+        base_url = (payload.base_url or "").strip()
+        if not base_url:
+            base_url = (env.get("DASHSCOPE_BASE_URL", "") or "").strip() or "https://dashscope.aliyuncs.com"
+
+        clean_base = base_url.rstrip("/")
+        if clean_base.endswith("/compatible-mode/v1") or clean_base.endswith("/v1"):
+            endpoint = clean_base
+        else:
+            endpoint = f"{clean_base}/compatible-mode/v1"
+
+        try:
+            from openai import (
+                OpenAI,
+                AuthenticationError,
+                PermissionDeniedError,
+                RateLimitError,
+                APIConnectionError,
+                APITimeoutError,
+                NotFoundError,
+            )
+        except ImportError:
+            return {
+                "success": False,
+                "message": "openai 依赖库未安装，无法执行测试验证",
+            }
+
+        client = OpenAI(api_key=candidate_key, base_url=endpoint, timeout=12.0, max_retries=0)
+        start_t = time.time()
+        test_model = "qwen-plus"
+        try:
+            client.chat.completions.create(
+                model=test_model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+            )
+            latency = int((time.time() - start_t) * 1000)
+            return {
+                "success": True,
+                "message": f"连接成功！通义千问模型 ({test_model}) 响应正常",
+                "latency_ms": latency,
+                "details": {"model": test_model, "endpoint": endpoint},
+            }
+        except NotFoundError:
+            try:
+                client.models.list()
+                latency = int((time.time() - start_t) * 1000)
+                return {
+                    "success": True,
+                    "message": "密钥有效！已连接端点并获取模型列表",
+                    "latency_ms": latency,
+                    "details": {"endpoint": endpoint},
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"模型 ({test_model}) 不可用且无法列出模型。若使用第三方代理，请确认 Base URL 与支持的模型。\n详情: {str(e)}",
+                }
+        except AuthenticationError as e:
+            err_msg = getattr(e, "message", str(e))
+            return {
+                "success": False,
+                "message": f"密钥认证失败 (401 Unauthorized)：请检查 API Key 是否完整正确，避免混淆 RAM 访问控制的 AccessKey。\n详情: {err_msg}",
+            }
+        except PermissionDeniedError as e:
+            err_msg = getattr(e, "message", str(e))
+            return {
+                "success": False,
+                "message": f"访问受限 (403 Forbidden)：该 Key 没有对应模型的调用权限或已被禁用。\n详情: {err_msg}",
+            }
+        except RateLimitError as e:
+            err_msg = getattr(e, "message", str(e))
+            return {
+                "success": False,
+                "message": f"请求受限或额度不足 (429)：账户 Token 额度可能已耗尽，请前往阿里云百炼控制台查看。\n详情: {err_msg}",
+            }
+        except (APIConnectionError, APITimeoutError) as e:
+            return {
+                "success": False,
+                "message": f"网络连接超时或无法连接到端点 ({endpoint})。请检查网络连接或确认 Base URL 是否可达。\n详情: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"验证异常：{str(e)}",
+            }
+
+    return {
+        "success": False,
+        "message": f"当前不支持对服务提供商 '{provider}' 进行自动连通性测试",
+    }
+
 
 
 
