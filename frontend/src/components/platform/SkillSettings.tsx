@@ -11,8 +11,13 @@ async function hashManifest(manifest: Omit<Parameters<typeof platformApi.createS
 }
 
 const PRESET_SKILL_TITLES: Record<string, { title: string; category: string; desc: string }> = {
+  "cinematic-director": {
+    title: "电影级分镜导演",
+    category: "镜头",
+    desc: "35mm胶片逻辑、动量因果链与情绪肌肉系统，输出 Runway / 可灵 / Sora / Wan 电影级提示词与四维配音说明。",
+  },
   "zhang-dao-director": {
-    title: "张导专属 · 电影级分镜导演",
+    title: "电影级分镜导演",
     category: "镜头",
     desc: "35mm胶片逻辑、动量因果链与情绪肌肉系统，输出 Runway / 可灵 / Sora / Wan 电影级提示词与四维配音说明。",
   },
@@ -147,7 +152,7 @@ export default function SkillSettings() {
             <div>
               <h2 className="text-xl font-semibold text-foreground">视频 Skill 库</h2>
               <p className="text-sm text-text-secondary mt-1">
-                已集成 7 大影视工业级系统 Skill（张导专属、角色资产、场景设计、风格审美、分镜纠察、成片审核等），全方位赋能创作流程。
+                已集成 7 大影视工业级系统 Skill（电影分镜、角色资产、场景设计、风格审美、分镜纠察、成片审核等），全方位赋能创作流程。
               </p>
             </div>
           </div>

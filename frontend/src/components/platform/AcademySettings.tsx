@@ -71,7 +71,7 @@ export default function AcademySettings() {
             </h1>
 
             <p className="text-sm md:text-base text-text-secondary leading-relaxed">
-              系统掌握 AIGC 影视工业化流水线核心方法论、张导镜头语言实战与官方高分工程模板。从分镜层次与轴线防漂移，到一键 Fork 模板到工作区开展工业化成片制作。
+              系统掌握 AIGC 影视工业化流水线核心方法论、大师级镜头语言实战与官方高分工程模板。从分镜层次与轴线防漂移，到一键 Fork 模板到工作区开展工业化成片制作。
             </p>
 
             <div className="flex items-center gap-4 pt-1 flex-wrap text-xs text-text-muted">
@@ -213,7 +213,7 @@ export default function AcademySettings() {
           </button>
         </div>
         <span className="text-xs text-text-muted hidden md:inline">
-          已挂载张导专属镜头语言控制流
+          已挂载大师级镜头语言控制流
         </span>
       </div>
 
@@ -259,7 +259,7 @@ export default function AcademySettings() {
                   <div className="pt-4 border-t border-glass-border/60 flex items-center justify-between gap-3">
                     <span className="text-xs text-text-muted flex items-center gap-1.5">
                       <Video size={13} className="text-primary" />
-                      附带张导分镜流提示词与镜头预设
+                      附带电影级分镜流提示词与镜头预设
                     </span>
                     <button
                       type="button"
@@ -384,7 +384,7 @@ export default function AcademySettings() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-text-muted pt-2 border-t border-glass-border/60">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 size={14} className="text-emerald-400" />
-                配套资源：张导专属提示词已在画布中自动挂载，随课练习无需重复调参。
+                配套资源：电影级分镜提示词已在画布中自动挂载，随课练习无需重复调参。
               </span>
               <button
                 type="button"

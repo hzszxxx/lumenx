@@ -54,7 +54,7 @@ export default function CertificationSettings() {
         project_id: "exam-project-direct",
         project_title_snapshot: projectTitle || "实操考核提交作品",
         title: projectTitle || "实操考核提交作品",
-        description: submissionDesc || "遵循张导分镜流规范制作的实操考题样片",
+        description: submissionDesc || "遵循电影级分镜流规范制作的实操考题样片",
       };
       await platformApi.applyCertification({
         exam_id: exam.id,
@@ -91,7 +91,7 @@ export default function CertificationSettings() {
             </h1>
 
             <p className="text-sm md:text-base text-text-secondary leading-relaxed">
-              通过张导分镜流、视听语言一致性与动态掌控力实操考核，获得官方认证创作者徽章（Certified Creator），尊享商业任务广场优先认领权、极速算力通道与官方商单派发。
+              通过电影级分镜流、视听语言一致性与动态掌控力实操考核，获得官方认证创作者徽章（Certified Creator），尊享商业任务广场优先认领权、极速算力通道与官方商单派发。
             </p>
 
             <div className="flex items-center gap-4 pt-1 flex-wrap text-xs text-text-muted">
@@ -105,7 +105,7 @@ export default function CertificationSettings() {
               </span>
               <span className="flex items-center gap-1.5 text-foreground/80 font-medium">
                 <CheckCircle2 size={14} className="text-emerald-400" />
-                张导镜头参数深度微调权
+                大师级镜头参数深度微调权
               </span>
               <span className="flex items-center gap-1.5 text-foreground/80 font-medium">
                 <CheckCircle2 size={14} className="text-emerald-400" />
@@ -279,7 +279,7 @@ export default function CertificationSettings() {
                 active: isCertified,
               },
               {
-                title: "张导专家级 Skill 解锁",
+                title: "专家级分镜 Skill 解锁",
                 desc: "独家访问 35mm 胶片镜头深度物理参数微调权与防漂移视觉母版底层控制矩阵。",
                 active: isCertified,
               },
@@ -316,7 +316,7 @@ export default function CertificationSettings() {
             </div>
             <div>
               <h3 className="text-base font-bold text-foreground">认证实操考题</h3>
-              <p className="text-xs text-text-secondary mt-0.5">请遵循张导分镜流规范完成样片并在此提交验收</p>
+              <p className="text-xs text-text-secondary mt-0.5">请遵循电影级分镜流规范完成样片并在此提交验收</p>
             </div>
           </div>
           <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-surface-inset border border-glass-border text-text-muted">
@@ -350,7 +350,7 @@ export default function CertificationSettings() {
                     <label className="text-xs text-text-muted mb-1.5 block font-medium">创作说明与使用模型</label>
                     <input
                       className="glass-input w-full"
-                      placeholder="简述创作思路，如: 使用张导分镜流 + 6:3:1 镜头层次"
+                      placeholder="简述创作思路，如: 使用电影级分镜流 + 6:3:1 镜头层次"
                       value={submissionDesc}
                       onChange={e => setSubmissionDesc(e.target.value)}
                     />

@@ -30,7 +30,7 @@ def seed_platform_data(db_path: str):
             "面向全球 AIGC 影视导演、编剧与短片创作者，设立 100,000 算力奖池与签约合作机会。赛道包含科幻叙事、悬疑反转与东方奇幻。",
             """### 赛制要求
 1. **作品时长**：2~5 分钟完整微短片，需具备清晰人物弧光与动量因果链；
-2. **工具链**：推荐使用 影伴 画布与 Studio，结合张导电影级分镜 Skill；
+2. **工具链**：推荐使用 影伴 画布与 Studio，结合电影级分镜 Skill；
 3. **交付规格**：1080P/4K H.264 MP4，包含完整画外音或对白音频；
 4. **奖项设置**：
    - 最佳导演奖：50,000 算力 + ¥20,000 创作基金
@@ -45,12 +45,12 @@ def seed_platform_data(db_path: str):
         ),
         (
             str(uuid.uuid4()),
-            "48小时「张导分镜流」工业化创作极限挑战赛",
-            "zhang-dao-48h-sprint",
-            "限时 48 小时极速创作！使用张导专属电影级分镜导演 Skill，完成 30 秒高张力电影镜头序列编排，评审导师实时在线打分。",
+            "48小时「电影级分镜流」工业化创作极限挑战赛",
+            "cinematic-48h-sprint",
+            "限时 48 小时极速创作！使用电影级分镜导演 Skill，完成 30 秒高张力电影镜头序列编排，评审导师实时在线打分。",
             """### 赛程说明
 - 统一开题时间发布指定情绪命题；
-- 必须应用张导专属 Skill 动量因果链与 6:3:1 视觉空间层次规范；
+- 必须应用电影级分镜流动量因果链与 6:3:1 视觉空间层次规范；
 - 优秀作品直接入选官方创作者展映单元。""",
             0,
             20000,
@@ -297,7 +297,7 @@ def seed_platform_data(db_path: str):
     courses = [
         (
             str(uuid.uuid4()),
-            "电影级 AIGC 导演实战营 · 张导专属分镜流核心方法论",
+            "电影级 AIGC 导演实战营 · 电影级分镜流核心方法论",
             "系统拆解 35mm 胶片光学逻辑、镜头动量因果链与情绪肌肉系统，教你从小白进阶影视工业化导演。",
             "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
             "published",
@@ -342,7 +342,7 @@ def seed_platform_data(db_path: str):
         ),
         (
             str(uuid.uuid4()),
-            "【工业模板】古风武侠竹林决战 · 张导 35mm 运镜规范工程",
+            "【工业模板】古风武侠竹林决战 · 大师级 35mm 运镜规范工程",
             "template-wuxia-bamboo-02",
             "1.0.0",
             json.dumps({"shots": 12, "style": "新武侠写实", "ratio": "2.35:1", "duration": "60s"}, ensure_ascii=False),

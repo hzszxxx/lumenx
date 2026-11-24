@@ -11,12 +11,12 @@ from datetime import datetime, timezone
 
 PRESET_SKILLS = [
     {
-        "name": "zhang-dao-director",
+        "name": "cinematic-director",
         "version": "1.0.0",
-        "title": "张导专属 · 电影级分镜导演",
+        "title": "电影级分镜导演",
         "category": "shot",
         "description": "基于35mm胶片逻辑、动量因果链与20种情绪肌肉系统，输出Runway/可灵/Sora/Wan直接可用的专业镜头提示词与四维配音说明。",
-        "prompt_template": """你是一名资深AI电影导演（张导专属体系）。基于当前镜头草稿、角色资产与故事上下文，产出电影级视听提示词：
+        "prompt_template": """你是一名资深AI电影导演（电影级视听体系）。基于当前镜头草稿、角色资产与故事上下文，产出电影级视听提示词：
 1. 摄影参数：35mm光学质感、景深、真实布光拓扑（伦勃朗/侧逆光/漫射冷光）；
 2. 动量因果：起始发力->运动轨迹->减速碰撞反馈，禁止肢体抽搐；
 3. 神态与呼吸：结合面部微表情与呼吸起伏；

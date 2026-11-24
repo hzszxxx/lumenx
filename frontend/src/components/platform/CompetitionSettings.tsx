@@ -331,7 +331,7 @@ export default function CompetitionSettings() {
                         onClick={() => { window.location.hash = "#/atelier"; }}
                         className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold"
                       >
-                        使用画布置入张导分镜流开始创作 <ChevronRight size={13} />
+                        使用画布置入电影级分镜流开始创作 <ChevronRight size={13} />
                       </button>
                     </div>
                   </div>

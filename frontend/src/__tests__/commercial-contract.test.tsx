@@ -33,7 +33,7 @@ describe('Commercial Electronic Contract Components', () => {
     render(
       <ContractSignDialog
         task={mockTask}
-        signerName="测试创作者_张导"
+        signerName="测试创作者_张明"
         onConfirm={onConfirm}
         onClose={onClose}
         isSigning={false}
@@ -51,7 +51,7 @@ describe('Commercial Electronic Contract Components', () => {
     expect(screen.getByText('商用版权移交与创作者永久署名权')).toBeDefined();
 
     // 检查实名签署主体
-    expect(screen.getByText('测试创作者_张导')).toBeDefined();
+    expect(screen.getByText('测试创作者_张明')).toBeDefined();
 
     // 展开完整法务正文
     const toggleBtn = screen.getByText(/查看完整法务协议正文/);
@@ -73,7 +73,7 @@ describe('Commercial Electronic Contract Components', () => {
       contract_type: 'commercial_undertaking_nda',
       status: 'signed',
       digest_hash: 'sha256:abcd1234efgh5678ijkl9012mnop3456qrst7890',
-      signer_name: '测试创作者_张导',
+      signer_name: '测试创作者_张明',
       signed_at: '2026-11-18T12:00:00Z',
       terms: {
         title: '商业制作承揽与保密协议',
