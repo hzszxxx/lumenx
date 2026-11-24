@@ -903,6 +903,50 @@ export default function SettingsPage() {
       ) : (
         <div className="space-y-1">
           <FormRow label={t("dashscopeKeyLabel")} hint={t("dashscopeKeyHint")}>
+            <div className="mb-3.5 p-3.5 rounded-xl bg-surface-inset/80 border border-glass-border space-y-2.5 text-xs">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="font-medium text-foreground flex items-center gap-1.5">
+                  <span className="text-primary font-bold">💡 使用与获取指南</span>
+                  <span className="text-text-muted text-[0.6875rem]">（驱动通义千问剧本分析、智能分镜、对白润色与万相生图）</span>
+                </div>
+                <a
+                  href="https://bailian.console.aliyun.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 px-2.5 py-1 rounded-md bg-primary text-white text-[0.6875rem] font-medium hover:bg-primary-hover transition-colors flex items-center gap-1"
+                >
+                  <span>前往百炼获取 Key</span>
+                  <ExternalLink size={11} />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 border-t border-glass-border/60">
+                <div className="p-2.5 rounded-lg bg-background/50 border border-glass-border/40 flex flex-col justify-between">
+                  <div className="text-[0.6875rem] font-medium text-text-muted">① 登录百炼控制台</div>
+                  <div className="text-xs text-text-secondary mt-1">
+                    访问阿里云百炼大模型服务平台，新用户可免费申领免费算力 Token 额度。
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-background/50 border border-glass-border/40 flex flex-col justify-between">
+                  <div className="text-[0.6875rem] font-medium text-text-muted">② 创建并复制 Key</div>
+                  <div className="text-xs text-text-secondary mt-1">
+                    点击右上角个人头像 ➔ <strong>API-KEY</strong> ➔ 创建新的密钥并点击复制。
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-background/50 border border-glass-border/40 flex flex-col justify-between">
+                  <div className="text-[0.6875rem] font-medium text-text-muted">③ 填入并保存</div>
+                  <div className="text-xs text-text-secondary mt-1">
+                    粘贴在下方输入框（格式为 <code className="text-primary font-mono text-[0.6875rem]">sk-32位字符</code>），点击页面右下角保存配置。
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-1 text-[0.6875rem] text-text-muted leading-relaxed space-y-1">
+                <div>⚠️ <strong>防坑提示</strong>：阿里云 RAM 访问控制的 <code className="text-text-secondary font-mono">AccessKeyId/Secret</code> 是云存储(OSS)密钥，<strong>不是</strong>大模型 API-KEY，请勿填错。</div>
+                <div>💡 <strong>使用第三方代理/仙宫云 Key？</strong>：若 Key 形如 <code className="text-text-secondary font-mono">sk-ws-...</code>，必须在下方【高级 · API 端点】中填入对应的接口 Base URL，否则直连阿里云官方必然报错 401。</div>
+              </div>
+            </div>
+
             <FieldLabel>DASHSCOPE_API_KEY</FieldLabel>
             <KeyField
               value={config.DASHSCOPE_API_KEY}
