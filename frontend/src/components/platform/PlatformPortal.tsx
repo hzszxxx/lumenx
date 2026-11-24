@@ -199,12 +199,57 @@ export default function PlatformPortal() {
     </div>
   );
 
+  const accountSections = sections.filter((s) =>
+    ["users", "wallet", "compute", "skills", "xiangongyun", "agent"].includes(s.id)
+  );
+
+  // 公共门户频道（任务市场、课程培训、考核认证、赛事活动）全宽沉浸展示，无内部冗余标题
+  if (section === "tasks") {
+    return (
+      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
+        <div className="max-w-7xl mx-auto">
+          <TaskSettings />
+        </div>
+      </main>
+    );
+  }
+
+  if (section === "academy") {
+    return (
+      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
+        <div className="max-w-7xl mx-auto">
+          <AcademySettings />
+        </div>
+      </main>
+    );
+  }
+
+  if (section === "certification") {
+    return (
+      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
+        <div className="max-w-7xl mx-auto">
+          <CertificationSettings />
+        </div>
+      </main>
+    );
+  }
+
+  if (section === "competitions") {
+    return (
+      <main className="min-h-full py-6 md:py-8 px-4 sm:px-6 lg:px-8 bg-background">
+        <div className="max-w-7xl mx-auto">
+          <CompetitionSettings />
+        </div>
+      </main>
+    );
+  }
+
   if (!user && !isPublicSection) {
     return (
       <main className="min-h-full p-6 md:p-10 bg-background">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {sections.map(item => {
+            {accountSections.map(item => {
               const Icon = item.icon;
               const isActive = section === item.id;
               return (
@@ -238,10 +283,10 @@ export default function PlatformPortal() {
       <header className="max-w-6xl mx-auto mb-8 flex items-start justify-between gap-6">
         <div>
           <p className="font-mono text-xs tracking-[0.28em] text-primary uppercase">
-            {isZh ? "创作者平台 · 账户与运营" : "Creator Platform · Account & Operations"}
+            {isZh ? "创作者中心 · 账户与资产" : "Creator Center · Account & Assets"}
           </p>
-          <h1 className="text-4xl font-display text-foreground mt-3">创作者平台</h1>
-          <p className="text-text-secondary mt-2">用户、认证、赛事、培训与商业任务统一工作台</p>
+          <h1 className="text-3xl font-display text-foreground mt-2">个人与资产管理</h1>
+          <p className="text-text-secondary mt-1 text-sm">个人资料、签约认证、算力钱包与渠道代理设置</p>
         </div>
         <div className="flex gap-2">
           {user?.role === "admin" && (
@@ -265,9 +310,9 @@ export default function PlatformPortal() {
         </div>
       </header>
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Platform Section Pills */}
+        {/* Account Sub-sections Pills */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {sections.map(item => {
+          {accountSections.map(item => {
             const Icon = item.icon;
             const isActive = section === item.id;
             return (
@@ -298,11 +343,7 @@ export default function PlatformPortal() {
           {section === "skills" && <SkillSettings />}
           {section === "xiangongyun" && <XiangongyunSettings />}
           {section === "agent" && <AgentCenter />}
-          {section === "competitions" && <CompetitionSettings />}
-          {section === "certification" && <CertificationSettings />}
-          {section === "tasks" && <TaskSettings />}
           {section === "wallet" && <WalletSettings />}
-          {section === "academy" && <AcademySettings />}
         </div>
       </div>
     </main>

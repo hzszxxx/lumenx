@@ -22,6 +22,7 @@ export default function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
+  const isPortal = activeTab === "platform";
   return (
     <div className="flex h-screen w-full flex-col">
       <OfflineBanner />
@@ -33,10 +34,14 @@ export default function AppShell({
         onLogout={onLogout}
       />
       <div className="flex min-h-0 flex-1">
-        <GlobalSidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
+        {!isPortal && (
+          <GlobalSidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
+        )}
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
       </div>
-      <BottomTabBar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
+      {!isPortal && (
+        <BottomTabBar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} />
+      )}
     </div>
   );
 }
