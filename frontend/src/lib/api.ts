@@ -176,6 +176,19 @@ export interface EnvConfigPayload {
     [key: string]: string | Record<string, string> | Record<string, boolean> | boolean | undefined;
 }
 
+export interface TestKeyRequest {
+    provider?: string;
+    api_key?: string;
+    base_url?: string;
+}
+
+export interface TestKeyResponse {
+    success: boolean;
+    message: string;
+    latency_ms?: number;
+    details?: Record<string, any>;
+}
+
 export interface ProjectPackageExportResult {
     blob: Blob;
     filename?: string;
@@ -1496,6 +1509,13 @@ export const api = {
     saveEnvConfig: async (config: EnvConfigPayload) => {
         const res = await axios.post(`${API_URL}/config/env`, config, {
             timeout: 60000, // 60 seconds timeout
+        });
+        return res.data;
+    },
+
+    testApiKey: async (payload: TestKeyRequest): Promise<TestKeyResponse> => {
+        const res = await axios.post<TestKeyResponse>(`${API_URL}/config/test-key`, payload, {
+            timeout: 15000,
         });
         return res.data;
     },

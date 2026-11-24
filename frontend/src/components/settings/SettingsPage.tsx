@@ -224,6 +224,12 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [endpointsOpen, setEndpointsOpen] = useState(false);
+  const [isTestingDashscope, setIsTestingDashscope] = useState(false);
+  const [dashscopeTestResult, setDashscopeTestResult] = useState<{
+    success: boolean;
+    message: string;
+    latency_ms?: number;
+  } | null>(null);
 
   // ── Default Model Settings ──
   const [modelSettings, setModelSettings] = useState<FrontendModelSettings>(() =>
@@ -455,7 +461,34 @@ export default function SettingsPage() {
 
   const handleChange = (key: keyof EnvConfig, value: string) => {
     if (!hasCurrentConfigOwner()) return;
+    if (key === "DASHSCOPE_API_KEY") {
+      setDashscopeTestResult(null);
+    }
     setConfig((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleTestDashscopeKey = async () => {
+    setIsTestingDashscope(true);
+    try {
+      const res = await api.testApiKey({
+        provider: "dashscope",
+        api_key: config.DASHSCOPE_API_KEY,
+        base_url: config.endpoint_overrides?.DASHSCOPE_BASE_URL,
+      });
+      setDashscopeTestResult(res);
+      if (res.success) {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message.split("\n")[0] || t("testKeyFailed"));
+      }
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message || t("testKeyFailed");
+      const res = { success: false, message: `测试请求失败: ${detail}` };
+      setDashscopeTestResult(res);
+      toast.error(res.message);
+    } finally {
+      setIsTestingDashscope(false);
+    }
   };
 
   const handleEndpointChange = (envKey: string, value: string) => {
@@ -957,6 +990,9 @@ export default function SettingsPage() {
                   ? { kind: "ok", text: t("filled") }
                   : { kind: "warn", text: t("notConfiguredUnavailable") }
               }
+              onTest={handleTestDashscopeKey}
+              isTesting={isTestingDashscope}
+              testResult={dashscopeTestResult}
             />
           </FormRow>
 

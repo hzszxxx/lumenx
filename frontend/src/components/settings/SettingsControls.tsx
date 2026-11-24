@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Eye, EyeOff, Copy, Check, CircleAlert } from "lucide-react";
+import { Eye, EyeOff, Copy, Check, CircleAlert, Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 
 /* ── Section card (Line B clean `.panel` — serif title + desc, no eyebrow) ─ */
 export function SectionCard({
@@ -79,11 +79,17 @@ export function KeyField({
   onChange,
   placeholder,
   status,
+  onTest,
+  isTesting,
+  testResult,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   status?: { kind: "ok" | "warn"; text: string };
+  onTest?: () => void;
+  isTesting?: boolean;
+  testResult?: { success: boolean; message: string; latency_ms?: number } | null;
 }) {
   const t = useTranslations("settings");
   const [revealed, setRevealed] = useState(false);
@@ -101,39 +107,90 @@ export function KeyField({
   };
 
   return (
-    <div className="atelier-field">
-      <div className="relative">
-        <input
-          type={revealed ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={settingsInputClass + " pr-[78px] font-mono text-[0.75rem] tracking-wide"}
-        />
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
-          <button
-            type="button"
-            onClick={() => setRevealed((r) => !r)}
-            aria-label={revealed ? t("hideKey") : t("showKey")}
-            title={revealed ? t("hide") : t("show")}
-            className="w-7 h-7 rounded-md grid place-items-center text-text-muted hover:bg-hover-bg hover:text-foreground transition-colors"
-          >
-            {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
-          <button
-            type="button"
-            onClick={copy}
-            aria-label={t("copyKey")}
-            title={t("copy")}
-            className="w-7 h-7 rounded-md grid place-items-center text-text-muted hover:bg-hover-bg hover:text-foreground transition-colors"
-          >
-            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-          </button>
+    <div className="atelier-field space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <input
+            type={revealed ? "text" : "password"}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className={settingsInputClass + " pr-[78px] font-mono text-[0.75rem] tracking-wide"}
+          />
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
+            <button
+              type="button"
+              onClick={() => setRevealed((r) => !r)}
+              aria-label={revealed ? t("hideKey") : t("showKey")}
+              title={revealed ? t("hide") : t("show")}
+              className="w-7 h-7 rounded-md grid place-items-center text-text-muted hover:bg-hover-bg hover:text-foreground transition-colors"
+            >
+              {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            <button
+              type="button"
+              onClick={copy}
+              aria-label={t("copyKey")}
+              title={t("copy")}
+              className="w-7 h-7 rounded-md grid place-items-center text-text-muted hover:bg-hover-bg hover:text-foreground transition-colors"
+            >
+              {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+            </button>
+          </div>
         </div>
+        {onTest && (
+          <button
+            type="button"
+            onClick={onTest}
+            disabled={isTesting}
+            className="shrink-0 h-[38px] px-3.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isTesting ? (
+              <>
+                <Loader2 size={13} className="animate-spin text-primary" />
+                <span>{t("testingKey")}</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={13} />
+                <span>{t("testKey")}</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
-      {status && (
+
+      {testResult && (
+        <div
+          className={`p-2.5 rounded-lg border text-xs transition-all ${
+            testResult.success
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-1.5 leading-relaxed">
+              {testResult.success ? (
+                <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+              )}
+              <div className="whitespace-pre-line font-medium text-[0.75rem]">
+                {testResult.message}
+              </div>
+            </div>
+            {testResult.latency_ms !== undefined && (
+              <span className="shrink-0 font-mono text-[0.6875rem] px-1.5 py-0.5 rounded bg-surface-inset border border-glass-border text-text-muted">
+                {testResult.latency_ms}ms
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {status && !testResult && (
         <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[0.59375rem] tracking-wide mt-1.5 ${
+          className={`inline-flex items-center gap-1.5 font-mono text-[0.59375rem] tracking-wide ${
             status.kind === "ok" ? "text-emerald-400" : "text-amber-400"
           }`}
         >
