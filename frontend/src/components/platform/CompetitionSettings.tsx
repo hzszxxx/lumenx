@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Trophy, Calendar, Award, CheckCircle2, ChevronRight, FileText, Users, Sparkles, Loader2 } from "lucide-react";
 import { platformApi, type PlatformCompetition } from "@/lib/platformApi";
+import { usePlatformStore } from "@/store/platformStore";
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   enrolling: { label: "报名中", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
@@ -19,6 +20,7 @@ export default function CompetitionSettings() {
   const [filter, setFilter] = useState<string>("all");
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const { user } = usePlatformStore();
 
   const loadCompetitions = async () => {
     setLoading(true);
@@ -37,6 +39,10 @@ export default function CompetitionSettings() {
   }, []);
 
   const handleEnroll = async (comp: PlatformCompetition) => {
+    if (!user) {
+      setMessage("报名参赛需要先登录创作者账号，请先登录。");
+      return;
+    }
     setEnrollingId(comp.id);
     setMessage(null);
     try {
@@ -81,6 +87,21 @@ export default function CompetitionSettings() {
             </button>
           </div>
         </div>
+
+        {!user && (
+          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="text-xs text-text-secondary leading-relaxed">
+              💡 <span className="font-semibold text-foreground">公开赛事大厅</span>：任何人均可查看赛事赛程与评选规则。报名参赛并锁定大赛创作算力需登录创作者账号。
+            </div>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#/platform?section=users"; }}
+              className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 shrink-0 cursor-pointer"
+            >
+              登录创作者账号
+            </button>
+          </div>
+        )}
 
         {/* Filter Pills */}
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-glass-border">

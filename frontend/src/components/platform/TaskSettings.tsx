@@ -628,6 +628,7 @@ export default function TaskSettings() {
             const criteria = parseJson<string[]>(task.acceptance_criteria_json, []);
 
             const isBeginner = task.level_tier === "beginner";
+            const cleanBrief = (task.brief_markdown || "").replace(/\\n/g, "\n");
 
             return (
               <div
@@ -749,7 +750,7 @@ export default function TaskSettings() {
 
                   {/* 需求摘要 */}
                   <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">
-                    {task.brief_markdown.replace(/^[#\s\-*]+/gm, " ").slice(0, 140)}…
+                    {cleanBrief.replace(/^[#\s\-*]+/gm, " ").slice(0, 140)}…
                   </p>
 
                   {/* 交付截止与等级要求 */}
@@ -890,7 +891,7 @@ export default function TaskSettings() {
                       <h5 className="font-semibold text-primary uppercase text-[11px] mb-1.5">
                         商业需求详细简报 (Brief)
                       </h5>
-                      {task.brief_markdown}
+                      {cleanBrief}
                     </div>
 
                     {/* 交付抽屉 (当已接单且未终审时呈现) */}
