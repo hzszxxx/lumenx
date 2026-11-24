@@ -32,6 +32,12 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     except PlatformError as exc: raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
 
 
+def optional_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), svc: PlatformService = Depends(service)) -> dict[str, Any] | None:
+    if not credentials: return None
+    try: return svc.authenticate(credentials.credentials)
+    except Exception: return None
+
+
 def admin_user(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
     if user.get("role") != "admin":
         raise HTTPException(403, detail={"code": "forbidden", "message": "admin role required"})
@@ -515,7 +521,7 @@ def cert_status(user=Depends(current_user), svc: PlatformService = Depends(servi
 def review_cert(application_id: str, body: CertReviewIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.review_certification(user, application_id, body.approved, body.score, body.feedback))
 
 @router.get("/tasks/square")
-def square(user=Depends(current_user), svc: PlatformService = Depends(service)): return svc.task_square(user)
+def square(user=Depends(optional_user), svc: PlatformService = Depends(service)): return svc.task_square(user)
 
 @router.post("/tasks")
 def create_task(body: TaskIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.create_task(user, body.model_dump()))
