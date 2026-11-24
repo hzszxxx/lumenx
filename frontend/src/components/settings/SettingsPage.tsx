@@ -565,10 +565,13 @@ export default function SettingsPage() {
     );
 
     try {
-      await api.triggerMulerunLogin();
+      const res = await api.triggerMulerunLogin();
       if (!stillCurrent()) {
         finishMulerunLogin(generation);
         return;
+      }
+      if (res?.message) {
+        toast.info(res.message);
       }
 
       let pollInFlight = false;
@@ -947,14 +950,18 @@ export default function SettingsPage() {
           </FormRow>
 
           <FormRow label={t("mulerunLabel")} hint={t("mulerunHint")}>
+            <div className="mb-3 p-3 rounded-lg bg-surface-inset border border-glass-border text-xs text-text-secondary leading-relaxed">
+              💡 推荐直接在下方填入 <strong className="text-foreground">MULEROUTER_API_KEY</strong>（支持 Bearer Token 或 MuleRouter 凭证），免装 CLI 即可调用 Seedance 2.0 视频生成与 GPT-Image-2 图像模型。
+            </div>
             {!config.MULEROUTER_API_KEY && !config.MULERUN_CLI_LOGGED_IN && (
               <button
                 type="button"
                 onClick={startMulerunLogin}
                 disabled={mulerunLoginActive}
-                className="w-full py-2.5 rounded-lg bg-primary text-on-accent text-sm font-medium hover:bg-primary-hover transition-colors mb-3 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full py-2.5 rounded-lg bg-primary text-on-accent text-sm font-medium hover:bg-primary-hover transition-colors mb-3 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {t("mulerunLogin")}
+                {mulerunLoginActive && <Loader2 size={15} className="animate-spin" />}
+                {mulerunLoginActive ? "正在等待 MuleRun 登录…" : t("mulerunLogin")}
               </button>
             )}
             {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (

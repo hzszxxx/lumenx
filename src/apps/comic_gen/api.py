@@ -6110,7 +6110,10 @@ def _check_mulerun_cli_status(request: Request) -> bool:
 def trigger_mulerun_login(request: Request):
     """Open OAuth using only the current application's owned CLI profile."""
     if shutil.which("mulerun") is None:
-        raise HTTPException(status_code=400, detail="MuleRun CLI 未安装。请先运行: npm i -g @mulerunai/cli")
+        raise HTTPException(
+            status_code=400,
+            detail="MuleRun CLI 未安装。请在终端执行 npm i -g @mulerunai/cli，或直接在下方配置 MULEROUTER_API_KEY（推荐，免装 CLI）。"
+        )
     try:
         started = _mulerun_login_session(request).start()
         return {"status": "ok", "message": "浏览器已打开，请完成登录" if started else "登录正在进行，请完成当前登录"}
