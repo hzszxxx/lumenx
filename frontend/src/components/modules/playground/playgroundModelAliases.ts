@@ -1,4 +1,11 @@
 const PLAYGROUND_MODEL_ALIASES: Record<string, string> = {
+  'xiangongyun-h3-t2v': 'xiangongyun-h3-t2v',
+  'xiangongyun/h3-video#t2v': 'xiangongyun-h3-t2v',
+  'xiangongyun-h3-i2v': 'xiangongyun-h3-i2v',
+  'xiangongyun/h3-video#i2v': 'xiangongyun-h3-i2v',
+  'xiangongyun-h3-r2v': 'xiangongyun-h3-r2v',
+  'xiangongyun/h3-video#r2v': 'xiangongyun-h3-r2v',
+
   'seedance-2.0-t2v': 'seedance-2.0-t2v',
   'seedance/seedance-2.0-video#t2v': 'seedance-2.0-t2v',
   'seedance-2.0-i2v': 'seedance-2.0-i2v',

@@ -39,7 +39,7 @@ def test_xiangongyun_initialization_with_env():
 
 
 def test_factory_creates_xiangongyun_model():
-    for name in ("xiangongyun", "xiangongyun-h3", "xiangongyun-h3-i2v", "xiangongyun-h3-r2v", "h3-video"):
+    for name in ("xiangongyun", "xiangongyun-h3", "xiangongyun-h3-t2v", "xiangongyun-h3-i2v", "xiangongyun-h3-r2v", "h3-video"):
         instance = ModelFactory.create_model({"model.name": name})
         assert isinstance(instance, XiangongyunH3Model)
 
@@ -289,3 +289,34 @@ def test_pipeline_create_video_task_normalizes_xiangongyun_r2v(tmp_path, monkeyp
     assert task.generation_mode == "r2v"
     assert task.model == "xiangongyun-h3-r2v"
     pipe.close()
+
+
+def test_playground_service_xiangongyun_dispatch(tmp_path):
+    from src.apps.playground.models import GenerateRequest
+    from src.apps.playground.service import PlaygroundService
+    from src.apps.playground.storage import PlaygroundStorage
+
+    storage = PlaygroundStorage(tmp_path)
+    service = PlaygroundService(
+        storage,
+        data_dir=tmp_path,
+        env={"XIANGONGYUN_SIMULATE": "1"},
+    )
+
+    # 1. T2V generation
+    t2v_req = GenerateRequest(
+        client_request_id="t2v-xiangongyun-1",
+        mode="t2v",
+        model_id="xiangongyun-h3-t2v",
+        prompt="A cute cat running on the grass",
+        parameters={"duration": 5, "resolution": "768p"},
+        batch_size=1,
+    )
+    receipt = service.admit_generation(t2v_req)
+    gen_id = receipt.generation.id
+    service.process_generation(gen_id)
+
+    updated = storage.get_generation(gen_id)
+    assert updated.status == "completed"
+    assert len(updated.outputs) == 1
+    assert os.path.exists(tmp_path / updated.outputs[0].media_path)

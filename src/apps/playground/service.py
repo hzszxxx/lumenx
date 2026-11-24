@@ -136,6 +136,7 @@ class PlaygroundService:
         self._kling_model = None
         self._vidu_model = None
         self._mulerouter_video_model = None
+        self._xiangongyun_model = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -1002,6 +1003,8 @@ class PlaygroundService:
                     self._generate_video_kling(gen, out_path)
                 elif model_lower.startswith("vidu") or model_lower.startswith("viduq"):
                     self._generate_video_vidu(gen, out_path)
+                elif model_lower.startswith("xiangongyun") or model_lower.startswith("h3"):
+                    self._generate_video_xiangongyun(gen, out_path)
                 elif model_lower.startswith("happyhorse"):
                     self._generate_video_wanx(gen, out_path)
                 elif model_lower.startswith("pixverse"):
@@ -1182,6 +1185,41 @@ class PlaygroundService:
             seed=params.get("seed", 0),
             audio=params.get("audio", True),
             movement_amplitude=params.get("movement_amplitude", "auto"),
+        )
+
+    def _generate_video_xiangongyun(self, gen: PlaygroundGeneration, out_path: str) -> None:
+        """Delegate to :class:`XiangongyunH3Model`."""
+        from ...models.xiangongyun import XiangongyunH3Model
+
+        if self._xiangongyun_model is None:
+            self._xiangongyun_model = XiangongyunH3Model(
+                dict(self.model_config),
+                **({"env": self._env} if self._env is not None else {}),
+            )
+
+        params = gen.parameters
+        img_path, img_url = self._resolve_first_input_media(gen)
+
+        kwargs = {
+            "model": gen.model_id,
+            "duration": params.get("duration", 5),
+            "resolution": params.get("resolution", "768p"),
+            "aspect_ratio": params.get("ratio") or params.get("aspect_ratio", "16:9"),
+            "seed": params.get("seed"),
+            "audio": params.get("audio", True),
+            "generation_mode": gen.mode.value,
+        }
+
+        # r2v: reference images
+        if gen.mode == PlaygroundMode.R2V and gen.input_media:
+            kwargs["ref_image_urls"] = list(gen.input_media)
+
+        self._xiangongyun_model.generate(
+            prompt=gen.prompt,
+            output_path=out_path,
+            img_path=cast(str, img_path),
+            img_url=cast(str, img_url),
+            **kwargs,
         )
 
     # ------------------------------------------------------------------

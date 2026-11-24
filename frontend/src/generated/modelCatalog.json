@@ -43,7 +43,8 @@
       "wan3.0-video": "wan/wan3.0-video#video",
       "wan3.0-video-prime": "wan/wan3.0-video-prime#video",
       "xiangongyun-h3-i2v": "xiangongyun/h3-video#i2v",
-      "xiangongyun-h3-r2v": "xiangongyun/h3-video#r2v"
+      "xiangongyun-h3-r2v": "xiangongyun/h3-video#r2v",
+      "xiangongyun-h3-t2v": "xiangongyun/h3-video#t2v"
     }
   },
   "defaults": {
@@ -475,7 +476,8 @@
       "family": "xiangongyun",
       "models": [
         "xiangongyun-h3-i2v",
-        "xiangongyun-h3-r2v"
+        "xiangongyun-h3-r2v",
+        "xiangongyun-h3-t2v"
       ],
       "provider": "xiangongyun",
       "routing_prefixes": [
@@ -488,6 +490,7 @@
         "vendor"
       ],
       "supported_modalities": [
+        "t2v",
         "i2v",
         "r2v"
       ],
@@ -2397,11 +2400,13 @@
       "id": "xiangongyun/h3-video",
       "legacy_model_ids": [
         "xiangongyun-h3-i2v",
-        "xiangongyun-h3-r2v"
+        "xiangongyun-h3-r2v",
+        "xiangongyun-h3-t2v"
       ],
       "modes": [
         "xiangongyun/h3-video#i2v",
-        "xiangongyun/h3-video#r2v"
+        "xiangongyun/h3-video#r2v",
+        "xiangongyun/h3-video#t2v"
       ],
       "provider": "xiangongyun",
       "release_stage": "stable",
@@ -2421,6 +2426,7 @@
         "vendor"
       ],
       "supported_modalities": [
+        "t2v",
         "i2v",
         "r2v"
       ],
@@ -6330,6 +6336,107 @@
         "order": 75,
         "recommended": false,
         "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
+      }
+    },
+    "xiangongyun-h3-t2v": {
+      "backend_env_key": "XIANGONGYUN_PROVIDER_MODE",
+      "capabilities": [
+        "t2v"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "XIANGONGYUN_ACCESS_TOKEN"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "仙宫云自部署 H3 文生视频 (音画一体)",
+      "display_name": "仙宫云 H3 T2V",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "xiangongyun/2026-11-24"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/xiangongyun-h3.md"
+        ]
+      },
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
+      "family": "xiangongyun",
+      "id": "xiangongyun-h3-t2v",
+      "inputs": {
+        "media": {
+          "max": 0
+        }
+      },
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ]
+        },
+        "audio": {
+          "default": true
+        },
+        "negativePrompt": true,
+        "promptExtend": false,
+        "resolution": {
+          "default": "768p",
+          "options": [
+            "768p",
+            "1080p"
+          ]
+        },
+        "seed": {
+          "max": 2147483647,
+          "min": -1
+        }
+      },
+      "provider": "xiangongyun",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "h3-",
+        "h3/",
+        "xiangongyun-",
+        "xiangongyun/"
+      ],
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "xiangongyun_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "xiangongyun_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "xiangongyun_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "new",
+          "self-hosted"
+        ],
+        "order": 95,
+        "recommended": false,
+        "selection_group": "t2v",
         "visible_in": [
           "project_settings",
           "series_settings",
@@ -10571,6 +10678,116 @@
         "order": 75,
         "recommended": false,
         "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
+      }
+    },
+    "xiangongyun/h3-video#t2v": {
+      "backend_env_key": "XIANGONGYUN_PROVIDER_MODE",
+      "capabilities": [
+        "t2v"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "XIANGONGYUN_ACCESS_TOKEN"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "仙宫云自部署 H3 文生视频 (音画一体)",
+      "display_name": "仙宫云 H3 T2V",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "xiangongyun/2026-11-24"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/xiangongyun-h3.md"
+        ]
+      },
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
+      "family": "xiangongyun",
+      "id": "xiangongyun/h3-video#t2v",
+      "inputs": {
+        "media": {
+          "max": 0
+        }
+      },
+      "legacy_model_id": "xiangongyun-h3-t2v",
+      "mode": "t2v",
+      "model_line_id": "xiangongyun/h3-video",
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ]
+        },
+        "audio": {
+          "default": true
+        },
+        "negativePrompt": true,
+        "promptExtend": false,
+        "resolution": {
+          "default": "768p",
+          "options": [
+            "768p",
+            "1080p"
+          ]
+        },
+        "seed": {
+          "max": 2147483647,
+          "min": -1
+        }
+      },
+      "provider": "xiangongyun",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "h3-",
+        "h3/",
+        "xiangongyun-",
+        "xiangongyun/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "xiangongyun-h3-t2v",
+          "gateway": "xiangongyun"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "xiangongyun_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "xiangongyun_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "xiangongyun_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "new",
+          "self-hosted"
+        ],
+        "order": 95,
+        "recommended": false,
+        "selection_group": "t2v",
         "visible_in": [
           "project_settings",
           "series_settings",

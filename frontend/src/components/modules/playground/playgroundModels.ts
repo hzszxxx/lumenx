@@ -90,11 +90,12 @@ const VIDEO_MODES = new Set<string>(['t2v', 'i2v', 'r2v', 'v2v']);
 
 const VIDEO_FAMILY_PRIORITY: Record<string, number> = {
   happyhorse: 1,
-  seedance: 2,
-  kling: 3,
-  pixverse: 4,
-  wan: 5,
-  vidu: 6,
+  xiangongyun: 2,
+  seedance: 3,
+  kling: 4,
+  pixverse: 5,
+  wan: 6,
+  vidu: 7,
 };
 
 const IMAGE_FAMILY_PRIORITY: Record<string, number> = {

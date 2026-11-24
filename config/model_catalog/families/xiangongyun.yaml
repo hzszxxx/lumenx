@@ -14,6 +14,7 @@ credential_sources:
   vendor:
     - XIANGONGYUN_ACCESS_TOKEN
 supported_modalities:
+  - t2v
   - i2v
   - r2v
 transport:
@@ -34,7 +35,7 @@ models:
     description: 仙宫云自部署 MiniMax H3 量化版，支持音画对白生成
     status: active
     release_stage: stable
-    capabilities: [i2v, r2v]
+    capabilities: [t2v, i2v, r2v]
     runtime:
       vendor:
         gateway: xiangongyun
@@ -42,6 +43,43 @@ models:
       repo_local_snapshot_paths:
         - docs/1-api-reference/xiangongyun-h3.md
     modes:
+      t2v:
+        legacy_id: xiangongyun-h3-t2v
+        display_name: 仙宫云 H3 T2V
+        description: 仙宫云自部署 H3 文生视频 (音画一体)
+        capabilities: [t2v]
+        runtime:
+          vendor:
+            api_model_id: xiangongyun-h3-t2v
+            gateway: xiangongyun
+        ui:
+          selection_group: t2v
+          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+          order: 95
+          badges: [new, self-hosted]
+        duration:
+          type: slider
+          min: 3
+          max: 15
+          step: 1
+          default: 5
+        params:
+          resolution:
+            options: [768p, 1080p]
+            default: 768p
+          aspectRatio:
+            options: ["16:9", "9:16", "1:1"]
+            default: "16:9"
+          audio:
+            default: true
+          seed:
+            min: -1
+            max: 2147483647
+          negativePrompt: true
+          promptExtend: false
+        inputs:
+          media:
+            max: 0
       i2v:
         legacy_id: xiangongyun-h3-i2v
         display_name: 仙宫云 H3 I2V

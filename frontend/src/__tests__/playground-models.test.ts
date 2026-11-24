@@ -15,6 +15,10 @@ describe('playground model catalog filtering', () => {
     expect(getModelsForMode('t2v').map((model) => model.id)).toContain('happyhorse-1.1-t2v');
     expect(getModelsForMode('i2v').map((model) => model.id)).toContain('happyhorse-1.1-i2v');
     expect(getModelsForMode('r2v').map((model) => model.id)).toContain('happyhorse-1.1-r2v');
+
+    expect(getModelsForMode('t2v').map((model) => model.id)).toContain('xiangongyun-h3-t2v');
+    expect(getModelsForMode('i2v').map((model) => model.id)).toContain('xiangongyun-h3-i2v');
+    expect(getModelsForMode('r2v').map((model) => model.id)).toContain('xiangongyun-h3-r2v');
   });
 
   it('exposes Vidu Q3 workspace models with WebP reference support', () => {
