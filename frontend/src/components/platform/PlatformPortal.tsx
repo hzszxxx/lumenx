@@ -2,26 +2,24 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { BriefcaseBusiness, GraduationCap, KeyRound, LogIn, ShieldCheck, Sparkles, Trophy, UserRound, Users, Cpu } from "lucide-react";
+import { BriefcaseBusiness, GraduationCap, KeyRound, LogIn, ShieldCheck, Sparkles, Trophy, UserRound, Users } from "lucide-react";
 import { platformApi } from "@/lib/platformApi";
 import { readAppAccessSession } from "@/lib/appAccess";
 import { usePlatformStore } from "@/store/platformStore";
-import ComputeSettings from "@/components/platform/ComputeSettings";
+import ComputeHub, { type ComputeSubTab } from "@/components/platform/ComputeHub";
 import SkillSettings from "@/components/platform/SkillSettings";
-import XiangongyunSettings from "@/components/platform/XiangongyunSettings";
 import CompetitionSettings from "@/components/platform/CompetitionSettings";
 import CertificationSettings from "@/components/platform/CertificationSettings";
 import TaskSettings from "@/components/platform/TaskSettings";
 import AcademySettings from "@/components/platform/AcademySettings";
 import UserSettings from "@/components/platform/UserSettings";
-import ApiKeySettings from "@/components/platform/ApiKeySettings";
 import AgentCenter from "@/components/platform/AgentCenter";
 import WalletSettings from "@/components/platform/WalletSettings";
 import PlatformFooter from "@/components/platform/PlatformFooter";
 import LumenXBranding from "@/components/layout/LumenXBranding";
 import { Building2, Wallet } from "lucide-react";
 
-type Section = "users" | "compute" | "apikeys" | "skills" | "xiangongyun" | "agent" | "competitions" | "certification" | "tasks" | "wallet" | "academy";
+type Section = "users" | "compute" | "skills" | "agent" | "competitions" | "certification" | "tasks" | "wallet" | "academy";
 
 const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
   { id: "academy", label: "课程培训", icon: GraduationCap },
@@ -31,9 +29,7 @@ const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
   { id: "users", label: "个人中心", icon: UserRound },
   { id: "wallet", label: "收益与钱包", icon: Wallet },
   { id: "compute", label: "算力与凭证", icon: KeyRound },
-  { id: "apikeys", label: "大模型 API-Key", icon: Cpu },
   { id: "skills", label: "我的视频 Skill", icon: Sparkles },
-  { id: "xiangongyun", label: "仙宫云 H3", icon: Cpu },
   { id: "agent", label: "渠道代理", icon: Building2 },
 ];
 
@@ -42,6 +38,7 @@ export default function PlatformPortal() {
   const locale = useLocale();
   const isZh = locale.startsWith("zh");
   const [section, setSection] = useState<Section>("tasks");
+  const [computeSubTab, setComputeSubTab] = useState<ComputeSubTab>("byok");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -67,7 +64,13 @@ export default function PlatformPortal() {
   useEffect(() => {
     const syncSection = () => {
       const match = window.location.hash.match(/^#\/platform\?section=([^&]+)/);
-      if (match && sections.some(item => item.id === match[1])) {
+      if (match && match[1] === "apikeys") {
+        setSection("compute");
+        setComputeSubTab("apikeys");
+      } else if (match && match[1] === "xiangongyun") {
+        setSection("compute");
+        setComputeSubTab("xiangongyun");
+      } else if (match && sections.some(item => item.id === match[1])) {
         setSection(match[1] as Section);
       } else if (window.location.hash === "#/tasks" || !window.location.hash || window.location.hash === "#/" || window.location.hash === "#") {
         setSection("tasks");
@@ -80,7 +83,8 @@ export default function PlatformPortal() {
       } else if (window.location.hash === "#/profile" || window.location.hash === "#/users") {
         setSection("users");
       } else if (window.location.hash === "#/apikeys" || window.location.hash === "#/api-key" || window.location.hash === "#/apikey") {
-        setSection("apikeys");
+        setSection("compute");
+        setComputeSubTab("apikeys");
       } else if (window.location.hash.startsWith("#/platform")) {
         setSection("tasks");
       }
@@ -205,7 +209,7 @@ export default function PlatformPortal() {
   );
 
   const accountSections = sections.filter((s) =>
-    ["users", "wallet", "compute", "apikeys", "skills", "xiangongyun", "agent"].includes(s.id)
+    ["users", "wallet", "compute", "skills", "agent"].includes(s.id)
   );
 
   // 公共门户频道（任务市场、课程培训、考核认证、赛事活动）全宽沉浸展示，无内部冗余标题
@@ -360,10 +364,10 @@ export default function PlatformPortal() {
           {/* Section View */}
           <div>
             {section === "users" && <UserSettings />}
-            {section === "compute" && <ComputeSettings />}
-            {section === "apikeys" && <ApiKeySettings />}
+            {section === "compute" && (
+              <ComputeHub initialTab={computeSubTab} isAdmin={user?.role === "admin"} />
+            )}
             {section === "skills" && <SkillSettings />}
-            {section === "xiangongyun" && <XiangongyunSettings />}
             {section === "agent" && <AgentCenter />}
             {section === "wallet" && <WalletSettings />}
           </div>
