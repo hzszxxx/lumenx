@@ -241,18 +241,18 @@ export default function PolishPanel({
             <div className="flex items-center justify-between gap-2">
                 <span
                     className={clsx(
-                        "inline-flex items-center gap-1.5 font-mono text-chrome-sm font-medium uppercase",
-                        isHardError ? "text-status-failed-fg" : isEchoWarning ? "text-accent" : "text-primary",
+                        "inline-flex items-center gap-1.5 font-mono text-chrome-sm font-semibold uppercase tracking-wider",
+                        isHardError ? "text-status-failed-fg" : isEchoWarning ? "text-amber-400" : "text-primary",
                     )}
                 >
                     {isHardError ? (
-                        <AlertCircle size={11} aria-hidden="true" />
+                        <AlertCircle size={12} aria-hidden="true" />
                     ) : isEchoWarning ? (
-                        <AlertTriangle size={11} aria-hidden="true" />
+                        <AlertTriangle size={12} aria-hidden="true" />
                     ) : isPolishing ? (
-                        <Loader2 size={11} className="animate-spin" aria-hidden="true" />
+                        <Loader2 size={12} className="animate-spin" aria-hidden="true" />
                     ) : (
-                        <Sparkles size={11} aria-hidden="true" />
+                        <Sparkles size={12} aria-hidden="true" />
                     )}
                     {isPolishing && !polished ? t("polishing") : t("polish")}
                 </span>
@@ -260,9 +260,9 @@ export default function PolishPanel({
                     type="button"
                     onClick={handleDiscard}
                     aria-label={t("polishDiscard")}
-                    className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                    className="-m-1 grid h-7 w-7 place-items-center rounded text-zinc-400 transition-colors duration-fast ease-out-quart hover:bg-white/10 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                 >
-                    <X size={12} aria-hidden="true" />
+                    <X size={13} aria-hidden="true" />
                 </button>
             </div>
 
@@ -349,13 +349,13 @@ export default function PolishPanel({
                         }}
                         placeholder={t("polishFeedbackPlaceholder")}
                         disabled={isPolishing}
-                        className="flex-1 rounded border border-glass-border bg-black/30 px-2.5 py-1.5 font-sans text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex-1 rounded-md border border-white/15 bg-black/40 px-3 py-1.5 font-sans text-body-sm text-zinc-100 placeholder:text-zinc-400 outline-none transition-colors duration-fast ease-out-quart focus:border-primary/70 focus-visible:ring-2 focus-visible:ring-primary/45 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <button
                         type="button"
                         onClick={() => void runPolish(feedback)}
                         disabled={!feedback.trim() || isPolishing}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/20 px-2.5 py-1.5 font-mono text-chrome font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:border-primary/45 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 font-mono text-chrome font-medium text-zinc-200 transition-colors duration-fast ease-out-quart hover:border-primary/45 hover:bg-primary/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {isPolishing ? (
                             <Loader2 size={11} className="animate-spin" aria-hidden="true" />
@@ -377,15 +377,15 @@ export default function PolishPanel({
                 animated={!!polished}
                 glowColor="262 80 70"
                 colors={["#646cff", "#a855f7", "#ec4899"]}
-                backgroundColor="rgba(20, 17, 31, 0.92)"
+                backgroundColor="rgba(20, 17, 31, 0.95)"
                 borderRadius={8}
                 glowRadius={28}
                 glowIntensity={0.85}
                 fillOpacity={0.3}
                 edgeSensitivity={35}
-                className="motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                className="text-zinc-100 motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]"
             >
-                <div className="space-y-2.5 p-3">
+                <div className="space-y-2.5 p-3 text-zinc-100">
                     {containerInner}
                 </div>
             </BorderGlow>
@@ -439,19 +439,19 @@ function BilingualColumn({
     onApply,
 }: BilingualColumnProps) {
     return (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-                <div className="font-mono text-chrome-sm font-medium uppercase text-text-muted">
+                <div className="font-mono text-chrome-sm font-semibold uppercase tracking-wider text-zinc-300">
                     {label}
                 </div>
                 {/* 按钮行：loading 时隐藏，避免 skeleton 旁还有可点按钮造成空操作 */}
                 {!isLoading && text ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                         <button
                             type="button"
                             onClick={onCopy}
                             title={copyLabel}
-                            className="btn-tip inline-flex items-center gap-1 rounded border border-glass-border bg-black/20 px-2 py-0.5 font-mono text-chrome font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:border-primary/45 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="btn-tip inline-flex items-center gap-1 rounded border border-white/15 bg-white/10 px-2 py-0.5 font-mono text-chrome font-medium text-zinc-200 transition-colors duration-fast ease-out-quart hover:border-primary/50 hover:bg-primary/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
                             {copied ? (
                                 <><Check size={10} aria-hidden="true" />{copiedLabel}</>
@@ -463,7 +463,7 @@ function BilingualColumn({
                             type="button"
                             onClick={onApply}
                             title={applyHint}
-                            className="btn-tip inline-flex items-center gap-1 rounded bg-primary/90 px-2 py-0.5 font-mono text-chrome font-semibold text-white transition-colors duration-fast ease-out-quart hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="btn-tip inline-flex items-center gap-1 rounded bg-primary px-2.5 py-0.5 font-mono text-chrome font-semibold text-white shadow-sm transition-colors duration-fast ease-out-quart hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
                             <CornerDownLeft size={10} aria-hidden="true" />
                             {applyLabel}
@@ -472,16 +472,16 @@ function BilingualColumn({
                 ) : null}
             </div>
             {isLoading ? (
-                <div className="space-y-1 rounded bg-black/30 px-2.5 py-2">
-                    <div className="h-3 w-full animate-pulse rounded bg-elevated" />
-                    <div className="h-3 w-[88%] animate-pulse rounded bg-elevated" />
-                    <div className="h-3 w-[72%] animate-pulse rounded bg-elevated" />
+                <div className="space-y-1.5 rounded-md border border-white/10 bg-black/40 px-3 py-2.5">
+                    <div className="h-3.5 w-full animate-pulse rounded bg-white/10" />
+                    <div className="h-3.5 w-[88%] animate-pulse rounded bg-white/10" />
+                    <div className="h-3.5 w-[72%] animate-pulse rounded bg-white/10" />
                 </div>
             ) : (
                 <p
                     className={clsx(
-                        "rounded bg-black/30 px-2.5 py-2 text-body-sm leading-relaxed text-foreground whitespace-pre-wrap",
-                        isMono ? "font-mono" : "font-sans",
+                        "rounded-md border border-white/10 bg-black/40 px-3 py-2.5 text-body-sm leading-relaxed text-zinc-100 selection:bg-primary/30 selection:text-white whitespace-pre-wrap select-text",
+                        isMono ? "font-mono text-xs" : "font-sans text-sm",
                     )}
                 >
                     {text}
