@@ -57,3 +57,24 @@ def test_legacy_video_tasks_still_accept_supported_i2v_model(tmp_path, monkeypat
         assert saved.video_tasks[0].model == 'wan2.7-i2v'
         assert len(scheduled) == 1
     runtime.close()
+
+
+def test_legacy_video_tasks_r2v_reconciles_reference_urls(tmp_path, monkeypatch):
+    runtime, app, scheduled = _app(tmp_path, monkeypatch)
+
+    with TestClient(app) as client:
+        # Case 1: When client sends image refs in reference_video_urls for an image-based model, reconcile it
+        payload = _legacy_payload(
+            model='xiangongyun-h3-r2v',
+            generation_mode='r2v',
+            reference_video_urls=['uploads/char.png'],
+        )
+        response = client.post('/projects/p/video_tasks', json=payload)
+        assert response.status_code == 200, response.text
+        saved = runtime.read_committed_script('p')
+        assert len(saved.video_tasks) == 1
+        assert saved.video_tasks[0].model == 'xiangongyun-h3-r2v'
+        assert saved.video_tasks[0].reference_image_urls == ['uploads/char.png']
+        assert saved.video_tasks[0].reference_video_urls == []
+    runtime.close()
+

@@ -3600,6 +3600,13 @@ class ComicGenPipeline:
         is_r2v_model = isinstance(model, str) and model.endswith("-r2v")
         if is_r2v_model:
             needs_video_refs = model == "wan2.6-r2v"
+            if not needs_video_refs and not reference_image_urls and reference_video_urls:
+                reference_image_urls = list(reference_video_urls)
+                reference_video_urls = []
+            elif needs_video_refs and not reference_video_urls and reference_image_urls:
+                reference_video_urls = list(reference_image_urls)
+                reference_image_urls = []
+
             refs = (reference_video_urls or []) if needs_video_refs else (reference_image_urls or [])
             if not refs:
                 kind = "video" if needs_video_refs else "image"

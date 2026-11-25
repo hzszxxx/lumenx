@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getModelOption, getModelsForMode, isReferenceImagePathAllowed } from '@/components/modules/playground/playgroundModels';
+import { isR2vImageBased } from '@/lib/modelCatalog';
 
 describe('playground model catalog filtering', () => {
   it('keeps active workspace-gateway Wan 3 video models out of legacy Playground lists', () => {
@@ -36,5 +37,12 @@ describe('playground model catalog filtering', () => {
     ]);
     expect(isReferenceImagePathAllowed('output/history-frame.WEBP', ['image/jpeg', 'image/png', 'image/webp'])).toBe(true);
     expect(isReferenceImagePathAllowed('output/history-frame.webp?cache=1', ['image/jpeg', 'image/png', 'image/webp'])).toBe(true);
+  });
+
+  it('treats xiangongyun and other modern R2V models as image-based reference models', () => {
+    expect(isR2vImageBased('xiangongyun-h3-r2v')).toBe(true);
+    expect(isR2vImageBased('happyhorse-1.1-r2v')).toBe(true);
+    expect(isR2vImageBased('wan2.7-r2v')).toBe(true);
+    expect(isR2vImageBased('wan2.6-r2v')).toBe(false);
   });
 });
