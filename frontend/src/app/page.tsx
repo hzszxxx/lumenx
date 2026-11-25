@@ -309,7 +309,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm" onClick={handleClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm p-4 sm:p-6 overflow-y-auto" onClick={handleClose}>
       <motion.div
         ref={dialogRef}
         role="dialog"
@@ -317,17 +317,17 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
         aria-labelledby={titleId}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-elevated border border-border rounded-2xl p-8 w-full max-w-4xl shadow-2xl"
+        className="bg-elevated border border-border rounded-2xl p-6 sm:p-8 w-full max-w-4xl shadow-2xl max-h-[90vh] flex flex-col my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 shrink-0">
           <h2 id={titleId} className="text-2xl font-display font-bold text-foreground">{t("newSeries")}</h2>
           <button onClick={handleClose} aria-label={tc("close")} className="p-2 rounded-lg hover:bg-hover-bg transition-colors">
             <X size={20} className="text-text-secondary" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 overflow-y-auto min-h-0 pr-1 -mr-1">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">{t("seriesTitle")} *</label>
             <input
@@ -522,25 +522,24 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
               className="glass-input w-full resize-none"
             />
           </div>
+          {createError && (
+            <div role="alert" className="mt-5 rounded-lg border border-status-failed-border bg-status-failed-bg px-4 py-3 text-sm text-status-failed-fg">
+              <p>{createError}</p>
+              {seriesCreateRuntime.receipt && (
+                <button
+                  type="button"
+                  onClick={retrySeriesReadback}
+                  disabled={isCreating}
+                  className="mt-3 glass-button text-xs disabled:opacity-50"
+                >
+                  {tc("sync")}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {createError && (
-          <div role="alert" className="mt-5 rounded-lg border border-status-failed-border bg-status-failed-bg px-4 py-3 text-sm text-status-failed-fg">
-            <p>{createError}</p>
-            {seriesCreateRuntime.receipt && (
-              <button
-                type="button"
-                onClick={retrySeriesReadback}
-                disabled={isCreating}
-                className="mt-3 glass-button text-xs disabled:opacity-50"
-              >
-                {tc("sync")}
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-3 pt-6">
+        <div className="flex gap-3 pt-4 shrink-0 border-t border-border mt-4">
           <button
             onClick={handleClose}
             className="flex-1 glass-button"

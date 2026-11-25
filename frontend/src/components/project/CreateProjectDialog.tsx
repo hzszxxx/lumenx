@@ -76,17 +76,17 @@ export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesT
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-overlay backdrop-blur-sm z-50 flex items-center justify-center p-6"
+                    className="fixed inset-0 bg-overlay backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
                     onClick={onClose}
                 >
                     <motion.div
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.9, opacity: 0 }}
-                        className="bg-elevated border border-border shadow-2xl p-8 rounded-2xl w-full max-w-4xl"
+                        className="bg-elevated border border-border shadow-2xl p-6 sm:p-8 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col my-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center justify-between mb-4 shrink-0">
                             <div>
                                 <h2 className="text-2xl font-display font-bold text-foreground">{t("createTitle")}</h2>
                                 {seriesId && (
@@ -103,7 +103,7 @@ export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesT
                             </button>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-4 flex-1 overflow-y-auto min-h-0 pr-1 -mr-1">
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-2">
                                     {t("projectTitle")}
@@ -122,7 +122,7 @@ export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesT
                                 <label className="block text-sm font-medium text-foreground mb-2">
                                     {t("workflowMode")}
                                 </label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <button
                                         type="button"
                                         onClick={() => setWorkflowMode("r2v")}
@@ -177,22 +177,22 @@ export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesT
                                     className="glass-input w-full resize-none font-mono text-sm"
                                 />
                             </div>
+                        </div>
 
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    onClick={onClose}
-                                    className="flex-1 glass-button"
-                                >
-                                    {tc("cancel")}
-                                </button>
-                                <button
-                                    onClick={handleCreate}
-                                    disabled={isCreating || !title}
-                                    className="flex-1 bg-primary hover:bg-primary/90 text-foreground px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isCreating ? t("creating") : t("createProject")}
-                                </button>
-                            </div>
+                        <div className="flex gap-3 pt-4 shrink-0 border-t border-border mt-4">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 glass-button"
+                            >
+                                {tc("cancel")}
+                            </button>
+                            <button
+                                onClick={handleCreate}
+                                disabled={isCreating || !title}
+                                className="flex-1 bg-primary hover:bg-primary/90 text-foreground px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isCreating ? t("creating") : t("createProject")}
+                            </button>
                         </div>
                     </motion.div>
                 </motion.div>
