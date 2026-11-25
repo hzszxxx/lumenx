@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Cpu, KeyRound, ShieldCheck } from "lucide-react";
 import ComputeSettings from "@/components/platform/ComputeSettings";
 import XiangongyunSettings from "@/components/platform/XiangongyunSettings";
-import ApiKeySettings from "@/components/platform/ApiKeySettings";
+import SettingsPage from "@/components/settings/SettingsPage";
 
 export type ComputeSubTab = "byok" | "xiangongyun" | "apikeys";
 
@@ -82,9 +82,11 @@ export default function ComputeHub({ initialTab = "byok", isAdmin = false }: Com
 
       {/* Active panel */}
       <div>
-        {activeTab === "byok" && <ComputeSettings />}
+        {activeTab === "byok" && (
+          <ComputeSettings onOpenGlobalKeys={isAdmin ? () => setActiveTab("apikeys") : undefined} />
+        )}
         {activeTab === "xiangongyun" && <XiangongyunSettings />}
-        {activeTab === "apikeys" && isAdmin && <ApiKeySettings />}
+        {activeTab === "apikeys" && isAdmin && <SettingsPage embeddedApikeysOnly />}
       </div>
     </div>
   );

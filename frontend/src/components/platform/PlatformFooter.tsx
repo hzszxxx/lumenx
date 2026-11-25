@@ -146,10 +146,10 @@ export default function PlatformFooter() {
               <li>
                 <button
                   type="button"
-                  onClick={() => navigateTo("#/settings?tab=apikeys")}
+                  onClick={() => navigateTo("#/platform?section=compute")}
                   className="hover:text-primary transition-colors flex items-center gap-1 font-medium text-foreground/90"
                 >
-                  <ChevronRight size={11} className="text-primary" /> 系统设置与 API-Key 对接
+                  <ChevronRight size={11} className="text-primary" /> 算力与凭证 / API-Key 对接
                 </button>
               </li>
             </ul>

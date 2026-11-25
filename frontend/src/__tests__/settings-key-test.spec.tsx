@@ -27,8 +27,7 @@ const STORAGE_KEY = '33333333-3333-4333-8333-333333333333';
 
 async function renderApiKeys(initial: EnvConfigPayload = { DASHSCOPE_API_KEY: 'sk-test-key-12345' }) {
   vi.mocked(api.getEnvConfig).mockResolvedValueOnce(initial);
-  const rendered = renderWithIntl(<SettingsPage />);
-  fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+  const rendered = renderWithIntl(<SettingsPage embeddedApikeysOnly />);
   await waitFor(() => expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled());
   return rendered;
 }

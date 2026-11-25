@@ -27,7 +27,7 @@ interface TopNavbarProps {
   onLogout?: () => void;
 }
 
-export type TopNavSection = "workspace" | "academy" | "competitions" | "certification" | "tasks" | "profile" | "settings";
+export type TopNavSection = "workspace" | "academy" | "competitions" | "certification" | "tasks" | "profile" | "compute" | "settings";
 
 export default function TopNavbar({
   activeTab,
@@ -52,7 +52,9 @@ export default function TopNavbar({
         setCurrentSection("certification");
       } else if (hash.startsWith("#/workspace") || hash.startsWith("#/project") || hash.startsWith("#/series") || hash.startsWith("#/library") || hash.startsWith("#/studio/editor")) {
         setCurrentSection("workspace");
-      } else if (hash.startsWith("#/profile") || hash.includes("section=users") || hash.includes("section=wallet") || hash.includes("section=compute")) {
+      } else if (hash.includes("section=compute")) {
+        setCurrentSection("compute");
+      } else if (hash.startsWith("#/profile") || hash.includes("section=users") || hash.includes("section=wallet")) {
         setCurrentSection("profile");
       } else {
         setCurrentSection("tasks");
@@ -68,6 +70,9 @@ export default function TopNavbar({
     if (section === "workspace") {
       onTabChange("workspace");
       window.location.hash = "#/workspace";
+    } else if (section === "compute") {
+      onTabChange("platform");
+      window.location.hash = "#/platform?section=compute";
     } else if (section === "settings") {
       onTabChange("settings");
       window.location.hash = "#/settings";
@@ -160,17 +165,17 @@ export default function TopNavbar({
           <span>开始创作</span>
         </button>
 
-        {/* 系统设置 / API-Key 对接入口 */}
+        {/* 算力与凭证 / API-Key 对接入口 */}
         <button
           type="button"
-          onClick={() => handleNavClick("settings")}
+          onClick={() => handleNavClick("compute")}
           className={clsx(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-colors",
-            activeTab === "settings" || currentSection === "settings"
+            currentSection === "compute"
               ? "bg-primary/15 text-primary border-primary/40 font-semibold"
               : "border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg"
           )}
-          title="系统设置与 API-Key 对接"
+          title="算力与凭证中心 (API-Key / 仙宫云)"
         >
           <Settings size={15} className="text-primary" />
           <span className="hidden sm:inline">设置 / API-Key</span>

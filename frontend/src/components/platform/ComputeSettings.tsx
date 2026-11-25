@@ -14,7 +14,11 @@ type Credential = {
   last_verified_at?: string | null;
 };
 
-export default function ComputeSettings() {
+export default function ComputeSettings({
+  onOpenGlobalKeys,
+}: {
+  onOpenGlobalKeys?: () => void;
+} = {}) {
   const [mode, setMode] = useState<BillingMode>(getBillingMode());
   const [credentialRef, setCredentialRef] = useState(getCredentialRef() || "");
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -79,17 +83,17 @@ export default function ComputeSettings() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            window.location.hash = "#/settings?tab=apikeys";
-          }}
-          className="px-5 py-3 rounded-xl bg-primary text-white text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-md shrink-0 flex items-center gap-2 cursor-pointer"
-        >
-          <Settings size={16} />
-          <span>打开系统全局设置 (API-Key)</span>
-          <ChevronRight size={14} />
-        </button>
+        {onOpenGlobalKeys && (
+          <button
+            type="button"
+            onClick={onOpenGlobalKeys}
+            className="px-5 py-3 rounded-xl bg-primary text-white text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-md shrink-0 flex items-center gap-2 cursor-pointer"
+          >
+            <Settings size={16} />
+            <span>打开系统全局密钥 (管理员)</span>
+            <ChevronRight size={14} />
+          </button>
+        )}
       </div>
 
       {message && (

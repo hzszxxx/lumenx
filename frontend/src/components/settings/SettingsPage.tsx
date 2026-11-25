@@ -192,11 +192,18 @@ function Section({
   );
 }
 
-export default function SettingsPage() {
+export default function SettingsPage({
+  embeddedApikeysOnly = false,
+  showApikeysTab = false,
+}: {
+  embeddedApikeysOnly?: boolean;
+  showApikeysTab?: boolean;
+} = {}) {
   const t = useTranslations("settings");
   const { locale, theme, animations, setLocale, setTheme, setAnimations } = useSettingsStore();
 
   const [active, setActive] = useState<SettingsCategory>(() => {
+    if (embeddedApikeysOnly) return "apikeys";
     if (typeof window !== "undefined") {
       const hash = window.location.hash;
       if (hash.includes("tab=apikeys") || hash.includes("category=apikeys")) return "apikeys";
@@ -1495,13 +1502,22 @@ export default function SettingsPage() {
   };
 
   // 横向 Tab 短标签（取代竖向 SettingsSidebar；与全局品牌侧栏轴向正交，不再撞脸）。
+  // API 密钥已统一合并至「算力与凭证中心」；仅在 embeddedApikeysOnly 时单独渲染。
   const TABS: { id: SettingsCategory; label: string }[] = [
     { id: "general", label: t("tabGeneral") },
     { id: "models", label: t("tabModels") },
     { id: "prompts", label: t("eyebrowPrompts") },
-    { id: "apikeys", label: t("eyebrowApikeys") },
+    ...(showApikeysTab ? [{ id: "apikeys" as const, label: t("eyebrowApikeys") }] : []),
     { id: "storage", label: t("tabStorage") },
   ];
+
+  if (embeddedApikeysOnly) {
+    return (
+      <div className="flex flex-col gap-6">
+        {renderActive()}
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full flex flex-col">

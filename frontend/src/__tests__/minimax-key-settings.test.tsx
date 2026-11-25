@@ -80,8 +80,7 @@ describe('MiniMax API Key Settings', () => {
     };
     vi.mocked(api.getEnvConfig).mockResolvedValue(initialConfig);
 
-    renderWithIntl(<SettingsPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+    renderWithIntl(<SettingsPage embeddedApikeysOnly />);
 
     await waitFor(() => expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled());
     expect(screen.getByText('MiniMax 开放平台')).toBeInTheDocument();

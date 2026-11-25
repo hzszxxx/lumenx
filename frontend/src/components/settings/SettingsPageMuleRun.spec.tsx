@@ -59,8 +59,7 @@ function deferred<T>() {
 
 async function renderApiKeys(initial: EnvConfigPayload = envConfig()) {
   vi.mocked(api.getEnvConfig).mockResolvedValueOnce(initial);
-  const rendered = renderWithIntl(<SettingsPage />);
-  fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+  const rendered = renderWithIntl(<SettingsPage embeddedApikeysOnly />);
   await screen.findByDisplayValue('dashscope-key');
   vi.useFakeTimers();
   return rendered;
@@ -101,8 +100,7 @@ describe('SettingsPage MuleRun login polling', () => {
   it('saves local configuration without a DashScope key', async () => {
     vi.mocked(api.getEnvConfig).mockResolvedValue(envConfig({ DASHSCOPE_API_KEY: '' }));
     vi.mocked(api.saveEnvConfig).mockResolvedValue(undefined);
-    renderWithIntl(<SettingsPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+    renderWithIntl(<SettingsPage embeddedApikeysOnly />);
     const save = await screen.findByRole('button', { name: '保存配置' });
     await waitFor(() => expect(save).toBeEnabled());
     await act(async () => fireEvent.click(save));
@@ -112,8 +110,7 @@ describe('SettingsPage MuleRun login polling', () => {
 
   it('still rejects missing credentials for explicitly selected vendor routing', async () => {
     vi.mocked(api.getEnvConfig).mockResolvedValue(envConfig({ DASHSCOPE_API_KEY: '', KLING_PROVIDER_MODE: 'vendor' }));
-    renderWithIntl(<SettingsPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+    renderWithIntl(<SettingsPage embeddedApikeysOnly />);
     const save = await screen.findByRole('button', { name: '保存配置' });
     await waitFor(() => expect(save).toBeEnabled());
     await act(async () => fireEvent.click(save));
@@ -142,8 +139,7 @@ describe('SettingsPage MuleRun login polling', () => {
     const saveA = deferred<void>();
     const saveB = deferred<void>();
     vi.mocked(api.saveEnvConfig).mockReturnValueOnce(saveA.promise).mockReturnValueOnce(saveB.promise);
-    renderWithIntl(<SettingsPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+    renderWithIntl(<SettingsPage embeddedApikeysOnly />);
     await screen.findByDisplayValue('dashscope-key');
     fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
     await act(async () => activateRuntimeEnvironment({ schema_version: 1, storage_id: STORAGE_B }));
@@ -162,8 +158,7 @@ describe('SettingsPage MuleRun login polling', () => {
     vi.mocked(api.getEnvConfig).mockResolvedValue(envConfig());
     const pending = deferred<void>();
     vi.mocked(api.saveEnvConfig).mockReturnValue(pending.promise);
-    const rendered = renderWithIntl(<SettingsPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+    const rendered = renderWithIntl(<SettingsPage embeddedApikeysOnly />);
     await screen.findByDisplayValue('dashscope-key');
     const save = screen.getByRole('button', { name: '保存配置' });
     act(() => { fireEvent.click(save); fireEvent.click(save); });
@@ -177,11 +172,10 @@ describe('SettingsPage MuleRun login polling', () => {
     vi.mocked(api.getEnvConfig).mockResolvedValue(envConfig());
     const view = (locale: string) => (
       <NextIntlClientProvider locale={locale} messages={zhMessages} timeZone="Asia/Shanghai">
-        <SettingsPage />
+        <SettingsPage embeddedApikeysOnly />
       </NextIntlClientProvider>
     );
     const rendered = renderWithIntl(view('zh'));
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
     fireEvent.change(await screen.findByDisplayValue('dashscope-key'), { target: { value: 'unsaved-current-key' } });
     rendered.rerender(view('en'));
     await act(async () => {});
@@ -354,8 +348,7 @@ describe('SettingsPage environment-scoped config loading', () => {
       .mockReturnValueOnce(staleB.promise)
       .mockReturnValueOnce(freshA.promise);
 
-    renderWithIntl(<SettingsPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+    renderWithIntl(<SettingsPage embeddedApikeysOnly />);
     expect(api.getEnvConfig).toHaveBeenCalledTimes(1);
 
     act(() => { activateRuntimeEnvironment({ schema_version: 1, storage_id: STORAGE_B }); });
@@ -393,7 +386,7 @@ describe('SettingsPage environment-scoped config loading', () => {
       OSS_BUCKET_NAME: 'a-bucket',
     }));
 
-    renderWithIntl(<SettingsPage />);
+    renderWithIntl(<SettingsPage showApikeysTab />);
     fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
     await screen.findByDisplayValue('a-key');
 
@@ -420,7 +413,7 @@ describe('SettingsPage environment-scoped config loading', () => {
         endpoint_overrides: {},
       } as EnvConfigPayload);
 
-    renderWithIntl(<SettingsPage />);
+    renderWithIntl(<SettingsPage showApikeysTab />);
     fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
     await screen.findByDisplayValue('a-key');
 
@@ -437,7 +430,7 @@ describe('SettingsPage environment-scoped config loading', () => {
       .mockResolvedValueOnce(envConfig({ DASHSCOPE_API_KEY: 'a-key' }))
       .mockResolvedValueOnce(envConfig({ DASHSCOPE_API_KEY: 'b-key' }));
 
-    renderWithIntl(<SettingsPage />);
+    renderWithIntl(<SettingsPage showApikeysTab />);
     fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
     await screen.findByDisplayValue('a-key');
 

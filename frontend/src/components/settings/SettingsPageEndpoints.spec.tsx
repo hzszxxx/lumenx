@@ -39,8 +39,7 @@ function deferred<T>() {
 
 async function renderApiKeys(initial: EnvConfigPayload = { DASHSCOPE_API_KEY: 'loaded-key' }) {
   vi.mocked(api.getEnvConfig).mockResolvedValueOnce(initial);
-  const rendered = renderWithIntl(<SettingsPage />);
-  fireEvent.click(await screen.findByRole('tab', { name: /API|密钥/ }));
+  const rendered = renderWithIntl(<SettingsPage embeddedApikeysOnly />);
   await waitFor(() => expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled());
   return rendered;
 }
@@ -189,8 +188,7 @@ describe('SettingsPage endpoint configuration', () => {
       .mockReturnValueOnce(oldA.promise)
       .mockReturnValueOnce(oldB.promise)
       .mockResolvedValueOnce({ endpoint_overrides: loadedEndpoints });
-    renderWithIntl(<SettingsPage />);
-    fireEvent.click(screen.getByRole('tab', { name: /API|密钥/ }));
+    renderWithIntl(<SettingsPage embeddedApikeysOnly />);
     expect(api.getEnvConfig).toHaveBeenCalledTimes(1);
     await act(async () => activateRuntimeEnvironment({ schema_version: 1, storage_id: STORAGE_B }));
     expect(api.getEnvConfig).toHaveBeenCalledTimes(2);
