@@ -20,7 +20,7 @@ import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { clearPlatformToken, getPlatformToken, platformApi } from "@/lib/platformApi";
 import { usePlatformStore } from "@/store/platformStore";
-import { getRuntimeEnvironment, requireActiveRuntimeEnvironment, subscribeRuntimeEnvironment } from "@/lib/runtimeEnvironment";
+import { getRuntimeEnvironment, requireActiveRuntimeEnvironment, subscribeRuntimeEnvironment, RuntimeEnvironmentError } from "@/lib/runtimeEnvironment";
 import { useTranslations } from "next-intl";
 import TauriMenuListener from "@/components/layout/TauriMenuListener";
 
@@ -745,6 +745,15 @@ export default function Home() {
     setAuthModalOpen(true);
   };
 
+  const shouldSyncWorkspaceData = [
+    "home",
+    "project",
+    "series",
+    "series-episode",
+    "project-editor",
+    "studio/editor",
+  ].includes(currentView);
+
   useEffect(() => {
     if (!getPlatformToken()) {
       setPlatformAccess("ready");
@@ -757,8 +766,6 @@ export default function Home() {
       .then(() => {
         if (active) {
           setPlatformAccess("ready");
-          void syncProjects();
-          void syncSeries();
         }
       })
       .catch(() => {
@@ -774,15 +781,18 @@ export default function Home() {
     const handleUserChanged = () => {
       resetProjectStoreForUserSwitch();
       resetAtelierStoreForUserSwitch();
-      void syncProjects();
-      void syncSeries();
+      if (shouldSyncWorkspaceData && getRuntimeEnvironment()) {
+        void syncProjects();
+        void syncSeries();
+      }
     };
     window.addEventListener("lumenx:user_changed", handleUserChanged);
     return () => window.removeEventListener("lumenx:user_changed", handleUserChanged);
-  }, []);
+  }, [shouldSyncWorkspaceData]);
 
   // Sync projects and series from backend once runtime environment is active
   useEffect(() => {
+    if (!shouldSyncWorkspaceData) return;
     let synced = false;
     const runSync = () => {
       if (synced) return;
@@ -800,7 +810,7 @@ export default function Home() {
     });
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [shouldSyncWorkspaceData]);
 
   // Support ?dev_login=admin or ?dev_login=creator for instant automated auth in development & T3 Preview
   useEffect(() => {
@@ -852,7 +862,12 @@ export default function Home() {
   }, [seriesList, t]);
 
   const syncSeries = async () => {
-    if (!await fetchSeriesList()) toast.error(t("toastProjectsSyncFailed"));
+    try {
+      if (!await fetchSeriesList()) toast.error(t("toastProjectsSyncFailed"));
+    } catch (error) {
+      if (error instanceof RuntimeEnvironmentError) return; // expected when no backend configured
+      toast.error(t("toastProjectsSyncFailed"));
+    }
   };
 
   const syncProjects = async () => {
@@ -863,6 +878,7 @@ export default function Home() {
       if (!Array.isArray(backendProjects)) throw new Error("Invalid project list response");
       syncProjectList(backendProjects, capture);
     } catch (error) {
+      if (error instanceof RuntimeEnvironmentError) return; // expected when no backend configured
       console.error("Failed to sync projects from backend:", error);
       toast.error(t("toastProjectsSyncFailed"), {
         body: error instanceof Error ? error.message : String(error),
