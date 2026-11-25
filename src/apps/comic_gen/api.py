@@ -1760,6 +1760,12 @@ class UpdateScriptTextRequest(BaseModel):
     expected_revision: int = Field(..., ge=0, strict=True)
 
 
+class RewriteScriptRequest(BaseModel):
+    script_text: str
+    skill_prompt: str
+    model: Optional[str] = ""
+
+
 @router.put("/projects/{script_id}/text", response_model=Script)
 def update_script_text(
     script_id: str,
@@ -1844,6 +1850,70 @@ async def extract_preview(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/projects/{script_id}/rewrite_script")
+async def rewrite_script(
+    script_id: str,
+    request: RewriteScriptRequest,
+    http_request: Request,
+    active_pipeline: Any = Depends(get_pipeline),
+):
+    """Rewrite script using LLM with user-selected and customized skill instructions."""
+    check_project_access(script_id, http_request, active_pipeline)
+    if not request.script_text.strip():
+        raise HTTPException(status_code=400, detail="剧本内容不能为空")
+    if not request.skill_prompt.strip():
+        raise HTTPException(status_code=400, detail="改写 Skill 指令不能为空")
+
+    from .llm_adapter import LLMAdapter
+    env = getattr(http_request.app.state, "runtime_environment", None)
+    adapter = LLMAdapter(env=env.snapshot() if env else None)
+    if not adapter.is_configured:
+        raise HTTPException(status_code=502, detail="LLM 服务未配置或 API Key 缺失")
+
+    system_prompt = (
+        "你是一位资深专业的影视与 AI 短剧编剧。你的任务是根据用户给定的【改写 Skill 指令】，"
+        "对提供的【剧本原稿】进行高质量改写。\n"
+        "输出规范：\n"
+        "1. 严格遵循用户的 Skill 指令要求。\n"
+        "2. 直接输出改写后的完整剧本文本，保留或优化剧本分场结构。\n"
+        "3. 切勿输出任何前言、客套话、解释说明或 markdown 代码块外的多余文本。\n"
+    )
+    user_message = (
+        f"【改写 Skill 指令】：\n{request.skill_prompt.strip()}\n\n"
+        f"【剧本原稿】：\n{request.script_text.strip()}"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
+
+    model = request.model or adapter._get_default_model()
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            None,
+            partial(adapter.chat, messages, model=model, timeout=120.0)
+        )
+        rewritten_text = (result or "").strip()
+        if rewritten_text.startswith("```"):
+            lines = rewritten_text.splitlines()
+            if len(lines) >= 2 and lines[0].startswith("```"):
+                if lines[-1].startswith("```"):
+                    lines = lines[1:-1]
+                else:
+                    lines = lines[1:]
+                rewritten_text = "\n".join(lines).strip()
+
+        return {
+            "rewritten_text": rewritten_text,
+            "model": model,
+        }
+    except Exception as e:
+        logger.exception("rewrite_script error")
+        raise HTTPException(status_code=502, detail=f"AI 改写失败: {str(e)}") from e
 
 
 @router.get("/projects/", response_model=List[dict])

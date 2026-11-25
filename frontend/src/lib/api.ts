@@ -617,6 +617,20 @@ export const api = {
         return { ...res.data, originalText: res.data.original_text };
     },
 
+    rewriteScript: async (
+        scriptId: string,
+        scriptText: string,
+        skillPrompt: string,
+        model?: string,
+    ): Promise<{ rewritten_text: string; model: string }> => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/rewrite_script`, {
+            script_text: scriptText,
+            skill_prompt: skillPrompt,
+            model,
+        });
+        return res.data;
+    },
+
     syncDescriptions: async (scriptId: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/sync_descriptions`);
         return res.data;

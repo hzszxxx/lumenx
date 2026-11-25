@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { Wand2, Loader2 } from "lucide-react";
+import { Wand2, Loader2, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { getRuntimeEnvironment, isCurrentRuntimeEnvironment, subscribeRuntimeEnvironment } from "@/lib/runtimeEnvironment";
 import { extractionPreviewOperationKey, useProjectStore } from "@/store/projectStore";
@@ -10,6 +10,7 @@ import { toast } from "@/store/toastStore";
 import StepPageHeader, { StepPill } from "@/components/shared/StepPageHeader";
 import PreviousEpisodeSummary from "@/components/modules/PreviousEpisodeSummary";
 import ReconcileModal from "@/components/modules/ReconcileModal";
+import ScriptRewriteModal from "@/components/modules/ScriptRewriteModal";
 import { scriptDraftKey, useScriptDraftStore } from "@/store/scriptDraftStore";
 import { readProjectOnce } from "@/lib/projectReadback";
 
@@ -36,6 +37,7 @@ export default function ScriptProcessor() {
         key: string; generation: number; text: string; interaction: number; promise: Promise<void>;
     } | null>(null);
     const [isWaitingForSave, setIsWaitingForSave] = useState(false);
+    const [rewriteModalOpen, setRewriteModalOpen] = useState(false);
     const [review, setReview] = useState<{
         key: string; generation: number; text: string; baseline: number | undefined;
         status: 'reading' | 'ready' | 'failed'; savedText?: string; revision?: number;
@@ -309,15 +311,26 @@ export default function ScriptProcessor() {
                         </>
                     ) : null}
                     trailing={(
-                        <button
-                            type="button"
-                            onClick={handleAnalyze}
-                            disabled={!script || isAnalyzing || isWaitingForSave}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 font-sans text-[0.8125rem] font-semibold text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] transition-all duration-fast ease-out-quart hover:bg-primary-hover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
-                        >
-                            {isAnalyzing || isWaitingForSave ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-                            <span>{isWaitingForSave ? tp("saving") : isAnalyzing ? ts("analyzingScript") : ts("extractEntities")}</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setRewriteModalOpen(true)}
+                                disabled={!script || isAnalyzing || isWaitingForSave}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 font-sans text-[0.8125rem] font-medium text-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.1)] transition-all duration-fast ease-out-quart hover:bg-primary/20 hover:border-primary/50 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            >
+                                <Sparkles size={13} />
+                                <span>{ts("smartRewrite") || "剧本智能改写"}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAnalyze}
+                                disabled={!script || isAnalyzing || isWaitingForSave}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 font-sans text-[0.8125rem] font-semibold text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] transition-all duration-fast ease-out-quart hover:bg-primary-hover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            >
+                                {isAnalyzing || isWaitingForSave ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                                <span>{isWaitingForSave ? tp("saving") : isAnalyzing ? ts("analyzingScript") : ts("extractEntities")}</span>
+                            </button>
+                        </div>
                     )}
                 />
                 <div className="flex-1 relative p-6 bg-surface overflow-hidden flex flex-col gap-2">
@@ -383,6 +396,22 @@ export default function ScriptProcessor() {
                 isOpen={reconcileOpen}
                 scriptId={projectId || null}
                 onClose={() => setReconcileOpen(false)}
+            />
+
+            {/* 剧本智能改写弹窗 */}
+            <ScriptRewriteModal
+                isOpen={rewriteModalOpen}
+                scriptText={script}
+                projectId={projectId}
+                onClose={() => setRewriteModalOpen(false)}
+                onApply={(newText) => {
+                    if (draftKey && environment && isCurrentRuntimeEnvironment(environment.key, environment.generation)) {
+                        draftInteractionRef.current += 1;
+                        pendingAnalyzeRef.current = null;
+                        setIsWaitingForSave(false);
+                        changeText(draftKey, newText);
+                    }
+                }}
             />
 
         </div>
