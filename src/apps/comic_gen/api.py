@@ -2803,6 +2803,7 @@ class EnvConfig(ProviderRoutingConfig):
     KLING_SECRET_KEY: Optional[str] = None
     VIDU_API_KEY: Optional[str] = None
     MULEROUTER_API_KEY: Optional[str] = None
+    MINIMAX_API_KEY: Optional[str] = None
     endpoint_overrides: Dict[str, str] = Field(default_factory=dict)
 
 
@@ -3101,6 +3102,47 @@ def test_api_key(payload: TestKeyRequest, request: Request):
             return {
                 "success": False,
                 "message": f"验证异常：{str(e)}",
+            }
+
+    elif provider == "minimax":
+        candidate_key = (payload.api_key or "").strip()
+        if not candidate_key or _MASK_CHAR in candidate_key or "*" in candidate_key:
+            candidate_key = (env.get("MINIMAX_API_KEY", "") or "").strip()
+
+        if not candidate_key:
+            return {
+                "success": False,
+                "message": "未检测到 MiniMax API Key，请先输入密钥或保存后再测试",
+            }
+
+        base_url = (payload.base_url or "").strip() or (env.get("MINIMAX_BASE_URL", "") or "").strip() or "https://api.minimaxi.chat"
+        endpoint = f"{base_url.rstrip('/')}/v1/models"
+        import requests
+        start_t = time.time()
+        try:
+            resp = requests.get(endpoint, headers={"Authorization": f"Bearer {candidate_key}"}, timeout=10.0)
+            latency = int((time.time() - start_t) * 1000)
+            if resp.status_code == 200:
+                return {
+                    "success": True,
+                    "message": "连接成功！MiniMax 开放平台响应正常",
+                    "latency_ms": latency,
+                    "details": {"endpoint": endpoint},
+                }
+            elif resp.status_code in (401, 403):
+                return {
+                    "success": False,
+                    "message": f"密钥认证失败 (HTTP {resp.status_code})：请确认 MiniMax API Key 是否正确",
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"MiniMax 接口返回 HTTP {resp.status_code}: {resp.text[:200]}",
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"连接 MiniMax 失败：{str(e)}",
             }
 
     return {
@@ -6443,6 +6485,7 @@ SECRET_FIELDS = {
     "KLING_SECRET_KEY",
     "VIDU_API_KEY",
     "MULEROUTER_API_KEY",
+    "MINIMAX_API_KEY",
 }
 
 # Bullet sentinel: never appears in a real key, so the save path can detect an
@@ -6495,6 +6538,7 @@ def get_env_config(request: Request):
             "KLING_SECRET_KEY": _mask_secret(env.get("KLING_SECRET_KEY")),
             "VIDU_API_KEY": _mask_secret(env.get("VIDU_API_KEY")),
             "MULEROUTER_API_KEY": _mask_secret(env.get("MULEROUTER_API_KEY")),
+            "MINIMAX_API_KEY": _mask_secret(env.get("MINIMAX_API_KEY")),
             # Non-secret config.
             "OSS_BUCKET_NAME": env.get("OSS_BUCKET_NAME", ""),
             "OSS_ENDPOINT": env.get("OSS_ENDPOINT", ""),

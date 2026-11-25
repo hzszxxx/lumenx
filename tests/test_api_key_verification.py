@@ -125,3 +125,28 @@ def test_unsupported_provider(api_client):
     data = resp.json()
     assert data["success"] is False
     assert "不支持" in data["message"]
+
+
+def test_minimax_test_key_success(api_client):
+    mock_resp = Mock()
+    mock_resp.status_code = 200
+    with patch("requests.get", return_value=mock_resp):
+        resp = api_client.post("/config/test-key", json={
+            "provider": "minimax",
+            "api_key": "minimax-test-key",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert "连接成功" in data["message"]
+
+
+def test_minimax_missing_key(api_client):
+    resp = api_client.post("/config/test-key", json={
+        "provider": "minimax",
+        "api_key": "",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is False
+    assert "未检测到 MiniMax API Key" in data["message"]
