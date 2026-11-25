@@ -2682,6 +2682,7 @@ function StoryboardR2VSession() {
                         currentModel={activeVideoModelId}
                         duration={videoConfig.duration}
                         resolution={videoConfig.resolution}
+                        resolveReferenceUrls={(shot) => parseAssetTags(shot.prompt)}
                         onRefreshProject={() => {
                             if (currentProject?.id) {
                                 void readProjectOnce(currentProject.id);

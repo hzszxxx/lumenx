@@ -26,6 +26,7 @@ interface XiangongyunBatchBarProps {
     currentModel: string;
     duration?: number;
     resolution?: string;
+    resolveReferenceUrls?: (shot: any) => string[];
     onBatchSubmitted?: (taskIds: string[]) => void;
     onRefreshProject?: () => void;
 }
@@ -40,6 +41,7 @@ export default function XiangongyunBatchBar({
     currentModel,
     duration = 5,
     resolution = "768p",
+    resolveReferenceUrls,
     onBatchSubmitted,
     onRefreshProject,
 }: XiangongyunBatchBarProps) {
@@ -118,14 +120,19 @@ export default function XiangongyunBatchBar({
         }
 
         const selectedShots = shots.filter(s => selectedShotIds.includes(s.id));
-        const items = selectedShots.map(s => ({
-            frame_id: s.id,
-            prompt: s.prompt,
-            image_url: s.imageUrl || s.image_url || "",
-            duration,
-            resolution,
-            generation_mode: (currentModel.endsWith("-r2v") ? "r2v" : "i2v") as "r2v" | "i2v",
-        }));
+        const items = selectedShots.map(s => {
+            const genMode = (currentModel.endsWith("-r2v") ? "r2v" : "i2v") as "r2v" | "i2v";
+            const refs = genMode === "r2v" && resolveReferenceUrls ? resolveReferenceUrls(s) : (s.reference_image_urls || []);
+            return {
+                frame_id: s.id,
+                prompt: s.prompt,
+                image_url: s.imageUrl || s.image_url || "",
+                duration,
+                resolution,
+                generation_mode: genMode,
+                ...(refs.length > 0 ? { reference_image_urls: refs } : {}),
+            };
+        });
 
         setSubmitting(true);
         try {

@@ -5046,12 +5046,68 @@ def create_xiangongyun_batch(
         image_url = item.image_url or frame.image_url or ""
         ref_images = list(item.reference_image_urls)
         if batch_req.model.endswith("-r2v") and not ref_images:
-            for char in getattr(script, "characters", []) or []:
-                if char.image_url and char.name and f"[{char.name}]" in prompt:
-                    ref_images.append(char.image_url)
-            for scene in getattr(script, "scenes", []) or []:
-                if scene.image_url and scene.name and f"[{scene.name}]" in prompt:
-                    ref_images.append(scene.image_url)
+            def _selected_asset_url(asset_obj: Any, *container_names: str, fallback_attrs: tuple[str, ...] = ("image_url",)) -> Optional[str]:
+                for cname in container_names:
+                    container = getattr(asset_obj, cname, None)
+                    if not container:
+                        continue
+                    variants = getattr(container, "variants", None) or getattr(container, "image_variants", None) or []
+                    sel_id = getattr(container, "selected_id", None) or getattr(container, "selected_image_id", None)
+                    if sel_id and variants:
+                        match_v = next((v for v in variants if getattr(v, "id", None) == sel_id and getattr(v, "url", None)), None)
+                        if match_v:
+                            return match_v.url
+                    if variants and getattr(variants[0], "url", None):
+                        return variants[0].url
+                for attr in fallback_attrs:
+                    val = getattr(asset_obj, attr, None)
+                    if val:
+                        return val
+                return None
+
+            def _lookup_entity_url(entity_name: str) -> Optional[str]:
+                for char in getattr(script, "characters", []) or []:
+                    if getattr(char, "name", None) == entity_name:
+                        url = _selected_asset_url(
+                            char,
+                            "reference_sheet", "full_body", "full_body_asset", "head_shot", "headshot_asset",
+                            fallback_attrs=("full_body_image_url", "image_url", "avatar_url"),
+                        )
+                        if url:
+                            return url
+                for scene in getattr(script, "scenes", []) or []:
+                    if getattr(scene, "name", None) == entity_name:
+                        url = _selected_asset_url(scene, "image_asset", fallback_attrs=("image_url",))
+                        if url:
+                            return url
+                for prop in getattr(script, "props", []) or []:
+                    if getattr(prop, "name", None) == entity_name:
+                        url = _selected_asset_url(prop, "image_asset", fallback_attrs=("image_url",))
+                        if url:
+                            return url
+                return None
+
+            import re
+            seen_slots: set[str] = set()
+            for m in re.finditer(r"\[(?:character\d+|scene|prop):([^\]]+)\]", prompt):
+                ename = m.group(1)
+                if ename in seen_slots:
+                    continue
+                seen_slots.add(ename)
+                url = _lookup_entity_url(ename)
+                if url:
+                    ref_images.append(url)
+            if not ref_images:
+                for char in getattr(script, "characters", []) or []:
+                    if char.name and f"[{char.name}]" in prompt:
+                        url = _lookup_entity_url(char.name)
+                        if url:
+                            ref_images.append(url)
+                for scene in getattr(script, "scenes", []) or []:
+                    if scene.name and f"[{scene.name}]" in prompt:
+                        url = _lookup_entity_url(scene.name)
+                        if url:
+                            ref_images.append(url)
             if not ref_images and frame.image_url:
                 ref_images.append(frame.image_url)
 
