@@ -4215,7 +4215,7 @@ class CreateVideoTaskRequest(BaseModel):
     workbench_tab: Optional[Literal["t2i_i2v", "direct_r2v"]] = None
 
 
-def process_video_task(active_pipeline: Any, script_id: str, task_id: str):
+def process_video_task(active_pipeline: Any, script_id: str, task_id: str, endpoint: Optional[str] = None, access_token: Optional[str] = None):
     """Background task to generate video.
 
     The pipeline method has its own try/except that flips status to
@@ -4226,7 +4226,7 @@ def process_video_task(active_pipeline: Any, script_id: str, task_id: str):
     and the UI would show an eternal spinner.
     """
     try:
-        active_pipeline.process_video_task(script_id, task_id)
+        active_pipeline.process_video_task(script_id, task_id, endpoint=endpoint, access_token=access_token)
     except StorageError:
         raise
     except Exception as e:
@@ -4657,6 +4657,322 @@ def create_video_task(
     except Exception as e:
         logger.exception("An error occurred")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class XiangongyunBatchFrameItem(BaseModel):
+    frame_id: StrictStr
+    prompt: Optional[StrictStr] = None
+    image_url: Optional[StrictStr] = None
+    duration: int = 5
+    resolution: str = "768p"
+    generation_mode: str = "r2v"
+    reference_image_urls: List[StrictStr] = Field(default_factory=list)
+
+
+class XiangongyunBatchGenerateRequest(BaseModel):
+    items: List[XiangongyunBatchFrameItem]
+    instance_id: Optional[StrictStr] = None
+    auto_shutdown: bool = True
+    model: str = "xiangongyun-h3-r2v"
+
+
+class XiangongyunShutdownRequest(BaseModel):
+    instance_id: Optional[StrictStr] = None
+
+
+def run_xiangongyun_batch_worker(
+    active_pipeline: Any,
+    script_id: str,
+    batch_id: str,
+    access_token: str,
+    instance_id: str,
+    task_ids: List[str],
+    auto_shutdown: bool,
+):
+    from ...models.xiangongyun_manager import XiangongyunClient, batch_registry, XiangongyunManagerError
+    client = XiangongyunClient(access_token)
+    try:
+        batch_registry.update_batch(batch_id, status="booting", current_step="正在检查或启动仙宫云实例...")
+        inst = client.get_instance(instance_id)
+        if not inst:
+            raise XiangongyunManagerError(f"未找到仙宫云实例 {instance_id}")
+
+        inst_status = str(inst.get("status", "")).lower()
+        if inst_status != "running":
+            batch_registry.update_batch(batch_id, status="booting", current_step="正在开机启动服务器 (约需1-2分钟)...")
+            client.boot_instance(instance_id)
+        else:
+            batch_registry.update_batch(batch_id, status="booting", current_step="实例已开机，正在验证端口就绪...")
+
+        endpoint = client.wait_until_ready(instance_id, timeout_sec=300)
+        batch_registry.update_batch(batch_id, status="running", current_step="服务器已就绪，开始批量生成视频...")
+
+        for index, task_id in enumerate(task_ids):
+            step_msg = f"正在生成第 {index + 1}/{len(task_ids)} 个视频..."
+            batch_registry.update_batch(batch_id, current_step=step_msg)
+            try:
+                active_pipeline.process_video_task(script_id, task_id, endpoint=endpoint, access_token=access_token)
+            except Exception as e:
+                logger.error(f"Task {task_id} in batch {batch_id} failed: {e}")
+            batch_registry.update_batch(batch_id, completed_count=index + 1)
+
+        if auto_shutdown:
+            batch_registry.update_batch(batch_id, current_step="所有分镜已完成，正在关机释放 GPU 算力...")
+            client.shutdown_release_gpu(instance_id)
+            batch_registry.update_batch(batch_id, status="completed", current_step="批次已完成，服务器已自动关机释放算力")
+        else:
+            batch_registry.update_batch(batch_id, status="completed", current_step="批次已完成，服务器保持运行")
+    except Exception as exc:
+        logger.exception(f"Xiangongyun batch {batch_id} execution failed: {exc}")
+        batch_registry.update_batch(batch_id, status="failed", error=str(exc), current_step=f"批次异常终止: {exc}")
+        for task_id in task_ids:
+            try:
+                active_pipeline.mark_video_task_failed(script_id, task_id, f"仙宫云批次失败: {exc}")
+            except Exception:
+                pass
+        if auto_shutdown:
+            try:
+                client.shutdown_release_gpu(instance_id)
+            except Exception:
+                pass
+
+
+@router.get("/projects/{script_id}/xiangongyun/status")
+def get_xiangongyun_server_status(
+    script_id: str,
+    request: Request,
+    active_pipeline: Any = Depends(get_pipeline),
+):
+    from ...models.xiangongyun_manager import XiangongyunClient, batch_registry
+    token = None
+    platform = getattr(request.app.state, "platform_service", None)
+    actor = getattr(request.state, "platform_actor", None)
+    if platform and actor:
+        try:
+            token = platform.resolve_xiangongyun_token(actor)
+        except Exception:
+            token = None
+    if not token:
+        token = os.environ.get("XIANGONGYUN_ACCESS_TOKEN") or os.environ.get("XIANGONG_ACCESS_TOKEN")
+
+    active_batch = batch_registry.find_active_batch_for_project(script_id)
+    if not token:
+        return signed_response({
+            "verified": False,
+            "balance": None,
+            "instances": [],
+            "active_batch": active_batch,
+        }, runtime=active_pipeline)
+
+    try:
+        client = XiangongyunClient(token)
+        balance = client.get_balance()
+        raw_instances = client.list_instances()
+        safe_instances = [
+            {
+                "id": str(item.get("id")),
+                "name": str(item.get("name") or "H3 算力实例"),
+                "gpu_model": str(item.get("gpu_model") or "RTX 4090"),
+                "status": str(item.get("status") or "stopped"),
+                "price_per_hour": item.get("price_per_hour"),
+                "ip": item.get("public_ip") or item.get("ip"),
+                "port": item.get("port") or 8000,
+            }
+            for item in raw_instances
+        ]
+        return signed_response({
+            "verified": True,
+            "balance": balance,
+            "instances": safe_instances,
+            "active_batch": active_batch,
+        }, runtime=active_pipeline)
+    except Exception as exc:
+        logger.warning(f"Failed to fetch Xiangongyun status: {exc}")
+        return signed_response({
+            "verified": False,
+            "error": str(exc),
+            "balance": None,
+            "instances": [],
+            "active_batch": active_batch,
+        }, runtime=active_pipeline)
+
+
+@router.get("/projects/{script_id}/xiangongyun/batch/{batch_id}")
+def get_xiangongyun_batch_status(
+    script_id: str,
+    batch_id: str,
+    active_pipeline: Any = Depends(get_pipeline),
+):
+    from ...models.xiangongyun_manager import batch_registry
+    batch = batch_registry.get_batch(batch_id)
+    if not batch or batch.get("project_id") != script_id:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return signed_response(batch, runtime=active_pipeline)
+
+
+@router.post("/projects/{script_id}/xiangongyun/batch_generate")
+def create_xiangongyun_batch(
+    script_id: str,
+    request: Request,
+    batch_req: XiangongyunBatchGenerateRequest,
+    background_tasks: BackgroundTasks,
+    active_pipeline: Any = Depends(get_pipeline),
+):
+    from ...models.xiangongyun_manager import XiangongyunClient, batch_registry, MAX_BATCH_SIZE
+    if not batch_req.items:
+        raise HTTPException(status_code=400, detail="至少需要选择 1 个分镜进行生成")
+    if len(batch_req.items) > MAX_BATCH_SIZE:
+        raise HTTPException(status_code=400, detail=f"仙宫云单批次最多支持 {MAX_BATCH_SIZE} 个分镜视频，请分批提交")
+
+    token = None
+    platform = getattr(request.app.state, "platform_service", None)
+    actor = getattr(request.state, "platform_actor", None)
+    if platform and actor:
+        try:
+            token = platform.resolve_xiangongyun_token(actor)
+        except Exception:
+            token = None
+    if not token:
+        token = os.environ.get("XIANGONGYUN_ACCESS_TOKEN") or os.environ.get("XIANGONG_ACCESS_TOKEN")
+
+    if not token:
+        raise HTTPException(status_code=400, detail="未检测到仙宫云凭证，请先在平台设置中绑定仙宫云账号")
+
+    client = XiangongyunClient(token)
+    try:
+        balance = client.get_balance()
+        if balance <= 0:
+            raise HTTPException(status_code=400, detail=f"仙宫云账户余额不足 (当前: ¥{balance:.2f})，请先充值")
+        instances = client.list_instances()
+        if not instances:
+            raise HTTPException(status_code=400, detail="仙宫云账号下未找到任何 GPU 实例，请先在控制台创建 H3 实例")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"连接仙宫云接口失败: {exc}")
+
+    target_instance_id = batch_req.instance_id
+    if not target_instance_id:
+        running_inst = next((i for i in instances if str(i.get("status", "")).lower() == "running"), None)
+        target_instance_id = str(running_inst.get("id")) if running_inst else str(instances[0].get("id"))
+
+    active_existing = batch_registry.find_active_batch_for_project(script_id)
+    if active_existing:
+        raise HTTPException(status_code=409, detail="当前项目已有正在执行的仙宫云批次，请等待其完成")
+
+    script = active_pipeline.get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    task_ids: List[str] = []
+    created_tasks: List[Any] = []
+    for item in batch_req.items:
+        frame = next((f for f in script.frames if f.id == item.frame_id), None)
+        if not frame:
+            raise HTTPException(status_code=400, detail=f"分镜 {item.frame_id} 不存在")
+
+        prompt = item.prompt or frame.prompt or ""
+        image_url = item.image_url or frame.image_url or ""
+        ref_images = list(item.reference_image_urls)
+        if batch_req.model.endswith("-r2v") and not ref_images:
+            for char in getattr(script, "characters", []) or []:
+                if char.image_url and char.name and f"[{char.name}]" in prompt:
+                    ref_images.append(char.image_url)
+            for scene in getattr(script, "scenes", []) or []:
+                if scene.image_url and scene.name and f"[{scene.name}]" in prompt:
+                    ref_images.append(scene.image_url)
+            if not ref_images and frame.image_url:
+                ref_images.append(frame.image_url)
+
+        try:
+            updated_script, task_id = active_pipeline.create_video_task(
+                script_id=script_id,
+                image_url=image_url,
+                prompt=prompt,
+                frame_id=item.frame_id,
+                duration=item.duration,
+                resolution=item.resolution,
+                model=batch_req.model,
+                generation_mode=item.generation_mode,
+                reference_image_urls=ref_images if batch_req.model.endswith("-r2v") else None,
+            )
+            task_ids.append(task_id)
+            new_task = next((t for t in updated_script.video_tasks if t.id == task_id), None)
+            if new_task:
+                created_tasks.append(new_task)
+            script = updated_script
+        except ValueError as exc:
+            for created_id in task_ids:
+                try:
+                    active_pipeline.mark_video_task_failed(script_id, created_id, "批次准备失败")
+                except Exception:
+                    pass
+            raise HTTPException(status_code=400, detail=f"分镜校验失败: {exc}")
+
+    batch_id = str(uuid.uuid4())
+    batch_info = batch_registry.register_batch(
+        batch_id=batch_id,
+        project_id=script_id,
+        frame_ids=[it.frame_id for it in batch_req.items],
+        task_ids=task_ids,
+        instance_id=target_instance_id,
+        auto_shutdown=batch_req.auto_shutdown,
+    )
+
+    background_tasks.add_task(
+        run_xiangongyun_batch_worker,
+        active_pipeline=active_pipeline,
+        script_id=script_id,
+        batch_id=batch_id,
+        access_token=token,
+        instance_id=target_instance_id,
+        task_ids=task_ids,
+        auto_shutdown=batch_req.auto_shutdown,
+    )
+
+    return signed_response({
+        "batch_id": batch_id,
+        "instance_id": target_instance_id,
+        "total_count": len(task_ids),
+        "task_ids": task_ids,
+        "tasks": created_tasks,
+        "status": batch_info["status"],
+    }, runtime=active_pipeline)
+
+
+@router.post("/projects/{script_id}/xiangongyun/server/shutdown")
+def shutdown_xiangongyun_server(
+    script_id: str,
+    request: Request,
+    body: Optional[XiangongyunShutdownRequest] = None,
+    active_pipeline: Any = Depends(get_pipeline),
+):
+    from ...models.xiangongyun_manager import XiangongyunClient
+    token = None
+    platform = getattr(request.app.state, "platform_service", None)
+    actor = getattr(request.state, "platform_actor", None)
+    if platform and actor:
+        try:
+            token = platform.resolve_xiangongyun_token(actor)
+        except Exception:
+            token = None
+    if not token:
+        token = os.environ.get("XIANGONGYUN_ACCESS_TOKEN") or os.environ.get("XIANGONG_ACCESS_TOKEN")
+
+    if not token:
+        raise HTTPException(status_code=400, detail="未配置仙宫云 Access Token")
+
+    client = XiangongyunClient(token)
+    instance_id = body.instance_id if body else None
+    if not instance_id:
+        instances = client.list_instances()
+        running_inst = next((i for i in instances if str(i.get("status", "")).lower() == "running"), None)
+        if not running_inst:
+            return signed_response({"status": "no_running_instance", "message": "未发现正在运行的仙宫云实例"}, runtime=active_pipeline)
+        instance_id = str(running_inst["id"])
+
+    res = client.shutdown_release_gpu(instance_id)
+    return signed_response({"status": "shutdown_requested", "instance_id": instance_id, "result": res}, runtime=active_pipeline)
 
 
 _IMAGE_REQUEST_VALIDATION_DETAILS = (

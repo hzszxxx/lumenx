@@ -653,6 +653,17 @@ class PlatformService:
             self._save_idem(c, actor["id"], idempotency_key, response, request_hash)
         return response
 
+    def resolve_xiangongyun_token(self, actor: dict[str, Any]) -> str | None:
+        with connect(self.path) as c:
+            row = c.execute(
+                "SELECT b.credential_id FROM platform_xiangongyun_bindings b JOIN platform_credentials c ON c.id=b.credential_id WHERE b.user_id=? AND c.status='active' AND c.provider='xiangongyun'",
+                (actor["id"],),
+            ).fetchone()
+        if not row:
+            return None
+        cred = self.resolve_credential(actor, row[0])
+        return cred.get("secret")
+
     def _credentials_cipher(self) -> AESGCM:
         raw = self.config.credentials_key
         if not raw:

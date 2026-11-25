@@ -5964,7 +5964,7 @@ class ComicGenPipeline:
                     if self._video_task_runs.get(key) is token:
                         del self._video_task_runs[key]
 
-    def process_video_task(self, script_id: str, task_id: str):
+    def process_video_task(self, script_id: str, task_id: str, endpoint: Optional[str] = None, access_token: Optional[str] = None):
         """Processes a video task with an in-process claim and short-lock commits."""
         key = (script_id, task_id)
         token = object()
@@ -6082,14 +6082,13 @@ class ComicGenPipeline:
             )
 
             if use_xiangongyun:
-                if video_env is not None:
-                    from ...models.xiangongyun import XiangongyunH3Model
-                    active_model = XiangongyunH3Model({"output_root": str(self.data_dir)}, env=video_env)
-                else:
-                    if self._xiangongyun_model is None:
-                        from ...models.xiangongyun import XiangongyunH3Model
-                        self._xiangongyun_model = XiangongyunH3Model({"output_root": str(self.data_dir)})
-                    active_model = self._xiangongyun_model
+                from ...models.xiangongyun import XiangongyunH3Model
+                cfg: Dict[str, Any] = {"output_root": str(self.data_dir)}
+                if endpoint:
+                    cfg["endpoint"] = endpoint
+                if access_token:
+                    cfg["access_token"] = access_token
+                active_model = XiangongyunH3Model(cfg, env=video_env)
                 active_model.generate(
                     prompt=request.prompt,
                     output_path=output_path,
