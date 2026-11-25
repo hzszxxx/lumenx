@@ -1,0 +1,100 @@
+family: minimax
+display_name: "MiniMax (海螺)"
+provider: minimax
+routing_prefixes:
+  - minimax/
+  - minimax-
+supported_backends:
+  - vendor
+default_backend: vendor
+credential_sources:
+  vendor:
+    - MINIMAX_API_KEY
+supported_modalities:
+  - t2i
+  - i2i
+transport:
+  image_input_mode:
+    vendor: minimax_vendor_image_url
+  audio_input_mode:
+    vendor: minimax_vendor_audio_url
+  reference_video_input_mode:
+    vendor: minimax_vendor_video_url
+docs:
+  official_snapshot_ids:
+    - minimax/h3-image/2026-11-25
+  repo_local_snapshot_paths:
+    - docs/1-api-reference/minimax-image.md
+models:
+  - id: minimax/h3-image
+    display_name: MiniMax H3-Image
+    description: MiniMax 旗舰级 4K 高画质图像大模型，支持多图参考 (H3 DiT 33.1B)
+    status: active
+    release_stage: stable
+    capabilities: [t2i, i2i]
+    docs:
+      repo_local_snapshot_paths:
+        - docs/1-api-reference/minimax-image.md
+    runtime:
+      vendor:
+        gateway: minimax
+        api_model_id: MiniMax-H3-Image
+    ui:
+      selection_group: image
+      visible_in: [project_settings, series_settings, global_settings]
+      order: 88
+      badges: [new, 4k, recommended]
+    params:
+      aspectRatio:
+        options: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]
+        default: "16:9"
+      promptOptimizer:
+        default: true
+  - id: minimax/h3-image-highspeed
+    display_name: MiniMax H3-Image Highspeed
+    description: MiniMax H3-Image 高速版，出图速度翻倍，适合批量分镜探索与高性价比抽卡
+    status: active
+    release_stage: stable
+    capabilities: [t2i, i2i]
+    docs:
+      repo_local_snapshot_paths:
+        - docs/1-api-reference/minimax-image.md
+    runtime:
+      vendor:
+        gateway: minimax
+        api_model_id: MiniMax-H3-Image-Highspeed
+    ui:
+      selection_group: image
+      visible_in: [project_settings, series_settings, global_settings]
+      order: 87
+      badges: [highspeed, recommended]
+    params:
+      aspectRatio:
+        options: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]
+        default: "16:9"
+      promptOptimizer:
+        default: true
+  - id: minimax/image-01
+    display_name: MiniMax Image-01
+    description: MiniMax 早期轻量超低成本文生图模型 (¥0.025/张)
+    status: active
+    release_stage: stable
+    capabilities: [t2i]
+    docs:
+      repo_local_snapshot_paths:
+        - docs/1-api-reference/minimax-image.md
+    runtime:
+      vendor:
+        gateway: minimax
+        api_model_id: image-01
+    ui:
+      selection_group: image
+      visible_in: [project_settings, series_settings, global_settings]
+      order: 86
+      badges: [ultra-low-cost]
+    params:
+      aspectRatio:
+        options: ["16:9", "9:16", "1:1", "4:3", "3:4"]
+        default: "16:9"
+      promptOptimizer:
+        default: true

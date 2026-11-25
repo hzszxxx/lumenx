@@ -8,6 +8,9 @@
       "happyhorse-1.1-t2v": "happyhorse/happyhorse-1.1-t2v#t2v",
       "kling-v3-i2v": "kling/kling-v3-video#i2v",
       "kling-v3-r2v": "kling/kling-v3-video#r2v",
+      "minimax/h3-image": "minimax/minimax/h3-image#image",
+      "minimax/h3-image-highspeed": "minimax/minimax/h3-image-highspeed#image",
+      "minimax/image-01": "minimax/minimax/image-01#image",
       "pixverse-c1-i2v": "pixverse/pixverse-c1-video#i2v",
       "pixverse-c1-r2v": "pixverse/pixverse-c1-video#r2v",
       "pixverse-v4-i2v": "pixverse/pixverse-v4-i2v#i2v",
@@ -201,6 +204,50 @@
         "reference_video_input_mode": {
           "dashscope": "dashscope_temp_file_url",
           "vendor": "kling_vendor_video_url"
+        }
+      }
+    },
+    "minimax": {
+      "backend_env_key": null,
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "display_name": "MiniMax (海螺)",
+      "docs": {
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ]
+      },
+      "family": "minimax",
+      "models": [
+        "minimax/h3-image",
+        "minimax/h3-image-highspeed",
+        "minimax/image-01"
+      ],
+      "provider": "minimax",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "supported_backends": [
+        "vendor"
+      ],
+      "supported_modalities": [
+        "t2i",
+        "i2i"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
         }
       }
     },
@@ -812,6 +859,183 @@
         "reference_video_input_mode": {
           "dashscope": "dashscope_temp_file_url",
           "vendor": "kling_vendor_video_url"
+        }
+      }
+    },
+    "minimax/minimax/h3-image": {
+      "backend_env_key": null,
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax 旗舰级 4K 高画质图像大模型，支持多图参考 (H3 DiT 33.1B)",
+      "display_name": "MiniMax H3-Image",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "family": "minimax",
+      "id": "minimax/minimax/h3-image",
+      "legacy_model_ids": [
+        "minimax/h3-image"
+      ],
+      "modes": [
+        "minimax/minimax/h3-image#image"
+      ],
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "MiniMax-H3-Image",
+          "gateway": "minimax"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "supported_modalities": [
+        "t2i",
+        "i2i"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      }
+    },
+    "minimax/minimax/h3-image-highspeed": {
+      "backend_env_key": null,
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax H3-Image 高速版，出图速度翻倍，适合批量分镜探索与高性价比抽卡",
+      "display_name": "MiniMax H3-Image Highspeed",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "family": "minimax",
+      "id": "minimax/minimax/h3-image-highspeed",
+      "legacy_model_ids": [
+        "minimax/h3-image-highspeed"
+      ],
+      "modes": [
+        "minimax/minimax/h3-image-highspeed#image"
+      ],
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "MiniMax-H3-Image-Highspeed",
+          "gateway": "minimax"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "supported_modalities": [
+        "t2i",
+        "i2i"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      }
+    },
+    "minimax/minimax/image-01": {
+      "backend_env_key": null,
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax 早期轻量超低成本文生图模型 (¥0.025/张)",
+      "display_name": "MiniMax Image-01",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "family": "minimax",
+      "id": "minimax/minimax/image-01",
+      "legacy_model_ids": [
+        "minimax/image-01"
+      ],
+      "modes": [
+        "minimax/minimax/image-01#image"
+      ],
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "image-01",
+          "gateway": "minimax"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "supported_modalities": [
+        "t2i",
+        "i2i"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
         }
       }
     },
@@ -3094,6 +3318,241 @@
           "project_settings",
           "series_settings",
           "video_sidebar",
+          "global_settings"
+        ]
+      }
+    },
+    "minimax/h3-image": {
+      "backend_env_key": null,
+      "capabilities": [
+        "t2i",
+        "i2i"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax 旗舰级 4K 高画质图像大模型，支持多图参考 (H3 DiT 33.1B)",
+      "display_name": "MiniMax H3-Image",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "duration": null,
+      "family": "minimax",
+      "id": "minimax/h3-image",
+      "inputs": {},
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4",
+            "21:9"
+          ]
+        },
+        "promptOptimizer": {
+          "default": true
+        }
+      },
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "new",
+          "4k",
+          "recommended"
+        ],
+        "order": 88,
+        "recommended": false,
+        "selection_group": "image",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "global_settings"
+        ]
+      }
+    },
+    "minimax/h3-image-highspeed": {
+      "backend_env_key": null,
+      "capabilities": [
+        "t2i",
+        "i2i"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax H3-Image 高速版，出图速度翻倍，适合批量分镜探索与高性价比抽卡",
+      "display_name": "MiniMax H3-Image Highspeed",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "duration": null,
+      "family": "minimax",
+      "id": "minimax/h3-image-highspeed",
+      "inputs": {},
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4",
+            "21:9"
+          ]
+        },
+        "promptOptimizer": {
+          "default": true
+        }
+      },
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "highspeed",
+          "recommended"
+        ],
+        "order": 87,
+        "recommended": false,
+        "selection_group": "image",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "global_settings"
+        ]
+      }
+    },
+    "minimax/image-01": {
+      "backend_env_key": null,
+      "capabilities": [
+        "t2i"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax 早期轻量超低成本文生图模型 (¥0.025/张)",
+      "display_name": "MiniMax Image-01",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "duration": null,
+      "family": "minimax",
+      "id": "minimax/image-01",
+      "inputs": {},
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4"
+          ]
+        },
+        "promptOptimizer": {
+          "default": true
+        }
+      },
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "ultra-low-cost"
+        ],
+        "order": 86,
+        "recommended": false,
+        "selection_group": "image",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
           "global_settings"
         ]
       }
@@ -7161,6 +7620,268 @@
           "project_settings",
           "series_settings",
           "video_sidebar",
+          "global_settings"
+        ]
+      }
+    },
+    "minimax/minimax/h3-image#image": {
+      "backend_env_key": null,
+      "capabilities": [
+        "t2i",
+        "i2i"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax 旗舰级 4K 高画质图像大模型，支持多图参考 (H3 DiT 33.1B)",
+      "display_name": "MiniMax H3-Image",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "duration": null,
+      "family": "minimax",
+      "id": "minimax/minimax/h3-image#image",
+      "inputs": {},
+      "legacy_model_id": "minimax/h3-image",
+      "mode": "image",
+      "model_line_id": "minimax/minimax/h3-image",
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4",
+            "21:9"
+          ]
+        },
+        "promptOptimizer": {
+          "default": true
+        }
+      },
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "MiniMax-H3-Image",
+          "gateway": "minimax"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "new",
+          "4k",
+          "recommended"
+        ],
+        "order": 88,
+        "recommended": false,
+        "selection_group": "image",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "global_settings"
+        ]
+      }
+    },
+    "minimax/minimax/h3-image-highspeed#image": {
+      "backend_env_key": null,
+      "capabilities": [
+        "t2i",
+        "i2i"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax H3-Image 高速版，出图速度翻倍，适合批量分镜探索与高性价比抽卡",
+      "display_name": "MiniMax H3-Image Highspeed",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "duration": null,
+      "family": "minimax",
+      "id": "minimax/minimax/h3-image-highspeed#image",
+      "inputs": {},
+      "legacy_model_id": "minimax/h3-image-highspeed",
+      "mode": "image",
+      "model_line_id": "minimax/minimax/h3-image-highspeed",
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4",
+            "21:9"
+          ]
+        },
+        "promptOptimizer": {
+          "default": true
+        }
+      },
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "MiniMax-H3-Image-Highspeed",
+          "gateway": "minimax"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "highspeed",
+          "recommended"
+        ],
+        "order": 87,
+        "recommended": false,
+        "selection_group": "image",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "global_settings"
+        ]
+      }
+    },
+    "minimax/minimax/image-01#image": {
+      "backend_env_key": null,
+      "capabilities": [
+        "t2i"
+      ],
+      "credential_sources": {
+        "vendor": [
+          "MINIMAX_API_KEY"
+        ]
+      },
+      "default_backend": "vendor",
+      "description": "MiniMax 早期轻量超低成本文生图模型 (¥0.025/张)",
+      "display_name": "MiniMax Image-01",
+      "docs": {
+        "context_hub_doc_ids": [],
+        "official_snapshot_ids": [
+          "minimax/h3-image/2026-11-25"
+        ],
+        "repo_local_snapshot_paths": [
+          "docs/1-api-reference/minimax-image.md"
+        ]
+      },
+      "duration": null,
+      "family": "minimax",
+      "id": "minimax/minimax/image-01#image",
+      "inputs": {},
+      "legacy_model_id": "minimax/image-01",
+      "mode": "image",
+      "model_line_id": "minimax/minimax/image-01",
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4"
+          ]
+        },
+        "promptOptimizer": {
+          "default": true
+        }
+      },
+      "provider": "minimax",
+      "release_stage": "stable",
+      "routing_prefixes": [
+        "minimax-",
+        "minimax/"
+      ],
+      "runtime": {
+        "vendor": {
+          "api_model_id": "image-01",
+          "gateway": "minimax"
+        }
+      },
+      "status": "active",
+      "supported_backends": [
+        "vendor"
+      ],
+      "transport": {
+        "audio_input_mode": {
+          "vendor": "minimax_vendor_audio_url"
+        },
+        "image_input_mode": {
+          "vendor": "minimax_vendor_image_url"
+        },
+        "reference_video_input_mode": {
+          "vendor": "minimax_vendor_video_url"
+        }
+      },
+      "ui": {
+        "badges": [
+          "ultra-low-cost"
+        ],
+        "order": 86,
+        "recommended": false,
+        "selection_group": "image",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
           "global_settings"
         ]
       }
