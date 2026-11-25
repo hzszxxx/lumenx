@@ -1,6 +1,6 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, MapPin, Box, Check, X } from "lucide-react";
+import { Users, MapPin, Box, Check, X, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 export interface ExtractionPreview {
@@ -15,6 +15,7 @@ interface EntityConfirmModalProps {
     currentCounts: { characters: number; scenes: number; props: number };
     onConfirm: () => void;
     onDiscard: () => void;
+    isConfirming?: boolean;
     error?: string;
     discardLabel?: string;
 }
@@ -25,6 +26,7 @@ export default function EntityConfirmModal({
     currentCounts,
     onConfirm,
     onDiscard,
+    isConfirming = false,
     error,
     discardLabel,
 }: EntityConfirmModalProps) {
@@ -46,7 +48,7 @@ export default function EntityConfirmModal({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-[100] grid place-items-center bg-overlay backdrop-blur-sm"
-                    onClick={onDiscard}
+                    onClick={isConfirming ? undefined : onDiscard}
                 >
                     <motion.div
                         initial={{ scale: 0.96, opacity: 0 }}
@@ -102,18 +104,22 @@ export default function EntityConfirmModal({
                         {error && <p role="alert" className="px-6 pb-3 text-sm text-status-failed-fg">{error}</p>}
                         <footer className="flex items-center justify-end gap-3 px-6 py-4 border-t border-glass-border">
                             <button
+                                type="button"
                                 onClick={onDiscard}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors"
+                                disabled={isConfirming}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors disabled:opacity-50 disabled:pointer-events-none"
                             >
                                 <X size={14} />
                                 {discardLabel ?? t("extractDiscard")}
                             </button>
                             <button
+                                type="button"
                                 onClick={onConfirm}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+                                disabled={isConfirming}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:pointer-events-none"
                             >
-                                <Check size={14} />
-                                {t("extractApply")}
+                                {isConfirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                {isConfirming ? t("extractApplying") : t("extractApply")}
                             </button>
                         </footer>
                     </motion.div>

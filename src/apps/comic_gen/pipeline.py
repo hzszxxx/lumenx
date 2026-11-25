@@ -1055,7 +1055,7 @@ class ComicGenPipeline:
             cached = self._extraction_cache.pop(script_id, None)
             new_script = (
                 cached[2].model_copy(deep=True)
-                if cached and 0 <= time.time() - cached[0] < 300
+                if cached and 0 <= time.time() - cached[0] < 1800
                 and cached[1] == self._extraction_key(snapshot, text) else None
             )
         if new_script is None:

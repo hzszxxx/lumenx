@@ -326,12 +326,19 @@ function EntityExtractionConfirm() {
     const confirmExtraction = useProjectStore((s) => s.confirmExtraction);
     const discardExtraction = useProjectStore((s) => s.discardExtraction);
     const [failure, setFailure] = useState<{ sessionId: string; kind: PersistenceFailure } | null>(null);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     const handleConfirm = async () => {
+        if (isConfirming) return;
+        setIsConfirming(true);
         try {
             const acknowledged = await confirmExtraction();
             const environment = getRuntimeEnvironment();
-            if (!acknowledged || !owner || environment?.key !== owner.environment || environment.generation !== owner.generation) return;
+            if (!owner) {
+                discardExtraction();
+                return;
+            }
+            if (!acknowledged || environment?.key !== owner.environment || environment.generation !== owner.generation) return;
             const refreshed = useProjectStore.getState().currentProject;
             if (refreshed?.id !== owner.projectId) return;
             useScriptDraftStore.getState().acknowledgeExtraction(
@@ -350,10 +357,13 @@ function EntityExtractionConfirm() {
             if (kind === 'conflict') useScriptDraftStore.getState().markConflict(scriptDraftKey(owner.projectId));
             const { toast } = await import("@/store/toastStore");
             toast.error(ts("analysisFailedShort"));
+        } finally {
+            setIsConfirming(false);
         }
     };
 
     const handleDiscard = () => {
+        if (isConfirming) return;
         discardExtraction();
         import("@/store/toastStore").then(({ toast }) => toast.info(ts("extractionDiscarded")));
     };
@@ -369,6 +379,7 @@ function EntityExtractionConfirm() {
             }}
             onConfirm={handleConfirm}
             onDiscard={handleDiscard}
+            isConfirming={isConfirming}
             error={failure && failure.sessionId === owner?.sessionId ? tPersistence(failure.kind) : undefined}
             discardLabel={failure?.sessionId === owner?.sessionId && failure?.kind === 'conflict' ? ts('extractionReviewDraft') : undefined}
         />

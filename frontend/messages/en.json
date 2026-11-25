@@ -1230,6 +1230,7 @@
     "extractConfirmTitle": "Confirm Entity Extraction",
     "extractConfirmSubtitle": "Review extracted entities before applying to Cast. This will replace current entities.",
     "extractApply": "Apply to Cast",
+    "extractApplying": "Applying...",
     "extractDiscard": "Discard",
     "extractionDiscarded": "Extraction result discarded.",
     "entityKind_characters": "Characters",
