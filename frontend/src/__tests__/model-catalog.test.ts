@@ -55,7 +55,9 @@ describe('model catalog selectors', () => {
         // models so user picks (e.g. Wan 2.7 Image Pro) persist through
         // resolveModelId() instead of silently reverting to the default.
         expect(GLOBAL_T2I_MODELS.map((model) => model.id)).toEqual(GLOBAL_IMAGE_MODELS.map((m) => m.id));
-        expect(GLOBAL_I2I_MODELS.map((model) => model.id)).toEqual(GLOBAL_IMAGE_MODELS.map((m) => m.id));
+        expect(GLOBAL_I2I_MODELS.map((model) => model.id)).toEqual(
+            GLOBAL_IMAGE_MODELS.filter((model) => model.id !== 'minimax/image-01').map((m) => m.id)
+        );
 
         // Ordered DESC by ui.order; ties broken by display_name asc.
         expect(GLOBAL_I2V_MODELS.map((model) => model.id)).toEqual([

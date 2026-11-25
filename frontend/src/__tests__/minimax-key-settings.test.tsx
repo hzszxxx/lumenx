@@ -93,5 +93,24 @@ describe('MiniMax API Key Settings', () => {
     expect(h3Button).toBeInTheDocument();
     fireEvent.click(h3Button);
     expect(screen.getByText(/当前已启用为全局默认生图模型/)).toBeInTheDocument();
+
+    // Verify test key button for MiniMax
+    vi.mocked(api.testApiKey).mockResolvedValueOnce({
+      success: true,
+      message: '连接成功！MiniMax 开放平台响应正常',
+      latency_ms: 120,
+    });
+    const testButtons = screen.getAllByRole('button', { name: /测试有效性/ });
+    expect(testButtons.length).toBeGreaterThanOrEqual(2);
+    // Click the MiniMax test button (the second one)
+    fireEvent.click(testButtons[1]);
+    await waitFor(() => {
+      expect(api.testApiKey).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'minimax',
+          api_key: 'mm-existing-key',
+        })
+      );
+    });
   });
 });

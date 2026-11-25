@@ -430,6 +430,64 @@ export interface CameraMovementStructured {
     description?: string | null;
 }
 
+export interface XiangongyunInstance {
+    id: string;
+    name: string;
+    gpu_model: string;
+    status: string;
+    price_per_hour?: number;
+    ip?: string;
+    port?: number;
+}
+
+export interface XiangongyunBatchStatus {
+    batch_id: string;
+    project_id: string;
+    instance_id: string;
+    frame_ids: string[];
+    task_ids: string[];
+    auto_shutdown: boolean;
+    status: "queued" | "booting" | "running" | "completed" | "failed" | "cancelled";
+    current_step: string;
+    completed_count: number;
+    total_count: number;
+    error?: string | null;
+}
+
+export interface XiangongyunServerStatusResponse {
+    verified: boolean;
+    balance: number | null;
+    instances: XiangongyunInstance[];
+    active_batch: XiangongyunBatchStatus | null;
+    error?: string;
+}
+
+export interface XiangongyunBatchGenerateItem {
+    frame_id: string;
+    prompt?: string;
+    image_url?: string;
+    duration?: number;
+    resolution?: string;
+    generation_mode?: "r2v" | "i2v";
+    reference_image_urls?: string[];
+}
+
+export interface XiangongyunBatchGenerateRequest {
+    items: XiangongyunBatchGenerateItem[];
+    instance_id?: string;
+    auto_shutdown?: boolean;
+    model?: string;
+}
+
+export interface XiangongyunBatchGenerateResponse {
+    batch_id: string;
+    instance_id: string;
+    total_count: number;
+    task_ids: string[];
+    tasks: VideoTask[];
+    status: string;
+}
+
 export interface BlockingData {
     description?: string | null;
     stage?: Array<{
@@ -643,6 +701,37 @@ export const api = {
             ratio,
             watermark,
             workbench_tab: workbenchTab,
+        });
+        return res.data;
+    },
+
+    getXiangongyunServerStatus: async (projectId: string): Promise<XiangongyunServerStatusResponse> => {
+        const res = await axios.get(`${API_URL}/projects/${projectId}/xiangongyun/status`);
+        return res.data;
+    },
+
+    batchGenerateXiangongyun: async (
+        projectId: string,
+        data: XiangongyunBatchGenerateRequest
+    ): Promise<XiangongyunBatchGenerateResponse> => {
+        const res = await axios.post(`${API_URL}/projects/${projectId}/xiangongyun/batch_generate`, data);
+        return res.data;
+    },
+
+    getXiangongyunBatchStatus: async (
+        projectId: string,
+        batchId: string
+    ): Promise<XiangongyunBatchStatus> => {
+        const res = await axios.get(`${API_URL}/projects/${projectId}/xiangongyun/batch/${batchId}`);
+        return res.data;
+    },
+
+    shutdownXiangongyunServer: async (
+        projectId: string,
+        instanceId?: string
+    ): Promise<{ status: string; message?: string }> => {
+        const res = await axios.post(`${API_URL}/projects/${projectId}/xiangongyun/server/shutdown`, {
+            instance_id: instanceId,
         });
         return res.data;
     },

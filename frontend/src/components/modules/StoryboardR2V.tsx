@@ -34,6 +34,7 @@ import CandidatesSection from "./storyboard-r2v/shot-panel/CandidatesSection";
 import CompareModal from "./storyboard-r2v/shot-panel/CompareModal";
 import TaskQueueButton from "./storyboard-r2v/shot-panel/TaskQueueButton";
 import TaskQueuePanel, { canContinueProviderTask } from "./storyboard-r2v/shot-panel/TaskQueuePanel";
+import XiangongyunBatchBar from "./storyboard-r2v/XiangongyunBatchBar";
 import { GenerationBanner, type BannerState } from "./storyboard-r2v/GenerationBanner";
 import { FrameReadbackError, clearFrameEditFailures, frameEditFailure, frameEditsPending, frameRefiningKey, trackFrameEdit, useFrameCommand } from '@/lib/useFrameCommand';
 import { captureFrameEditRevision, enqueueFrameEdit, releaseFrameEditRevision, sendFrameRevisionEdit, type FrameEditRevision } from '@/lib/frameEditQueue';
@@ -377,6 +378,7 @@ function StoryboardR2VSession() {
     // intentionally don't localStorage this — it's transient "I want
     // to peek at queue" UI affordance, not a saved layout preference.
     const [queueOpen, setQueueOpen] = useState(false);
+    const [selectedShotIds, setSelectedShotIds] = useState<string[]>([]);
 
     // Compare-mode selection: a Set of task ids the user shift-clicked
     // in any shot's candidate panel. Multi-shot compare is a future
@@ -1994,6 +1996,36 @@ function StoryboardR2VSession() {
         ? (VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel)?.name ?? videoConfig.r2vModel)
         : (VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? (isProviderVideoModel(videoConfig.model) ? videoConfig.model : videoConfig.model));
 
+    const activeVideoModelId = isR2VWorkflow ? videoConfig.r2vModel : videoConfig.model;
+    const isXiangongyunModel = Boolean(
+        activeVideoModelId?.includes("xiangongyun") ||
+        activeVideoModelId?.includes("h3") ||
+        currentModelName?.toLowerCase().includes("仙宫云")
+    );
+
+    const handleToggleSelectShot = useCallback((shotId: string) => {
+        setSelectedShotIds((prev) => {
+            if (prev.includes(shotId)) {
+                return prev.filter((id) => id !== shotId);
+            }
+            if (prev.length >= 10) {
+                toast.warning("仙宫云单批次最多支持选择 10 个镜头");
+                return prev;
+            }
+            return [...prev, shotId];
+        });
+    }, []);
+
+    const handleSelectAllShots = useCallback((maxLimit = 10) => {
+        const candidateShots = shots.filter(s => s.videoStatus !== "completed");
+        const targets = candidateShots.length > 0 ? candidateShots : shots;
+        setSelectedShotIds(targets.slice(0, maxLimit).map((s) => s.id));
+    }, [shots]);
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedShotIds([]);
+    }, []);
+
     // ---- Project-level task derivations (drive Queue + Candidates) ----
     // We derive these via useMemo so per-render allocation is cheap and
     // children can rely on referentially-stable arrays (set-membership
@@ -2639,6 +2671,24 @@ function StoryboardR2VSession() {
                         </div>
                     </div>
                 )}
+                {isXiangongyunModel && currentProject && (
+                    <XiangongyunBatchBar
+                        projectId={currentProject.id}
+                        selectedShotIds={selectedShotIds}
+                        onSelectAllShots={handleSelectAllShots}
+                        onClearSelection={handleClearSelection}
+                        totalShotsCount={shots.length}
+                        shots={shots}
+                        currentModel={activeVideoModelId}
+                        duration={videoConfig.duration}
+                        resolution={videoConfig.resolution}
+                        onRefreshProject={() => {
+                            if (currentProject?.id) {
+                                void readProjectOnce(currentProject.id);
+                            }
+                        }}
+                    />
+                )}
                 {shots.map((shot, index) => {
                     const shotTasks = tasksForShot(shot);
                     const shotInFlight = shotTasks.filter(
@@ -2663,6 +2713,9 @@ function StoryboardR2VSession() {
                             characters={characters}
                             scenes={scenes}
                             props={props}
+                            showBatchCheckbox={isXiangongyunModel}
+                            isSelectedForBatch={selectedShotIds.includes(shot.id)}
+                            onToggleSelectForBatch={() => handleToggleSelectShot(shot.id)}
                             onUpdatePrompt={(prompt) => updatePrompt(index, prompt)}
                             onUpdateField={(field, value) => handleUpdateField(index, field, value)}
                             durationEditorConfig={durationEditorCfg}

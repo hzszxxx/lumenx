@@ -233,6 +233,12 @@ export default function SettingsPage() {
     message: string;
     latency_ms?: number;
   } | null>(null);
+  const [isTestingMinimax, setIsTestingMinimax] = useState(false);
+  const [minimaxTestResult, setMinimaxTestResult] = useState<{
+    success: boolean;
+    message: string;
+    latency_ms?: number;
+  } | null>(null);
 
   // ── Default Model Settings ──
   const [modelSettings, setModelSettings] = useState<FrontendModelSettings>(() =>
@@ -502,6 +508,30 @@ export default function SettingsPage() {
       toast.error(res.message);
     } finally {
       setIsTestingDashscope(false);
+    }
+  };
+
+  const handleTestMinimaxKey = async () => {
+    setIsTestingMinimax(true);
+    try {
+      const res = await api.testApiKey({
+        provider: "minimax",
+        api_key: config.MINIMAX_API_KEY,
+        base_url: config.endpoint_overrides?.MINIMAX_BASE_URL,
+      });
+      setMinimaxTestResult(res);
+      if (res.success) {
+        toast.success(res.message);
+      } else {
+        toast.error(res.message.split("\n")[0] || t("testKeyFailed"));
+      }
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message || t("testKeyFailed");
+      const res = { success: false, message: `测试请求失败: ${detail}` };
+      setMinimaxTestResult(res);
+      toast.error(res.message);
+    } finally {
+      setIsTestingMinimax(false);
     }
   };
 
@@ -1165,6 +1195,14 @@ export default function SettingsPage() {
               value={config.MINIMAX_API_KEY}
               onChange={(v) => setConfig((c) => ({ ...c, MINIMAX_API_KEY: v }))}
               placeholder="eyJhbGciOi..."
+              status={
+                config.MINIMAX_API_KEY?.trim()
+                  ? { kind: "ok", text: t("filled") }
+                  : { kind: "warn", text: t("notConfiguredUnavailable") }
+              }
+              onTest={handleTestMinimaxKey}
+              isTesting={isTestingMinimax}
+              testResult={minimaxTestResult}
             />
 
             {/* MiniMax 模型选择与默认生图模型设置 */}

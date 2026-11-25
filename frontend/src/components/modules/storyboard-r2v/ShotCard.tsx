@@ -173,6 +173,9 @@ interface ShotCardProps {
     onUnpinVideo?: () => void;
     /** Read-only compute route and cost preview; never submits generation. */
     onPreviewComputeRoute?: () => Promise<ComputeRoutePreview>;
+    showBatchCheckbox?: boolean;
+    isSelectedForBatch?: boolean;
+    onToggleSelectForBatch?: () => void;
 }
 
 export default function ShotCard({
@@ -208,6 +211,9 @@ export default function ShotCard({
     onRefineFrame,
     onUnpinVideo,
     onPreviewComputeRoute,
+    showBatchCheckbox,
+    isSelectedForBatch,
+    onToggleSelectForBatch,
 }: ShotCardProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -637,10 +643,20 @@ export default function ShotCard({
             />
 
             {/* Floating card body — mock-aligned glass surface */}
-            <div className="relative overflow-hidden rounded-[20px] border border-glass-border bg-surface shadow-[0_8px_30px_-10px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-base ease-out-quart group-hover:-translate-y-1 group-hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.07)] z-10">
+            <div className={`relative overflow-hidden rounded-[20px] border ${isSelectedForBatch ? "border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.22)]" : "border-glass-border"} bg-surface shadow-[0_8px_30px_-10px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-base ease-out-quart group-hover:-translate-y-1 group-hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.07)] z-10`}>
                 {/* Card top — shot no/cap + status badge + tab switcher */}
                 <div className="flex items-center justify-between gap-4 px-5 pt-4 pb-3">
                     <div className="flex items-center gap-3 min-w-0">
+                        {showBatchCheckbox && (
+                            <label className="flex items-center cursor-pointer p-1 -m-1" title="勾选加入仙宫云批量生成">
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(isSelectedForBatch)}
+                                    onChange={() => onToggleSelectForBatch?.()}
+                                    className="w-4 h-4 rounded border-slate-600 text-emerald-500 focus:ring-emerald-400/50 bg-slate-800 cursor-pointer"
+                                />
+                            </label>
+                        )}
                         <div className="font-display text-[1.875rem] font-semibold leading-none text-text-secondary tracking-tight">
                             {String(index + 1).padStart(2, "0")}
                         </div>
