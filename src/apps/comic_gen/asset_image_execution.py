@@ -1610,7 +1610,7 @@ class StudioAssetImageService:
         target = context['target']
         if dashscope_edit and (target.base_character_id or command.reference_source is not None):
             raise ValueError('studio_three_view_selected_local_reference_required')
-        if wan_edit and context['options']['negative_prompt']:
+        if wan_edit and command.negative_prompt:
             raise ValueError('studio_image_negative_prompt_not_supported')
         parent_reference = None
         if full_body and target.base_character_id:
@@ -1653,7 +1653,7 @@ class StudioAssetImageService:
                     or classify_media_ref(reference.url, output_root=str(self.pipeline.data_dir)) != MEDIA_REF_LOCAL_PATH):
                 raise ValueError(f'studio_{channel}_selected_local_reference_required')
             reference_url = reference.url
-        if full_body and context['options']['negative_prompt']:
+        if full_body and command.negative_prompt:
             raise ValueError('studio_gpt_image_negative_prompt_not_supported')
         size = context['options']['size'] if full_body else '1024x1024'
         if dashscope_edit:
@@ -1753,7 +1753,7 @@ class StudioAssetImageService:
         qwen_names = QWEN20_IMAGE_PROVIDER_MODELS | {f'qwen/{name}#image' for name in QWEN20_IMAGE_PROVIDER_MODELS}
         if options['model_name'] in wan_names:
             image_contract_version = WAN27_IMAGE_CONTRACT_VERSION
-            if options['negative_prompt']:
+            if command.negative_prompt:
                 raise ValueError('studio_image_negative_prompt_not_supported')
         elif options['model_name'] in qwen_names:
             image_contract_version = QWEN20_IMAGE_CONTRACT_VERSION
