@@ -975,9 +975,19 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     {(result.receipt?.request.members ?? Array.from({ length: result.journal.request.batch_size ?? 1 }, (_, index) => ({ attempt_id: `${result.journal.request.client_request_id}-${index}`, status: 'needs_confirmation' as const, output_ref: undefined }))).map((member, index) => <div key={member.attempt_id} data-testid="studio-image-member" className="flex items-center gap-2">
                                         {member.status === 'completed' && member.output_ref && <PreviewImage src={member.output_ref} alt={t('requestMember', { index: index + 1 })} className="h-12 w-12 rounded" clickToLightbox />}
                                         <span>{t('requestMember', { index: index + 1 })}</span><span>{t(member.status === 'cancelled' && result.receipt?.request.channel === 'image' ? 'requestNotGenerated' : `requestStatus.${member.status}`)}</span>
+                                        {(result.status === 'unknown' || !result.receipt) && studioRequests.dismiss && (
+                                            <button type="button" onClick={() => studioRequests.dismiss!(result)} className="text-[0.625rem] text-text-muted hover:text-danger ml-auto">清除</button>
+                                        )}
                                     </div>)}
                                 </div>)}
-                                {studioRequests.unknown && <p className="text-text-muted">{recovery('newRequest')}</p>}
+                                {studioRequests.unknown && <div className="flex items-center justify-between gap-2 pt-1 border-t border-glass-border">
+                                    <p className="text-text-muted">{recovery('newRequest')}</p>
+                                    {studioRequests.dismissAllUnknown && (
+                                        <button type="button" onClick={() => studioRequests.dismissAllUnknown!()} className="text-xs text-danger hover:underline cursor-pointer shrink-0">
+                                            清除待确认
+                                        </button>
+                                    )}
+                                </div>}
                                 {studioRequests.readFailed && <p role="status">{recovery('readFailed')}</p>}
                                 {studioRequests.submitFailed && <p role="status">{t('requestNotSubmitted')}</p>}
                                 {studioRequests.readbackFailed && <p role="status">{t('requestReadbackFailed')}</p>}

@@ -5,7 +5,7 @@ import { getRuntimeEnvironment, isCurrentRuntimeEnvironment, subscribeRuntimeEnv
 import { readProjectOnce } from '@/lib/projectReadback';
 import type { ImageVariant, Project } from '@/store/projectStore';
 import type { StudioAssetImageRequest } from '@/lib/studioAssetImageContract';
-import { listStudioAssetImageRequests, readStudioAssetImageRequestReceipt, resolveStudioAssetImageRequest,
+import { listStudioAssetImageRequests, readStudioAssetImageRequestReceipt, resolveStudioAssetImageRequest, dismissStudioAssetImageRequest,
     isStudioFullBodyEditRequest, isStudioGptImageModel, isStudioWanImageModel, isStudioQwenImageModel, storyboardImageRetentionProof, submitStudioAssetImageRequest, type StoredStudioAssetImageRequest, type StudioAssetImageReadResult, type StudioAssetImageRequestInput } from '@/lib/studioAssetImageRequest';
 
 type AssetKind = 'character' | 'scene' | 'prop' | 'storyboard_frame';
@@ -408,7 +408,23 @@ export function useStudioAssetImageRequests({ kind, channel = kind === 'characte
         catch { patch({ submitFailed: true }, lease); }
         finally { if (submitting.current === lease) submitting.current = null; patch({ submitting: false }, lease); }
     }, [live, environment, projectId, patch, consume, matchesTarget, kind, blockedResult]);
-    return { ...current, refresh, submit, canKeepResult, keepResult, keptResult,
+    const dismiss = useCallback((result: StudioAssetImageReadResult) => {
+        const lease = lifecycle.current;
+        if (!lease || !live(lease) || !environment || !projectId) return;
+        dismissStudioAssetImageRequest({ environment, rootKind: 'project', rootId: projectId, journal: result.journal });
+        void refresh(false);
+    }, [live, environment, projectId, refresh]);
+    const dismissAllUnknown = useCallback(() => {
+        const lease = lifecycle.current;
+        if (!lease || !live(lease) || !environment || !projectId) return;
+        for (const result of current.results) {
+            if (result.status === 'unknown' || !result.receipt) {
+                dismissStudioAssetImageRequest({ environment, rootKind: 'project', rootId: projectId, journal: result.journal });
+            }
+        }
+        void refresh(false);
+    }, [live, environment, projectId, current.results, refresh]);
+    return { ...current, refresh, submit, dismiss, dismissAllUnknown, canKeepResult, keepResult, keptResult,
         readbackFailed: kind === 'storyboard_frame' ? current.results.some(blockedResult) : current.readbackFailed,
         busy: current.submitting || current.results.some(pending),
         unknown: current.results.some(result => result.status === 'unknown' || result.receipt?.request.members.some(m => m.status === 'needs_confirmation')) };

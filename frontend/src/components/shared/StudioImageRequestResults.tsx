@@ -19,6 +19,9 @@ export default function StudioImageRequestResults({ requests }: { requests: Retu
             {(result.receipt?.request.members ?? Array.from({ length: result.journal.request.batch_size ?? 1 }, (_, index) => ({ attempt_id: `${result.journal.request.client_request_id}-${index}`, status: 'needs_confirmation' as const, output_ref: undefined }))).map((member, index) => <div key={member.attempt_id} className="flex items-center gap-2">
                 {member.status === 'completed' && member.output_ref && <PreviewImage src={member.output_ref} alt={t('requestMember', { index: index + 1 })} className="h-12 w-12 rounded" clickToLightbox />}
                 <span>{t('requestMember', { index: index + 1 })}</span><span>{t(member.status === 'cancelled' && result.receipt?.request.channel === 'image' ? 'requestNotGenerated' : `requestStatus.${member.status}`)}</span>
+                {(result.status === 'unknown' || !result.receipt) && requests.dismiss && (
+                    <button type="button" onClick={() => requests.dismiss!(result)} className="text-[0.625rem] text-text-muted hover:text-danger ml-auto">清除</button>
+                )}
             </div>)}
             {requests.canKeepResult?.(result) && <div className="space-y-1">
                 <p>{t('storyboardKeepResultHint')}</p>
@@ -27,7 +30,14 @@ export default function StudioImageRequestResults({ requests }: { requests: Retu
             </div>}
             {requests.keptResult?.(result) && <p role="status">{t('storyboardResultKept')}</p>}
         </div>)}
-        {requests.unknown && <p>{recovery('newRequest')}</p>}
+        {requests.unknown && <div className="flex items-center justify-between gap-2 pt-1 border-t border-glass-border">
+            <p className="text-text-muted">{recovery('newRequest')}</p>
+            {requests.dismissAllUnknown && (
+                <button type="button" onClick={() => requests.dismissAllUnknown!()} className="text-xs text-danger hover:underline cursor-pointer shrink-0">
+                    清除待确认
+                </button>
+            )}
+        </div>}
         {requests.readFailed && <p role="status">{recovery('readFailed')}</p>}
         {requests.submitFailed && <p role="status">{t('requestNotSubmitted')}</p>}
         {requests.readbackFailed && <p role="status">{t('requestReadbackFailed')}</p>}

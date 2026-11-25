@@ -433,8 +433,8 @@ export default function CharacterWorkbench({ asset, onClose, onUpdateDescription
 
     // New State for Style Control
     const [applyStyle, setApplyStyle] = useState(true);
-    // User's own negative prompt (initially empty or with sensible defaults)
-    const [negativePrompt, setNegativePrompt] = useState("low quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, jpeg artifacts, signature, watermark, blurry");
+    // User's own negative prompt (initially empty)
+    const [negativePrompt, setNegativePrompt] = useState("");
     // Art Direction Style expanded state (collapsed by default to save space)
     const [showStyleExpanded, setShowStyleExpanded] = useState(false);
     const inheritedStyleCurrent = currentSeries?.id === currentProject?.series_id && (!freshFullBody

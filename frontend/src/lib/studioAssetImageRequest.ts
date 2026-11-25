@@ -311,3 +311,12 @@ export function resolveStudioAssetImageRequest(options: ReadOptions & { receipt:
     catch { fail('storage_unavailable'); }
     return true;
 }
+export function dismissStudioAssetImageRequest(options: ReadOptions): void {
+    try {
+        current(options);
+        const storage = storageFor(options), name = key(options, options.journal.request.client_request_id);
+        storage.removeItem(name);
+    } catch {
+        // storage dismissal is best-effort
+    }
+}
