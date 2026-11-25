@@ -99,6 +99,7 @@ class LLMAdapter:
         *,
         timeout: Optional[float] = None,
         max_retries: Optional[int] = None,
+        enable_thinking: Optional[bool] = None,
     ) -> str:
         """
         Send a chat completion request and return the response content.
@@ -109,6 +110,7 @@ class LLMAdapter:
             response_format: Optional {"type": "json_object"} constraint
             timeout: Optional provider request timeout. Existing callers keep SDK defaults.
             max_retries: Optional provider retry count. Existing callers keep SDK defaults.
+            enable_thinking: Optional reasoning control for hybrid models. Defaults to False on DashScope.
 
         Returns:
             The assistant's response content as a string.
@@ -120,7 +122,7 @@ class LLMAdapter:
 
         # 显式 model override 路径：单次尝试，失败就抛。
         if model:
-            return self._chat_once(client, model, messages, response_format, timeout=timeout, max_retries=max_retries)
+            return self._chat_once(client, model, messages, response_format, timeout=timeout, max_retries=max_retries, enable_thinking=enable_thinking)
 
         # Provider 默认路径：DashScope 走 fallback chain，OpenAI 单次尝试。
         if self.provider == "openai":
@@ -131,6 +133,7 @@ class LLMAdapter:
                 response_format,
                 timeout=timeout,
                 max_retries=max_retries,
+                enable_thinking=enable_thinking,
             )
 
         last_err: Optional[Exception] = None
@@ -143,6 +146,7 @@ class LLMAdapter:
                     response_format,
                     timeout=timeout,
                     max_retries=max_retries,
+                    enable_thinking=enable_thinking,
                 )
             except RuntimeError as e:
                 # 仅在 "模型不存在 / 不可用" 类错误时回退；其他错误（鉴权、限流、网络）
@@ -240,6 +244,7 @@ class LLMAdapter:
         max_completion_tokens: int,
         timeout: float,
         response_format: Optional[Dict[str, str]],
+        enable_thinking: Optional[bool] = None,
     ):
         kwargs: Dict[str, Any] = {
             "model": model,
@@ -248,6 +253,9 @@ class LLMAdapter:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        if self.provider != "openai":
+            thinking = enable_thinking if enable_thinking is not None else False
+            kwargs["extra_body"] = {"enable_thinking": thinking}
         request_client = client.with_options(timeout=timeout, max_retries=0)
         return request_client.chat.completions.create(**kwargs)
 
@@ -285,6 +293,7 @@ class LLMAdapter:
         *,
         timeout: Optional[float] = None,
         max_retries: Optional[int] = None,
+        enable_thinking: Optional[bool] = None,
     ) -> str:
         kwargs: Dict[str, Any] = {
             "model": model,
@@ -292,6 +301,9 @@ class LLMAdapter:
         }
         if response_format:
             kwargs["response_format"] = response_format
+        if self.provider != "openai":
+            thinking = enable_thinking if enable_thinking is not None else False
+            kwargs["extra_body"] = {"enable_thinking": thinking}
 
         request_client = client
         if timeout is not None or max_retries is not None:

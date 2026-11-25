@@ -305,3 +305,23 @@ def test_legacy_chat_fallback_and_string_return_stay_unchanged(monkeypatch):
 
     assert adapter.chat([{"role": "user", "content": "hello"}]) == "legacy-ok"
     assert [request["model"] for request in client.requests] == ["qwen3.7-plus", "qwen3.6-plus"]
+    assert client.requests[0]["extra_body"] == {"enable_thinking": False}
+
+
+def test_chat_passes_enable_thinking_to_dashscope(monkeypatch):
+    client = FakeCompletionClient(responses=[response(content="ok")])
+    install_openai(monkeypatch, client)
+    adapter = LLMAdapter(env={"DASHSCOPE_API_KEY": "dashscope-key"})
+
+    adapter.chat([{"role": "user", "content": "hello"}], enable_thinking=True)
+    assert client.requests[0]["extra_body"] == {"enable_thinking": True}
+
+
+def test_chat_does_not_pass_extra_body_to_openai(monkeypatch):
+    client = FakeCompletionClient(responses=[response(content="ok")])
+    install_openai(monkeypatch, client)
+    adapter = LLMAdapter(env={"LLM_PROVIDER": "openai", "OPENAI_API_KEY": "openai-key"})
+
+    adapter.chat([{"role": "user", "content": "hello"}])
+    assert "extra_body" not in client.requests[0]
+
