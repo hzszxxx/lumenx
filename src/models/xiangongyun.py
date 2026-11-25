@@ -149,7 +149,7 @@ class XiangongyunH3Model(VideoGenModel):
             endpoint = self.find_running_instance_endpoint() or ""
 
         # Simulation / offline test fallback
-        if self.simulate or not endpoint:
+        if self.simulate:
             logger.info("Xiangongyun H3 running in simulation/offline mode")
             if os.path.isfile(FIXTURE_MP4_PATH):
                 shutil.copy2(FIXTURE_MP4_PATH, output_path)
@@ -158,6 +158,11 @@ class XiangongyunH3Model(VideoGenModel):
                     f.write(MINIMAL_MP4_BYTES)
             elapsed = time.time() - start_time
             return output_path, elapsed
+
+        if not endpoint:
+            if not self.access_token:
+                raise RuntimeError("仙宫云 H3 模型未配置 Access Token 或 Endpoint，请先在平台凭证中绑定仙宫云账号。")
+            raise RuntimeError("仙宫云账号下未检测到运行中的 GPU 实例（实例列表为空）。请先在仙宫云控制台启动 H3 算力实例，或切换为 Wan / Kling 等云端模型。")
 
         # Live API dispatch
         image_payload = self._resolve_image_input(img_path or img_url)

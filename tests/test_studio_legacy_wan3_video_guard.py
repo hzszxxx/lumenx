@@ -78,3 +78,12 @@ def test_legacy_video_tasks_r2v_reconciles_reference_urls(tmp_path, monkeypatch)
         assert saved.video_tasks[0].reference_video_urls == []
     runtime.close()
 
+
+def test_xiangongyun_model_raises_when_no_running_instance(tmp_path, monkeypatch):
+    from src.models.xiangongyun import XiangongyunH3Model
+    model = XiangongyunH3Model({'access_token': 'test_token', 'endpoint': ''}, env={})
+    monkeypatch.setattr(model, 'find_running_instance_endpoint', lambda: None)
+    with pytest.raises(RuntimeError, match='仙宫云账号下未检测到运行中的 GPU 实例'):
+        model.generate(prompt='test', output_path=str(tmp_path / 'test.mp4'))
+
+
