@@ -4917,7 +4917,7 @@ def get_xiangongyun_server_status(
     from ...models.xiangongyun_manager import XiangongyunClient, batch_registry
     token = None
     platform = getattr(request.app.state, "platform_service", None)
-    actor = getattr(request.state, "platform_actor", None)
+    actor = get_request_user(request)
     if platform and actor:
         try:
             token = platform.resolve_xiangongyun_token(actor)
@@ -4997,7 +4997,7 @@ def create_xiangongyun_batch(
 
     token = None
     platform = getattr(request.app.state, "platform_service", None)
-    actor = getattr(request.state, "platform_actor", None)
+    actor = get_request_user(request)
     if platform and actor:
         try:
             token = platform.resolve_xiangongyun_token(actor)
@@ -5121,7 +5121,7 @@ def shutdown_xiangongyun_server(
     from ...models.xiangongyun_manager import XiangongyunClient
     token = None
     platform = getattr(request.app.state, "platform_service", None)
-    actor = getattr(request.state, "platform_actor", None)
+    actor = get_request_user(request)
     if platform and actor:
         try:
             token = platform.resolve_xiangongyun_token(actor)
