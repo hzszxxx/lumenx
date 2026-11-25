@@ -255,6 +255,17 @@ class WanxImageModel(ImageGenModel):
         logger.info(f"Create task response status: {response.status_code}")
         logger.info(f"Create task response body: {response.text[:500]}")
 
+        if response.status_code == 403 and model_name.startswith('wan2.7-image'):
+            try:
+                err_code = response.json().get('code')
+            except Exception:
+                err_code = None
+            if err_code == 'AccessDenied.Unpurchased':
+                fallback_model = 'wan2.6-image' if ref_image_paths else 'wan2.6-t2i'
+                logger.warning(f"Model {model_name} unpurchased, falling back to {fallback_model}")
+                payload["model"] = fallback_model
+                response = requests.post(create_url, headers=headers, json=payload, timeout=120)
+
         if response.status_code != 200:
             error_data = response.json() if response.text else {}
             error_msg = error_data.get('message', response.text)

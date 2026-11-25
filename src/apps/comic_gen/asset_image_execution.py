@@ -943,8 +943,8 @@ class StudioAssetImageService:
             raise
         except AssetImageRequestNotFound:
             return False
-        except Exception:
-            logger.warning('Studio image member stopped (%s, submitted=%s)', execution.attempt_id, started)
+        except Exception as exc:
+            logger.warning('Studio image member stopped (%s, submitted=%s): %s', execution.attempt_id, started, exc, exc_info=True)
             return False if _requires_complete_batch(original) else started
 
     def _image_owner(self, record):

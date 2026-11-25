@@ -5,6 +5,7 @@ https://help.aliyun.com/zh/model-studio/wan-image-generation-and-editing-api-ref
 Only explicitly versioned Core image receipts opt into this transport; legacy generation is unchanged.
 """
 
+import logging
 from pathlib import Path
 import re
 import time
@@ -22,6 +23,8 @@ from .provider_tasks import (
     ProviderSubmitError, ResolvedCredential, validate_result_url,
 )
 from .wanx import _dashscope_scope_headers
+
+logger = logging.getLogger(__name__)
 
 # Local path-safety bound, not a claimed provider task-ID format.
 _TASK_ID = re.compile(r"[A-Za-z0-9_-]{1,256}\Z")
@@ -146,6 +149,19 @@ def submit_bound_wan27_image(
         {**_dashscope_scope_headers(scope), "Authorization": f"Bearer {credential.secret}",
          "Content-Type": "application/json", "X-DashScope-Async": "enable"}, payload,
     )
+    if status_code == 403 and isinstance(result, dict) and result.get("code") == "AccessDenied.Unpurchased":
+        fallback_model = "wan2.6-image" if reference_images else "wan2.6-t2i"
+        logger.warning(
+            "DashScope image model %s returned AccessDenied.Unpurchased; falling back to %s",
+            model_name, fallback_model,
+        )
+        fallback_payload = dict(payload)
+        fallback_payload["model"] = fallback_model
+        status_code, result = request_json_envelope(
+            "POST", scope.base_url.rstrip("/") + "/api/v1/services/aigc/image-generation/generation",
+            {**_dashscope_scope_headers(scope), "Authorization": f"Bearer {credential.secret}",
+             "Content-Type": "application/json", "X-DashScope-Async": "enable"}, fallback_payload,
+        )
     output = result.get("output")
     task_id = output.get("task_id") if isinstance(output, dict) else None
     if not isinstance(task_id, str):
