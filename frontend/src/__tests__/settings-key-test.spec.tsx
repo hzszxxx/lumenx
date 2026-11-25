@@ -41,9 +41,10 @@ beforeEach(() => {
 });
 
 describe('SettingsPage API Key Testing', () => {
-  it('renders the test button next to DashScope key field', async () => {
+  it('renders the test button next to DashScope key field and MiniMax key field', async () => {
     await renderApiKeys();
-    expect(screen.getByRole('button', { name: '测试有效性' })).toBeInTheDocument();
+    const testBtns = screen.getAllByRole('button', { name: '测试有效性' });
+    expect(testBtns.length).toBeGreaterThanOrEqual(2);
   });
 
   it('calls api.testApiKey and displays success message and latency', async () => {
@@ -54,7 +55,7 @@ describe('SettingsPage API Key Testing', () => {
     });
 
     await renderApiKeys();
-    const testBtn = screen.getByRole('button', { name: '测试有效性' });
+    const testBtn = screen.getAllByRole('button', { name: '测试有效性' })[0];
     fireEvent.click(testBtn);
 
     await waitFor(() => {
@@ -79,7 +80,7 @@ describe('SettingsPage API Key Testing', () => {
     });
 
     await renderApiKeys();
-    const testBtn = screen.getByRole('button', { name: '测试有效性' });
+    const testBtn = screen.getAllByRole('button', { name: '测试有效性' })[0];
     fireEvent.click(testBtn);
 
     await waitFor(() => {
@@ -96,7 +97,7 @@ describe('SettingsPage API Key Testing', () => {
     });
 
     await renderApiKeys();
-    const testBtn = screen.getByRole('button', { name: '测试有效性' });
+    const testBtn = screen.getAllByRole('button', { name: '测试有效性' })[0];
     fireEvent.click(testBtn);
 
     await waitFor(() => {

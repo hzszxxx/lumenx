@@ -571,7 +571,7 @@ export default function EnvConfigDialog({ isOpen, onClose }: EnvConfigDialogProp
                       type="password"
                       value={config.MINIMAX_API_KEY}
                       onChange={(e) => handleChange("MINIMAX_API_KEY", e.target.value)}
-                      placeholder="eyJhbGciOi..."
+                      placeholder="如: sk-cp-... (M Plan订阅) 或 sk-..."
                       className={inputClass}
                     />
                   </div>

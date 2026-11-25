@@ -26,6 +26,7 @@ from .image import ImageGenModel
 logger = logging.getLogger(__name__)
 
 DEFAULT_MINIMAX_BASE_URL = "https://api.minimaxi.chat"
+DEFAULT_MINIMAX_MPLAN_BASE_URL = "https://api.minimaxi.com"
 
 # Minimal 1x1 transparent PNG for simulation / offline tests
 MINIMAL_PNG_BYTES = (
@@ -204,13 +205,52 @@ class MinimaxImageModel(ImageGenModel):
             "Accept": "application/json",
         }
 
-        endpoint = f"{self.base_url}/v1/image_generation"
-        logger.info(f"Calling MiniMax image generation: model={api_model_id}, aspect_ratio={aspect_ratio}")
+        # 确定端点列表：支持 M Plan 订阅 Key (sk-cp-) 自动切换到 api.minimaxi.com / api.minimax.io
+        is_subscription_key = api_key.startswith("sk-cp-")
+        has_custom_base = bool(self.config.get("base_url") or self._env.get("MINIMAX_BASE_URL"))
+        if has_custom_base:
+            candidate_endpoints = [f"{self.base_url.rstrip('/')}/v1/image_generation"]
+        elif is_subscription_key:
+            candidate_endpoints = [
+                f"{DEFAULT_MINIMAX_MPLAN_BASE_URL}/v1/image_generation",
+                "https://api.minimax.io/v1/image_generation",
+            ]
+        else:
+            candidate_endpoints = [
+                f"{self.base_url.rstrip('/')}/v1/image_generation",
+                f"{DEFAULT_MINIMAX_MPLAN_BASE_URL}/v1/image_generation",
+            ]
 
-        resp = requests.post(endpoint, json=payload, headers=headers, timeout=120)
-        if resp.status_code != 200:
+        logger.info(
+            f"Calling MiniMax image generation: model={api_model_id}, aspect_ratio={aspect_ratio}, "
+            f"is_subscription={is_subscription_key}"
+        )
+
+        resp = None
+        last_err = None
+        for endpoint in candidate_endpoints:
+            try:
+                resp = requests.post(endpoint, json=payload, headers=headers, timeout=120)
+                if resp.status_code == 200:
+                    break
+                elif resp.status_code in (401, 403) and len(candidate_endpoints) > 1:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                    continue
+                else:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                    break
+            except Exception as e:
+                last_err = str(e)
+                continue
+
+        if resp is None or resp.status_code != 200:
+            if is_subscription_key and (resp is not None and resp.status_code in (401, 403)):
+                raise RuntimeError(
+                    f"MiniMax 生图认证失败 ({resp.status_code})：您的 Key 为 M Plan 订阅 Key (sk-cp-)，"
+                    f"系统已自动尝试连接官方订阅端点。请检查 M Plan Explore 订阅是否有效。详情: {last_err}"
+                )
             raise RuntimeError(
-                f"MiniMax image generation failed with HTTP {resp.status_code}: {resp.text[:300]}"
+                f"MiniMax image generation failed: {last_err or (f'HTTP {resp.status_code}' if resp else 'No response')}"
             )
 
         res_json = resp.json()

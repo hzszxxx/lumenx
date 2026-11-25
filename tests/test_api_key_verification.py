@@ -130,7 +130,8 @@ def test_unsupported_provider(api_client):
 def test_minimax_test_key_success(api_client):
     mock_resp = Mock()
     mock_resp.status_code = 200
-    with patch("requests.get", return_value=mock_resp):
+    mock_resp.json.return_value = {"data": [{"id": "MiniMax-H3-Image"}]}
+    with patch("requests.get", return_value=mock_resp) as mock_get:
         resp = api_client.post("/config/test-key", json={
             "provider": "minimax",
             "api_key": "minimax-test-key",
@@ -139,6 +140,56 @@ def test_minimax_test_key_success(api_client):
         data = resp.json()
         assert data["success"] is True
         assert "连接成功" in data["message"]
+        # Standard key starts with api.minimaxi.chat
+        assert mock_get.call_args[0][0] == "https://api.minimaxi.chat/v1/models"
+
+
+def test_minimax_subscription_key_mplan_auto_route(api_client):
+    mock_resp = Mock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"data": [{"id": "MiniMax-H3-Image"}, {"id": "image-01"}]}
+    with patch("requests.get", return_value=mock_resp) as mock_get:
+        resp = api_client.post("/config/test-key", json={
+            "provider": "minimax",
+            "api_key": "sk-cp-SdhUg1234567890efQg3k",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert "MiniMax M Plan (sk-cp) 订阅套餐" in data["message"]
+        assert data["details"]["plan_type"] == "M Plan Subscription"
+        # M Plan subscription key automatically routes to api.minimaxi.com
+        assert mock_get.call_args[0][0] == "https://api.minimaxi.com/v1/models"
+
+
+def test_minimax_subscription_key_fallback_to_io(api_client):
+    fail_resp = Mock(status_code=401, text="Unauthorized")
+    ok_resp = Mock(status_code=200)
+    ok_resp.json.return_value = {"data": [{"id": "MiniMax-H3-Image"}]}
+    with patch("requests.get", side_effect=[fail_resp, ok_resp]) as mock_get:
+        resp = api_client.post("/config/test-key", json={
+            "provider": "minimax",
+            "api_key": "sk-cp-international-key",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["details"]["endpoint"] == "https://api.minimax.io/v1/models"
+        assert mock_get.call_count == 2
+
+
+def test_minimax_subscription_key_failed_with_clear_hint(api_client):
+    fail_resp = Mock(status_code=401, text="Unauthorized")
+    with patch("requests.get", return_value=fail_resp):
+        resp = api_client.post("/config/test-key", json={
+            "provider": "minimax",
+            "api_key": "sk-cp-invalid-key",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is False
+        assert "M Plan Explore" in data["message"]
+        assert "sk-cp-" in data["message"]
 
 
 def test_minimax_missing_key(api_client):

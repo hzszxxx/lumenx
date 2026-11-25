@@ -3115,35 +3115,94 @@ def test_api_key(payload: TestKeyRequest, request: Request):
                 "message": "未检测到 MiniMax API Key，请先输入密钥或保存后再测试",
             }
 
-        base_url = (payload.base_url or "").strip() or (env.get("MINIMAX_BASE_URL", "") or "").strip() or "https://api.minimaxi.chat"
-        endpoint = f"{base_url.rstrip('/')}/v1/models"
+        # 判断是否为 M Plan 订阅 Key (sk-cp-)
+        is_subscription_key = candidate_key.startswith("sk-cp-")
+
+        # 确定候选 API 端点列表
+        user_base = (payload.base_url or "").strip() or (env.get("MINIMAX_BASE_URL", "") or "").strip()
+        if user_base:
+            candidate_bases = [user_base]
+        elif is_subscription_key:
+            # M Plan 订阅 Key 优先走国内站点 api.minimaxi.com，备选国际站点 api.minimax.io
+            candidate_bases = ["https://api.minimaxi.com", "https://api.minimax.io"]
+        else:
+            # 普通按量付费 Key 优先 api.minimaxi.chat，备选国内站点与国际站点
+            candidate_bases = ["https://api.minimaxi.chat", "https://api.minimaxi.com", "https://api.minimax.io"]
+
         import requests
         start_t = time.time()
-        try:
-            resp = requests.get(endpoint, headers={"Authorization": f"Bearer {candidate_key}"}, timeout=10.0)
-            latency = int((time.time() - start_t) * 1000)
-            if resp.status_code == 200:
-                return {
-                    "success": True,
-                    "message": "连接成功！MiniMax 开放平台响应正常",
-                    "latency_ms": latency,
-                    "details": {"endpoint": endpoint},
-                }
-            elif resp.status_code in (401, 403):
+        last_status = None
+        last_error = None
+        last_endpoint = None
+
+        for base in candidate_bases:
+            endpoint = f"{base.rstrip('/')}/v1/models"
+            last_endpoint = endpoint
+            try:
+                resp = requests.get(endpoint, headers={"Authorization": f"Bearer {candidate_key}"}, timeout=10.0)
+                last_status = resp.status_code
+                if resp.status_code == 200:
+                    latency = int((time.time() - start_t) * 1000)
+                    model_count = 0
+                    try:
+                        data = resp.json()
+                        model_count = len(data.get("data") or [])
+                    except Exception:
+                        pass
+
+                    plan_title = "MiniMax M Plan (sk-cp) 订阅套餐" if is_subscription_key else "MiniMax 开放平台"
+                    msg = f"连接成功！{plan_title}响应正常"
+                    if model_count > 0:
+                        msg += f"（已就绪 {model_count} 个模型接口）"
+
+                    return {
+                        "success": True,
+                        "message": msg,
+                        "latency_ms": latency,
+                        "details": {
+                            "endpoint": endpoint,
+                            "plan_type": "M Plan Subscription" if is_subscription_key else "Pay-as-you-go / Standard",
+                            "model_count": model_count,
+                        },
+                    }
+                elif resp.status_code in (401, 403):
+                    last_error = f"HTTP {resp.status_code}"
+                    continue
+                else:
+                    last_error = f"HTTP {resp.status_code}: {resp.text[:150]}"
+                    continue
+            except Exception as exc:
+                last_error = f"网络请求异常: {str(exc)}"
+                continue
+
+        if last_status in (401, 403):
+            if is_subscription_key:
                 return {
                     "success": False,
-                    "message": f"密钥认证失败 (HTTP {resp.status_code})：请确认 MiniMax API Key 是否正确",
+                    "message": (
+                        f"密钥认证失败 (HTTP {last_status})：已自动适配 MiniMax M Plan 订阅端点 ({', '.join(candidate_bases)})。\n"
+                        "请确认：\n"
+                        "1. 您的 M Plan Explore 订阅当前处于生效中；\n"
+                        "2. 填写的 Key 与官网复制的订阅 Key (以 sk-cp- 开头) 完全一致；\n"
+                        "3. 若您的账户属于特定专有集群，可在下方【高级 · API 端点】显式指定 Base URL。"
+                    ),
+                    "details": {"candidate_bases": candidate_bases, "key_prefix": candidate_key[:8] + "..."},
                 }
             else:
                 return {
                     "success": False,
-                    "message": f"MiniMax 接口返回 HTTP {resp.status_code}: {resp.text[:200]}",
+                    "message": (
+                        f"密钥认证失败 (HTTP {last_status})：请确认 MiniMax API Key 是否正确。\n"
+                        "提示：MiniMax 订阅套餐（M Plan）与普通按量付费 API Key 不可互换。若您购买的是 M Plan 订阅套餐，请在控制台复制以 sk-cp- 开头的订阅 Key。"
+                    ),
+                    "details": {"candidate_bases": candidate_bases},
                 }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"连接 MiniMax 失败：{str(e)}",
-            }
+
+        return {
+            "success": False,
+            "message": f"连接 MiniMax 端点失败：{last_error or '未知错误'}",
+            "details": {"endpoint": last_endpoint, "candidate_bases": candidate_bases},
+        }
 
     return {
         "success": False,

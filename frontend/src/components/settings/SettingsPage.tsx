@@ -1189,12 +1189,12 @@ export default function SettingsPage() {
             </details>
           </FormRow>
 
-          <FormRow label="MiniMax 开放平台" hint="配置 MiniMax API Key，支持 H3-Image 旗舰图像大模型与超低成本 Image-01">
+          <FormRow label="MiniMax 开放平台" hint="配置 MiniMax API Key，支持 H3-Image 旗舰图像大模型与超低成本 Image-01。全面兼容 M Plan Explore 订阅套餐 (sk-cp-...) 与按量付费 Key">
             <FieldLabel>MINIMAX_API_KEY</FieldLabel>
             <KeyField
               value={config.MINIMAX_API_KEY}
               onChange={(v) => setConfig((c) => ({ ...c, MINIMAX_API_KEY: v }))}
-              placeholder="eyJhbGciOi..."
+              placeholder="如: sk-cp-... (M Plan订阅) 或 sk-..."
               status={
                 config.MINIMAX_API_KEY?.trim()
                   ? { kind: "ok", text: t("filled") }
@@ -1204,6 +1204,9 @@ export default function SettingsPage() {
               isTesting={isTestingMinimax}
               testResult={minimaxTestResult}
             />
+            <p className="text-[0.6875rem] text-text-muted mt-1.5">
+              🛡️ 支持 MiniMax M Plan Explore 订阅套餐（以 <code className="text-primary font-mono font-semibold">sk-cp-</code> 开头的订阅 Key）与按量付费 Key，系统会自动识别并适配官方端点。
+            </p>
 
             {/* MiniMax 模型选择与默认生图模型设置 */}
             <div className="mt-4 pt-3.5 border-t border-glass-border space-y-2.5">

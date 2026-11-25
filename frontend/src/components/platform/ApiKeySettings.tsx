@@ -310,7 +310,7 @@ export default function ApiKeySettings() {
                 <input
                   type={visibleFields.MINIMAX_API_KEY ? "text" : "password"}
                   className="glass-input w-full pr-10 font-mono text-xs"
-                  placeholder="如: eyJhbGciOi..."
+                  placeholder="如: sk-cp-... (M Plan订阅) 或 sk-..."
                   value={(config as Record<string, string>).MINIMAX_API_KEY || ""}
                   onChange={(e) => handleChange("MINIMAX_API_KEY", e.target.value)}
                 />
@@ -323,6 +323,7 @@ export default function ApiKeySettings() {
                 </button>
               </div>
               <p className="text-[0.6875rem] text-text-muted mt-1">
+                🛡️ 全面支持 M Plan Explore 订阅套餐（以 sk-cp- 开头的订阅 Key）及普通按量付费 Key，系统将自动识别并适配端点。<br />
                 💡 多用户隔离说明：此处为主站全局兜底密钥。若各用户需使用个人 MiniMax 额度，请在【
                 <a href="#/platform?section=compute" className="text-primary hover:underline font-medium">
                   算力与凭证 (BYOK)

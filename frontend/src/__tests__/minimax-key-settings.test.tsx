@@ -56,7 +56,7 @@ describe('MiniMax API Key Settings', () => {
       expect(screen.getByText('MiniMax 开放平台 · 图像大模型')).toBeInTheDocument();
     });
 
-    const minimaxInput = screen.getByPlaceholderText('如: eyJhbGciOi...');
+    const minimaxInput = screen.getByPlaceholderText(/如: sk-cp-/);
     expect(minimaxInput).toBeInTheDocument();
 
     fireEvent.change(minimaxInput, { target: { value: 'minimax-secret-key-xyz' } });
