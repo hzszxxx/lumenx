@@ -56,7 +56,7 @@ function seed(current: Project = project()) {
 }
 
 function extractButton() {
-    return screen.getByRole('button', { name: /提取实体|智能分析中/ });
+    return screen.getByRole('button', { name: /提取实体|提取角色\/场景\/道具|智能分析中/ });
 }
 
 beforeEach(() => {
