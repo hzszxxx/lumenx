@@ -89,7 +89,23 @@ class StoryboardGenerator:
         self.output_root = self.config.get('output_root') or _default_output_root(self.output_dir, "storyboard")
         model_config = dict(self.config.get('model') or {})
         model_config.setdefault('output_root', self.output_root)
+        self.model_config = model_config
         self.model = WanxImageModel(model_config, **({"env": self._env} if self._env is not None else {}))
+        self._mulerouter_image_model = None
+        self._minimax_image_model = None
+
+    def _get_model_for(self, model_name: Optional[str]) -> "WanxImageModel":
+        if model_name and model_name.startswith("gpt-image"):
+            if self._mulerouter_image_model is None:
+                from ...models.mulerouter import MuleRouterImageModel
+                self._mulerouter_image_model = MuleRouterImageModel(self.model_config, **({"env": self._env} if self._env is not None else {}))
+            return self._mulerouter_image_model
+        if model_name and (model_name.startswith("minimax") or model_name.startswith("image-01")):
+            if self._minimax_image_model is None:
+                from ...models.minimax_image import MinimaxImageModel
+                self._minimax_image_model = MinimaxImageModel(self.model_config, **({"env": self._env} if self._env is not None else {}))
+            return self._minimax_image_model
+        return self.model
 
     def _check_storage(self, check_current: Optional[Callable[[], None]] = None) -> None:
         if self._before_generation is not None:
@@ -209,7 +225,7 @@ class StoryboardGenerator:
                 # Pass collected asset paths to model
                 logger.info(f"[Storyboard] Calling model.generate with {len(asset_ref_paths)} reference images using model {model_name or 'default'}")
                 self._check_storage(check_current)
-                self.model.generate(prompt, output_path, ref_image_paths=asset_ref_paths, size=effective_size, model_name=model_name)
+                self._get_model_for(model_name).generate(prompt, output_path, ref_image_paths=asset_ref_paths, size=effective_size, model_name=model_name)
                 self._check_storage(check_current)
                 
                 # Store relative path for frontend serving

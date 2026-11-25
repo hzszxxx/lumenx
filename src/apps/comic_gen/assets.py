@@ -284,6 +284,7 @@ class AssetGenerator:
         self.model_config.setdefault('output_root', self.output_root)
         self.model = WanxImageModel(self.model_config, **({"env": self._env} if self._env is not None else {}))
         self._mulerouter_image_model = None
+        self._minimax_image_model = None
 
     def _check_generation_allowed(self, check_current: Optional[Callable[[], None]] = None) -> None:
         if self.before_generation is not None:
@@ -343,6 +344,11 @@ class AssetGenerator:
                 from ...models.mulerouter import MuleRouterImageModel
                 self._mulerouter_image_model = MuleRouterImageModel(self.model_config, **({"env": self._env} if self._env is not None else {}))
             return self._mulerouter_image_model
+        if model_name and (model_name.startswith("minimax") or model_name.startswith("image-01")):
+            if self._minimax_image_model is None:
+                from ...models.minimax_image import MinimaxImageModel
+                self._minimax_image_model = MinimaxImageModel(self.model_config, **({"env": self._env} if self._env is not None else {}))
+            return self._minimax_image_model
         return self.model
 
     def generate_character(self, character: Character, generation_type: str = "all", prompt: str = "", positive_prompt: str = None, negative_prompt: str = "", batch_size: int = 1, model_name: str = None, i2i_model_name: str = None, size: str = None, *, check_current: Optional[Callable[[], None]] = None) -> Character:
