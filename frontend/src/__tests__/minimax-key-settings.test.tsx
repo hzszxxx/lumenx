@@ -86,5 +86,12 @@ describe('MiniMax API Key Settings', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled());
     expect(screen.getByText('MiniMax 开放平台')).toBeInTheDocument();
     expect(screen.getByText(/H3-Image 旗舰图像大模型/)).toBeInTheDocument();
+
+    // Verify MiniMax model setting buttons in API Keys tab
+    expect(screen.getByText('MiniMax 生图模型设置')).toBeInTheDocument();
+    const h3Button = screen.getByRole('button', { name: /MiniMax H3-Image/ });
+    expect(h3Button).toBeInTheDocument();
+    fireEvent.click(h3Button);
+    expect(screen.getByText(/当前已启用为全局默认生图模型/)).toBeInTheDocument();
   });
 });

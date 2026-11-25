@@ -458,7 +458,18 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveApiConfig = () => saveConfig(true);
+  const handleSaveApiConfig = () => {
+    if (runtimeEnvironment && isCurrentRuntimeEnvironment(runtimeEnvironment.key, runtimeEnvironment.generation)) {
+      const normalized = normalizeModelSettings(modelSettings, "global_settings");
+      const merged: FrontendModelSettings = {
+        ...normalized,
+        i2i_model: normalized.t2i_model,
+        image_model: normalized.t2i_model,
+      };
+      localStorage.setItem(environmentLocalStorageKey(LS_KEY_MODEL, runtimeEnvironment.key), JSON.stringify(merged));
+    }
+    saveConfig(true);
+  };
   // Storage settings can be saved independently of generation credentials.
   const handleSaveStorage = () => saveConfig(false);
 
@@ -1155,7 +1166,92 @@ export default function SettingsPage() {
               onChange={(v) => setConfig((c) => ({ ...c, MINIMAX_API_KEY: v }))}
               placeholder="eyJhbGciOi..."
             />
-            <div className="mt-2 text-xs text-text-muted space-y-1">
+
+            {/* MiniMax 模型选择与默认生图模型设置 */}
+            <div className="mt-4 pt-3.5 border-t border-glass-border space-y-2.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <FieldLabel>MiniMax 生图模型设置</FieldLabel>
+                {modelSettings.t2i_model?.startsWith("minimax") ? (
+                  <span className="text-[0.6875rem] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold flex items-center gap-1">
+                    ✓ 当前已启用为全局默认生图模型
+                  </span>
+                ) : (
+                  <span className="text-[0.6875rem] text-text-muted">
+                    当前默认生图模型: <code className="text-foreground font-mono">{modelSettings.t2i_model || "未指定"}</code>
+                  </span>
+                )}
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-2.5">
+                {[
+                  {
+                    id: "minimax/h3-image",
+                    name: "MiniMax H3-Image",
+                    tag: "推荐 · 原生4K",
+                    desc: "DiT 33.1B 旗舰架构，支持最多 16 张多图参考，细节与质感顶级",
+                  },
+                  {
+                    id: "minimax/h3-image-highspeed",
+                    name: "H3-Image Highspeed",
+                    tag: "高速版",
+                    desc: "出图速度翻倍，适合批量分镜探索与高效率抽卡",
+                  },
+                  {
+                    id: "minimax/image-01",
+                    name: "MiniMax Image-01",
+                    tag: "¥0.025/张",
+                    desc: "轻量超低成本文生图模型，极致控制生成预算",
+                  },
+                ].map((item) => {
+                  const isSelected = modelSettings.t2i_model === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        const updated: FrontendModelSettings = {
+                          ...modelSettings,
+                          t2i_model: item.id,
+                          i2i_model: item.id,
+                          image_model: item.id,
+                        };
+                        setModelSettings(updated);
+                        if (runtimeEnvironment && isCurrentRuntimeEnvironment(runtimeEnvironment.key, runtimeEnvironment.generation)) {
+                          localStorage.setItem(environmentLocalStorageKey(LS_KEY_MODEL, runtimeEnvironment.key), JSON.stringify(updated));
+                        }
+                        toast.success(`已将系统默认生图模型设为: ${item.name}`);
+                      }}
+                      className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-glass-border hover:border-primary/40 bg-surface/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-xs font-bold text-foreground truncate">{item.name}</span>
+                        <span className="text-[0.625rem] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium shrink-0">
+                          {item.tag}
+                        </span>
+                      </div>
+                      <p className="text-[0.6875rem] text-text-muted line-clamp-2 leading-relaxed">
+                        {item.desc}
+                      </p>
+                      {isSelected ? (
+                        <div className="mt-2 text-[0.625rem] text-primary font-semibold flex items-center gap-1">
+                          ● 当前默认生效
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[0.625rem] text-text-muted hover:text-primary transition-colors">
+                          点击设为默认模型 →
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-3 text-xs text-text-muted space-y-1">
               <div>
                 可前往{" "}
                 <a
@@ -1166,7 +1262,7 @@ export default function SettingsPage() {
                 >
                   MiniMax 开放平台控制台
                 </a>{" "}
-                获取 API 密钥。支持 H3-Image 原生 4K / 多图参考生图，单张低至 ¥0.025。
+                获取 API 密钥。单张低至 ¥0.025。
               </div>
               <div className="text-[0.6875rem] text-primary/80">
                 💡 <strong>多用户隔离提示</strong>：此处为系统全局兜底密钥。若创作者需单独使用自己的个人 MiniMax Key，请前往【
