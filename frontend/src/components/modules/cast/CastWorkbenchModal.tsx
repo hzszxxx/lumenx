@@ -1057,35 +1057,37 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                         src={getAssetUrl(v.url)}
                                                         alt={`${entity.name} ${v.id}`}
                                                         className="w-full h-auto max-h-[280px] object-contain"
-                                                        clickToLightbox
                                                     />
                                                 </div>
                                                 {/* Favorite star */}
                                                 <button
+                                                    type="button"
                                                     onClick={(e) => { e.stopPropagation(); handleToggleFavorite(v.id, !!v.is_favorited); }}
                                                     className={`absolute top-1.5 left-1.5 p-1 rounded-full transition-all ${
                                                         v.is_favorited
                                                             ? "bg-amber-500/30 text-amber-300"
-                                                            : "bg-black/40 text-text-secondary opacity-0 group-hover:opacity-100"
+                                                            : "bg-black/50 text-white/80 opacity-0 group-hover:opacity-100 hover:text-white"
                                                     }`}
                                                 >
                                                     <Star size={12} className={v.is_favorited ? "fill-amber-300" : ""} />
                                                 </button>
                                                 {/* Selected badge */}
                                                 {isSelected && (
-                                                    <div className={`absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground shadow-md ${accent.selectBadge}`}>
+                                                    <div className={`absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow-md ${accent.selectBadge}`}>
                                                         <Check size={12} strokeWidth={2.6} />
                                                     </div>
                                                 )}
-                                                {/* Select hint on hover */}
+                                                {/* Always-visible select action for unselected cards */}
                                                 {!isSelected && (
-                                                    <div
-                                                        onClick={() => handleSelectVariant(v.id)}
-                                                        className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer pt-6 pb-1.5"
-                                                    >
-                                                        <p className="w-full text-center text-[0.625rem] uppercase tracking-[0.16em] text-foreground font-mono">
-                                                            {t("clickToSelect")}
-                                                        </p>
+                                                    <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); handleSelectVariant(v.id); }}
+                                                            className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/70 px-3 py-1 text-[0.6875rem] font-medium text-white backdrop-blur-sm shadow-sm transition-colors hover:bg-primary"
+                                                        >
+                                                            <Check size={11} />
+                                                            <span>{t("clickToSelect")}</span>
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
