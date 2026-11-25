@@ -12,6 +12,15 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import requests
 
+try:
+    from ..core.provider_credentials import current_provider_credential
+except Exception:
+    try:
+        from src.core.provider_credentials import current_provider_credential
+    except Exception:
+        def current_provider_credential(_provider: str):
+            return None
+
 from .image import ImageGenModel
 
 logger = logging.getLogger(__name__)
@@ -152,7 +161,13 @@ class MinimaxImageModel(ImageGenModel):
             elapsed = time.time() - start_time
             return output_path, elapsed
 
-        api_key = self.api_key or self._env.get("MINIMAX_API_KEY", "")
+        # 优先读取当前请求上下文中绑定的用户专属 BYOK 凭证（多用户完全隔离）
+        credential = current_provider_credential("minimax")
+        api_key = (
+            (credential.get("secret") if credential else None)
+            or self.api_key
+            or self._env.get("MINIMAX_API_KEY", "")
+        )
         if not api_key:
             raise RuntimeError("MiniMax API Key 未配置，请先在设置中配置 MINIMAX_API_KEY。")
 

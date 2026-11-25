@@ -1155,17 +1155,26 @@ export default function SettingsPage() {
               onChange={(v) => setConfig((c) => ({ ...c, MINIMAX_API_KEY: v }))}
               placeholder="eyJhbGciOi..."
             />
-            <div className="mt-2 text-xs text-text-muted">
-              可前往{" "}
-              <a
-                href="https://platform.minimaxi.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                MiniMax 开放平台控制台
-              </a>{" "}
-              获取 API 密钥。支持 H3-Image 原生 4K / 多图参考生图，单张低至 ¥0.025。
+            <div className="mt-2 text-xs text-text-muted space-y-1">
+              <div>
+                可前往{" "}
+                <a
+                  href="https://platform.minimaxi.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  MiniMax 开放平台控制台
+                </a>{" "}
+                获取 API 密钥。支持 H3-Image 原生 4K / 多图参考生图，单张低至 ¥0.025。
+              </div>
+              <div className="text-[0.6875rem] text-primary/80">
+                💡 <strong>多用户隔离提示</strong>：此处为系统全局兜底密钥。若创作者需单独使用自己的个人 MiniMax Key，请前往【
+                <a href="#/platform?section=compute" className="underline hover:text-primary font-medium">
+                  个人中心 → 算力与凭证
+                </a>
+                】添加自备凭证 (BYOK)，系统将按用户会话严格物理隔离执行与计费。
+              </div>
             </div>
           </FormRow>
 

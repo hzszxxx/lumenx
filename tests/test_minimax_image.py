@@ -104,3 +104,46 @@ def test_minimax_api_error_handling(tmp_path):
     with patch("requests.post", return_value=mock_post_resp):
         with pytest.raises(RuntimeError, match="额度不足"):
             model.generate("test prompt", out_file)
+
+
+def test_minimax_user_isolated_byok_credential(tmp_path):
+    from src.core.provider_credentials import bind_provider_credential, reset_provider_credential
+
+    out_file = str(tmp_path / "byok_out.png")
+    # 模型本身配置为空，全局环境变量也为空
+    model = MinimaxImageModel({"output_root": str(tmp_path)}, env={"MINIMAX_API_KEY": ""})
+
+    # 1. 未绑定用户凭证时，报错
+    with pytest.raises(RuntimeError, match="MINIMAX_API_KEY"):
+        model.generate("test prompt", out_file)
+
+    # 2. 模拟用户 A 登录并绑定自己的专属凭证
+    token_a = bind_provider_credential({"provider": "minimax", "secret": "user-a-secret-key-888"})
+    mock_post_resp = Mock()
+    mock_post_resp.status_code = 200
+    mock_post_resp.json.return_value = {
+        "base_resp": {"status_code": 0, "status_msg": "success"},
+        "data": {"image_urls": ["https://mock.minimax.chat/files/user_a.png"]},
+    }
+    mock_dl_resp = Mock()
+    mock_dl_resp.status_code = 200
+    mock_dl_resp.content = MINIMAL_PNG_BYTES
+
+    try:
+        with patch("requests.post", return_value=mock_post_resp) as mock_post, \
+             patch("requests.get", return_value=mock_dl_resp):
+            model.generate("prompt for user A", out_file)
+            assert mock_post.call_args[1]["headers"]["Authorization"] == "Bearer user-a-secret-key-888"
+    finally:
+        reset_provider_credential(token_a)
+
+    # 3. 模拟用户 B 登录并绑定自己的专属凭证
+    token_b = bind_provider_credential({"provider": "minimax", "secret": "user-b-secret-key-999"})
+    try:
+        with patch("requests.post", return_value=mock_post_resp) as mock_post, \
+             patch("requests.get", return_value=mock_dl_resp):
+            model.generate("prompt for user B", out_file)
+            assert mock_post.call_args[1]["headers"]["Authorization"] == "Bearer user-b-secret-key-999"
+    finally:
+        reset_provider_credential(token_b)
+

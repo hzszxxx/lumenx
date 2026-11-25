@@ -322,6 +322,13 @@ export default function ApiKeySettings() {
                   {visibleFields.MINIMAX_API_KEY ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
+              <p className="text-[0.6875rem] text-text-muted mt-1">
+                💡 多用户隔离说明：此处为主站全局兜底密钥。若各用户需使用个人 MiniMax 额度，请在【
+                <a href="#/platform?section=compute" className="text-primary hover:underline font-medium">
+                  算力与凭证 (BYOK)
+                </a>
+                】中录入自备 Key，系统按登录账号严格物理隔离。
+              </p>
             </div>
           </div>
 

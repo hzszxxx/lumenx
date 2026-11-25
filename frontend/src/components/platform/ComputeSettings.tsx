@@ -73,7 +73,7 @@ export default function ComputeSettings() {
             找不到大模型 API-Key 的配置入口？
           </h3>
           <p className="text-xs text-text-secondary leading-relaxed max-w-2xl">
-            • <strong className="text-foreground">系统全局 API-Key</strong>：整站默认使用的阿里百炼（DashScope / Qwen / 万相）、快手可灵（Kling）、生数科技（Vidu）、MuleRouter（Seedance / GPT-Image-2）以及阿里云 OSS 存储密钥，位于【系统设置】中统一配置。
+            • <strong className="text-foreground">系统全局 API-Key</strong>：整站默认使用的阿里百炼（DashScope / Qwen / 万相）、MiniMax 开放平台（H3-Image / Image-01）、快手可灵（Kling）、生数科技（Vidu）、MuleRouter（Seedance / GPT-Image-2）以及阿里云 OSS 存储密钥，位于【系统设置】中统一配置。
             <br />
             • <strong className="text-foreground">创作者自备 Key (BYOK)</strong>：如果您希望使用个人账户的 API-Key 自行承担生成调用成本，可在下方【添加自备凭证】中录入。
           </p>
@@ -163,7 +163,7 @@ export default function ComputeSettings() {
               )}
             </div>
             <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-              使用您自己保存的百炼 DashScope / Vidu / Kling 独立凭证，不扣减平台账户算力。
+              使用您自己保存的 MiniMax / 百炼 DashScope / Vidu / Kling 独立凭证，多用户完全隔离，不扣减平台账户算力。
             </p>
           </button>
         </div>
@@ -208,25 +208,42 @@ export default function ComputeSettings() {
             添加创作者自备凭证 (BYOK)
           </h2>
           <p className="text-xs text-text-secondary mt-1">
-            API-Key 明文仅在提交时通过加密通道写入服务器凭据库，前端仅展示脱敏指纹，保障个人密钥安全。
+            API-Key 明文仅在提交时通过加密通道写入服务器凭据库，与您的登录账号严格物理隔离，前端仅展示脱敏指纹，保障个人密钥安全。
           </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-3">
           <div>
-            <label className="text-xs text-text-muted mb-1 block">Provider 类型</label>
-            <input
-              className="glass-input w-full"
-              placeholder="如: dashscope, vidu, kling"
-              value={provider}
-              onChange={event => setProvider(event.target.value)}
-            />
+            <label className="text-xs text-text-muted mb-1 block">Provider 供应商</label>
+            <select
+              className="glass-input w-full cursor-pointer"
+              value={["dashscope", "minimax", "kling", "vidu", "mulerouter"].includes(provider) ? provider : "custom"}
+              onChange={event => {
+                const val = event.target.value;
+                setProvider(val === "custom" ? "" : val);
+              }}
+            >
+              <option value="minimax">MiniMax 开放平台 (H3-Image / Image-01)</option>
+              <option value="dashscope">阿里百炼 (DashScope / 万相 / Qwen)</option>
+              <option value="kling">快手可灵 (Kling 视频大模型)</option>
+              <option value="vidu">生数科技 (Vidu 视频大模型)</option>
+              <option value="mulerouter">MuleRouter (Seedance 2.0 / GPT-Image-2)</option>
+              <option value="custom">其他自定义 Provider</option>
+            </select>
+            {!["dashscope", "minimax", "kling", "vidu", "mulerouter"].includes(provider) && (
+              <input
+                className="glass-input w-full mt-2"
+                placeholder="输入自定义 Provider 名称"
+                value={provider}
+                onChange={event => setProvider(event.target.value)}
+              />
+            )}
           </div>
           <div>
             <label className="text-xs text-text-muted mb-1 block">凭证备注名称</label>
             <input
               className="glass-input w-full"
-              placeholder="例如: 我的百炼专属主账号"
+              placeholder={provider === "minimax" ? "例如: 我的个人 MiniMax 密钥" : "例如: 我的专属账号"}
               value={label}
               onChange={event => setLabel(event.target.value)}
             />
@@ -234,14 +251,29 @@ export default function ComputeSettings() {
           <div>
             <label className="text-xs text-text-muted mb-1 block">API-Key 密钥明文</label>
             <input
-              className="glass-input w-full"
+              className="glass-input w-full font-mono text-xs"
               type="password"
-              placeholder="sk-..."
+              placeholder={provider === "minimax" ? "eyJhbGciOi..." : "sk-..."}
               value={apiKey}
               onChange={event => setApiKey(event.target.value)}
             />
           </div>
         </div>
+
+        {provider === "minimax" && (
+          <div className="text-xs text-text-muted flex items-center gap-1.5 bg-surface-inset/60 p-2.5 rounded-lg border border-glass-border">
+            <span className="text-primary font-semibold">MiniMax 独立隔离凭证：</span>
+            <span>已支持 H3-Image 旗舰图像模型与 Image-01，调用直接扣减您个人的 MiniMax 账户额度。</span>
+            <a
+              href="https://platform.minimaxi.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline ml-auto shrink-0"
+            >
+              前往 MiniMax 控制台获取 Key →
+            </a>
+          </div>
+        )}
 
         <button
           type="button"
