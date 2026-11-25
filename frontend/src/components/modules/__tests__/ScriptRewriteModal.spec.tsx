@@ -106,4 +106,52 @@ describe('ScriptRewriteModal', () => {
         expect(onApply).toHaveBeenCalledWith('第1场 咖啡馆 日 外\n阳光透过玻璃窗洒在桌面上。\n小猫端坐桌前，好奇地眨着眼睛。');
         expect(onClose).toHaveBeenCalled();
     });
+
+    it('falls back to standalone /script/rewrite endpoint when projectId is empty', async () => {
+        renderWithIntl(
+            <ScriptRewriteModal
+                isOpen={true}
+                scriptText="临时新建草稿剧本"
+                projectId=""
+                onClose={vi.fn()}
+                onApply={vi.fn()}
+            />
+        );
+
+        const rewriteBtn = screen.getByRole('button', { name: 'start-rewrite' });
+        fireEvent.click(rewriteBtn);
+
+        await waitFor(() => {
+            expect(requests.length).toBe(1);
+        });
+
+        expect(requests[0].url).toBe(`${API_URL}/script/rewrite`);
+        expect(requests[0].body).toEqual({
+            script_text: '临时新建草稿剧本',
+            skill_prompt: PRESET_REWRITE_SKILLS[0].prompt,
+            model: undefined,
+        });
+    });
+
+    it('formats timeout error into user-friendly message', async () => {
+        const timeoutAdapter: AxiosAdapter = async () => {
+            throw new Error('timeout exceeded');
+        };
+        axios.defaults.adapter = timeoutAdapter;
+
+        renderWithIntl(
+            <ScriptRewriteModal
+                isOpen={true}
+                scriptText="测试超时"
+                projectId="proj-timeout"
+                onClose={vi.fn()}
+                onApply={vi.fn()}
+            />
+        );
+
+        const rewriteBtn = screen.getByRole('button', { name: 'start-rewrite' });
+        fireEvent.click(rewriteBtn);
+
+        await screen.findByText('请求超时或网络中断，请检查网络或刷新页面后重试');
+    });
 });

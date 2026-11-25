@@ -1852,15 +1852,10 @@ async def extract_preview(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/projects/{script_id}/rewrite_script")
-async def rewrite_script(
-    script_id: str,
+async def _execute_script_rewrite(
     request: RewriteScriptRequest,
     http_request: Request,
-    active_pipeline: Any = Depends(get_pipeline),
-):
-    """Rewrite script using LLM with user-selected and customized skill instructions."""
-    check_project_access(script_id, http_request, active_pipeline)
+) -> dict:
     if not request.script_text.strip():
         raise HTTPException(status_code=400, detail="剧本内容不能为空")
     if not request.skill_prompt.strip():
@@ -1893,8 +1888,11 @@ async def rewrite_script(
     model = request.model or adapter._get_default_model()
     loop = asyncio.get_event_loop()
     try:
+        import contextvars
+        ctx = contextvars.copy_context()
         result = await loop.run_in_executor(
             None,
+            ctx.run,
             partial(adapter.chat, messages, model=model, timeout=120.0)
         )
         rewritten_text = (result or "").strip()
@@ -1914,6 +1912,27 @@ async def rewrite_script(
     except Exception as e:
         logger.exception("rewrite_script error")
         raise HTTPException(status_code=502, detail=f"AI 改写失败: {str(e)}") from e
+
+
+@router.post("/script/rewrite")
+async def rewrite_standalone_script(
+    request: RewriteScriptRequest,
+    http_request: Request,
+):
+    """Rewrite standalone script text using LLM without requiring an existing saved project."""
+    return await _execute_script_rewrite(request, http_request)
+
+
+@router.post("/projects/{script_id}/rewrite_script")
+async def rewrite_script(
+    script_id: str,
+    request: RewriteScriptRequest,
+    http_request: Request,
+    active_pipeline: Any = Depends(get_pipeline),
+):
+    """Rewrite script using LLM with user-selected and customized skill instructions."""
+    check_project_access(script_id, http_request, active_pipeline)
+    return await _execute_script_rewrite(request, http_request)
 
 
 @router.get("/projects/", response_model=List[dict])

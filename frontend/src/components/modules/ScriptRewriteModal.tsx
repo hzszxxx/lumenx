@@ -163,7 +163,14 @@ export default function ScriptRewriteModal({
                 throw new Error("返回改写内容为空");
             }
         } catch (err: any) {
-            const msg = err?.response?.data?.detail || err?.message || t("rewriteFailed") || "改写失败，请重试";
+            let msg = err?.response?.data?.detail || err?.message || t("rewriteFailed") || "改写失败，请重试";
+            if (typeof msg === "string") {
+                if (msg.includes("timeout") || msg.includes("timed out") || msg.includes("ECONNABORTED") || msg.includes("ETIMEDOUT")) {
+                    msg = "请求超时或网络中断，请检查网络或刷新页面后重试";
+                } else if (msg.includes("Runtime environment is not active") || msg.includes("runtime_environment_unavailable")) {
+                    msg = "服务连接已更新，请刷新网页后重新改写";
+                }
+            }
             setErrorMsg(String(msg));
             toast.error(String(msg));
         } finally {

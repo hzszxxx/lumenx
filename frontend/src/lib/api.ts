@@ -618,15 +618,20 @@ export const api = {
     },
 
     rewriteScript: async (
-        scriptId: string,
+        scriptId: string | null | undefined,
         scriptText: string,
         skillPrompt: string,
         model?: string,
     ): Promise<{ rewritten_text: string; model: string }> => {
-        const res = await axios.post(`${API_URL}/projects/${scriptId}/rewrite_script`, {
+        const url = scriptId && scriptId.trim()
+            ? `${API_URL}/projects/${encodeURIComponent(scriptId.trim())}/rewrite_script`
+            : `${API_URL}/script/rewrite`;
+        const res = await axios.post(url, {
             script_text: scriptText,
             skill_prompt: skillPrompt,
             model,
+        }, {
+            timeout: 120000,
         });
         return res.data;
     },
