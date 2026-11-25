@@ -154,11 +154,19 @@ export default function CandidateThumb({
                                 </span>
                             </div>
                         ) : isFailed ? (
-                            <div className="flex flex-col items-center gap-1 px-2 text-center">
+                            <div
+                                className="flex flex-col items-center gap-1 px-2 text-center"
+                                title={task.error || undefined}
+                            >
                                 <AlertCircle size={14} className="text-status-failed-fg" aria-hidden="true" />
                                 <span className="font-mono text-chrome-sm font-medium uppercase text-status-failed-fg">
                                     Failed
                                 </span>
+                                {task.error ? (
+                                    <span className="line-clamp-2 max-w-full text-[10px] leading-tight text-status-failed-fg/85">
+                                        {task.error}
+                                    </span>
+                                ) : null}
                                 {onRetry ? (
                                     <button
                                         type="button"

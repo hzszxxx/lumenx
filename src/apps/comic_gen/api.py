@@ -4751,10 +4751,26 @@ def create_video_task(
     script_id: str,
     request: CreateVideoTaskRequest,
     background_tasks: BackgroundTasks,
+    http_request: Request,
     active_pipeline: Any = Depends(get_pipeline),
 ):
     """Creates new video generation tasks."""
+    check_project_access(script_id, http_request, active_pipeline)
     try:
+        model_lower = (request.model or "").lower()
+        is_xiangongyun = (
+            model_lower.startswith("xiangongyun")
+            or model_lower.startswith("h3-")
+            or model_lower.startswith("h3/")
+            or "xiangongyun" in model_lower
+        )
+        xiangongyun_token: Optional[str] = None
+        if is_xiangongyun:
+            user = get_request_user(http_request)
+            platform = getattr(http_request.app.state, "platform_service", None)
+            if platform and user:
+                xiangongyun_token = platform.resolve_xiangongyun_token(user)
+
         tasks = []
         for _ in range(request.batch_size):
             script, task_id = active_pipeline.create_video_task(
@@ -4790,7 +4806,13 @@ def create_video_task(
                 tasks.append(created_task)
 
             # Add background processing
-            background_tasks.add_task(process_video_task, active_pipeline, script_id, task_id)
+            background_tasks.add_task(
+                process_video_task,
+                active_pipeline,
+                script_id,
+                task_id,
+                access_token=xiangongyun_token,
+            )
 
         return signed_response(tasks, runtime=active_pipeline)
 
