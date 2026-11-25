@@ -1649,6 +1649,7 @@ def upload_asset(
     asset_type: str,
     asset_id: str,
     upload_type: str,
+    http_request: Request,
     description: Optional[str] = None,
     file: UploadFile = File(...),
     active_pipeline: Any = Depends(get_pipeline),
@@ -1689,7 +1690,7 @@ def upload_asset(
             expected_owner=owner,
         )
         
-        return get_project(script_id, pipeline=active_pipeline)
+        return get_project(script_id, request=http_request, pipeline=active_pipeline)
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -5494,9 +5495,11 @@ class SelectVariantRequest(BaseModel):
 
 @router.post("/projects/{script_id}/assets/variant/select", response_model=Script)
 def select_asset_variant(script_id: str, request: SelectVariantRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Selects a specific variant for an asset."""
+    check_project_access(script_id, http_request, pipeline)
     try:
         pipeline.select_asset_variant(
             script_id,
@@ -5505,7 +5508,7 @@ def select_asset_variant(script_id: str, request: SelectVariantRequest,
             request.variant_id,
             request.generation_type
         )
-        return get_project(script_id, pipeline=pipeline)
+        return get_project(script_id, request=http_request, pipeline=pipeline)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except StorageError:
@@ -5520,9 +5523,11 @@ class DeleteVariantRequest(BaseModel):
 
 @router.post("/projects/{script_id}/assets/variant/delete", response_model=Script)
 def delete_asset_variant(script_id: str, request: DeleteVariantRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Deletes a specific variant from an asset."""
+    check_project_access(script_id, http_request, pipeline)
     try:
         pipeline.delete_asset_variant(
             script_id,
@@ -5530,7 +5535,7 @@ def delete_asset_variant(script_id: str, request: DeleteVariantRequest,
             request.asset_type,
             request.variant_id
         )
-        return get_project(script_id, pipeline=pipeline)
+        return get_project(script_id, request=http_request, pipeline=pipeline)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except StorageError:
@@ -5548,9 +5553,11 @@ class FavoriteVariantRequest(BaseModel):
 
 @router.post("/projects/{script_id}/assets/variant/favorite", response_model=Script)
 def toggle_variant_favorite(script_id: str, request: FavoriteVariantRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Toggles the favorite status of a variant. Favorited variants won't be auto-deleted when limit is reached."""
+    check_project_access(script_id, http_request, pipeline)
     try:
         pipeline.toggle_variant_favorite(
             script_id,
@@ -5560,7 +5567,7 @@ def toggle_variant_favorite(script_id: str, request: FavoriteVariantRequest,
             request.is_favorited,
             request.generation_type
         )
-        return get_project(script_id, pipeline=pipeline)
+        return get_project(script_id, request=http_request, pipeline=pipeline)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except StorageError:
@@ -5667,12 +5674,14 @@ class BindVoiceRequest(BaseModel):
 
 @router.post("/projects/{script_id}/characters/{char_id}/voice", response_model=Script)
 def bind_voice(script_id: str, char_id: str, request: BindVoiceRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Binds a voice to a character."""
+    check_project_access(script_id, http_request, pipeline)
     try:
         pipeline.bind_voice(script_id, char_id, request.voice_id, request.voice_name)
-        return get_project(script_id, pipeline=pipeline)
+        return get_project(script_id, request=http_request, pipeline=pipeline)
     except ValueError as exc:
         raise _setting_http_error(exc) from exc
     except StorageError:
@@ -5689,12 +5698,14 @@ class UpdateVoiceParamsRequest(BaseModel):
 
 @router.put("/projects/{script_id}/characters/{char_id}/voice_params", response_model=Script)
 def update_voice_params(script_id: str, char_id: str, request: UpdateVoiceParamsRequest,
+    http_request: Request,
     pipeline: Any = Depends(get_pipeline),
 ):
     """Updates voice parameters for a character."""
+    check_project_access(script_id, http_request, pipeline)
     try:
         pipeline.update_voice_params(script_id, char_id, **request.model_dump())
-        return get_project(script_id, pipeline=pipeline)
+        return get_project(script_id, request=http_request, pipeline=pipeline)
     except ValueError as exc:
         raise _setting_http_error(exc) from exc
 

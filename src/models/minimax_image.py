@@ -128,6 +128,47 @@ class MinimaxImageModel(ImageGenModel):
 
         return image_ref
 
+    def _resolve_image_bytes(self, image_ref: Optional[str]) -> Optional[Tuple[str, bytes, str]]:
+        """Resolve local file, data URI, or HTTP URL to (filename, bytes, mime_type)."""
+        if not image_ref:
+            return None
+        if image_ref.startswith("data:"):
+            try:
+                header, b64 = image_ref.split(",", 1)
+                mime = header.split(";")[0].split(":", 1)[1] if ":" in header else "image/png"
+                ext = mimetypes.guess_extension(mime) or ".png"
+                return f"ref{ext}", base64.b64decode(b64), mime
+            except Exception as exc:
+                logger.warning(f"Failed to decode data URI reference image: {exc}")
+                return None
+        if image_ref.startswith(("http://", "https://")):
+            try:
+                dl = requests.get(image_ref, timeout=30)
+                if dl.status_code == 200 and dl.content:
+                    mime = dl.headers.get("content-type", "image/png").split(";")[0].strip()
+                    ext = mimetypes.guess_extension(mime) or ".png"
+                    return f"ref{ext}", dl.content, mime
+            except Exception as exc:
+                logger.warning(f"Failed to download reference image {image_ref}: {exc}")
+                return None
+
+        candidates = [image_ref]
+        if self.output_root:
+            candidates.append(os.path.join(self.output_root, image_ref))
+
+        for path in candidates:
+            if os.path.isfile(path):
+                try:
+                    mime, _ = mimetypes.guess_type(path)
+                    mime = mime or "image/png"
+                    with open(path, "rb") as f:
+                        return os.path.basename(path) or "ref.png", f.read(), mime
+                except Exception as exc:
+                    logger.warning(f"Failed to read reference image file {path}: {exc}")
+                    break
+
+        return None
+
     def generate(
         self,
         prompt: str,
@@ -182,55 +223,84 @@ class MinimaxImageModel(ImageGenModel):
             all_refs.append(ref_image_path)
         if ref_image_paths:
             all_refs.extend(ref_image_paths)
-        resolved_refs = [
-            self._resolve_image_input(ref) for ref in all_refs[:16] if ref
-        ]
-        resolved_refs = [r for r in resolved_refs if r]
 
-        payload: Dict[str, Any] = {
-            "model": api_model_id,
-            "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
-            "response_format": "url",
-            "prompt_optimizer": kwargs.get("prompt_optimizer", True),
-        }
-        if "seed" in kwargs and kwargs["seed"] is not None:
-            payload["seed"] = kwargs["seed"]
-        if resolved_refs and api_model_id != "image-01":
-            payload["reference_images"] = resolved_refs
+        is_legacy_image01 = api_model_id == "image-01"
+        resolved_bytes = []
+        if not is_legacy_image01 and all_refs:
+            for ref in all_refs[:16]:
+                resolved = self._resolve_image_bytes(ref)
+                if resolved:
+                    resolved_bytes.append(resolved)
 
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
+        use_edits_endpoint = not is_legacy_image01 and bool(resolved_bytes)
+        if is_legacy_image01:
+            endpoint_path = "/v1/image_generation"
+        elif use_edits_endpoint:
+            endpoint_path = "/v1/images/edits"
+        else:
+            endpoint_path = "/v1/images/generations"
 
         # 确定端点列表：支持 M Plan 订阅 Key (sk-cp-) 自动切换到 api.minimaxi.com / api.minimax.io
         is_subscription_key = api_key.startswith("sk-cp-")
         has_custom_base = bool(self.config.get("base_url") or self._env.get("MINIMAX_BASE_URL"))
         if has_custom_base:
-            candidate_endpoints = [f"{self.base_url.rstrip('/')}/v1/image_generation"]
+            base_urls = [self.base_url.rstrip("/")]
         elif is_subscription_key:
-            candidate_endpoints = [
-                f"{DEFAULT_MINIMAX_MPLAN_BASE_URL}/v1/image_generation",
-                "https://api.minimax.io/v1/image_generation",
-            ]
+            base_urls = [DEFAULT_MINIMAX_MPLAN_BASE_URL, "https://api.minimax.io"]
         else:
-            candidate_endpoints = [
-                f"{self.base_url.rstrip('/')}/v1/image_generation",
-                f"{DEFAULT_MINIMAX_MPLAN_BASE_URL}/v1/image_generation",
-            ]
+            base_urls = [self.base_url.rstrip("/"), DEFAULT_MINIMAX_MPLAN_BASE_URL]
+
+        candidate_endpoints = [f"{base}{endpoint_path}" for base in base_urls]
 
         logger.info(
             f"Calling MiniMax image generation: model={api_model_id}, aspect_ratio={aspect_ratio}, "
-            f"is_subscription={is_subscription_key}"
+            f"endpoint_path={endpoint_path}, refs={len(resolved_bytes)}, is_subscription={is_subscription_key}"
         )
 
         resp = None
         last_err = None
         for endpoint in candidate_endpoints:
             try:
-                resp = requests.post(endpoint, json=payload, headers=headers, timeout=120)
+                if use_edits_endpoint:
+                    form_data: Dict[str, Any] = {
+                        "model": api_model_id,
+                        "prompt": prompt,
+                        "aspect_ratio": aspect_ratio,
+                        "response_format": "url",
+                    }
+                    if "seed" in kwargs and kwargs["seed"] is not None:
+                        form_data["seed"] = str(kwargs["seed"])
+                    files = [("images", (fname, content, mime)) for fname, content, mime in resolved_bytes]
+                    resp = requests.post(
+                        endpoint,
+                        data=form_data,
+                        files=files,
+                        headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                        timeout=120,
+                    )
+                else:
+                    payload: Dict[str, Any] = {
+                        "model": api_model_id,
+                        "prompt": prompt,
+                        "aspect_ratio": aspect_ratio,
+                        "response_format": "url",
+                    }
+                    if is_legacy_image01:
+                        payload["prompt_optimizer"] = kwargs.get("prompt_optimizer", True)
+                    else:
+                        payload["n"] = 1
+                    if "seed" in kwargs and kwargs["seed"] is not None:
+                        payload["seed"] = kwargs["seed"]
+                    resp = requests.post(
+                        endpoint,
+                        json=payload,
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                        },
+                        timeout=120,
+                    )
                 if resp.status_code == 200:
                     break
                 elif resp.status_code in (401, 403) and len(candidate_endpoints) > 1:
@@ -269,17 +339,27 @@ class MinimaxImageModel(ImageGenModel):
                 raise RuntimeError(f"MiniMax 请求限流 (1002)：并发超过阈值，请稍候重试。详情: {status_msg}")
             raise RuntimeError(f"MiniMax 生图异常 ({status_code}): {status_msg}")
 
-        # Extract generated image URL or base64
-        data = res_json.get("data") or {}
-        image_urls = data.get("image_urls") or []
+        # Extract generated image URL or base64 (supports both OpenAI-style list and legacy dict)
+        data = res_json.get("data")
         items = res_json.get("items") or []
-        image_base64_list = data.get("image_base64") or []
 
         image_url = None
-        if image_urls and isinstance(image_urls[0], str):
-            image_url = image_urls[0]
-        elif items and isinstance(items[0], dict) and items[0].get("url"):
-            image_url = items[0]["url"]
+        b64_str = None
+
+        if isinstance(data, list) and data:
+            first = data[0] if isinstance(data[0], dict) else {}
+            image_url = first.get("url")
+            b64_str = first.get("b64_json")
+        elif isinstance(data, dict):
+            image_urls = data.get("image_urls") or []
+            image_base64_list = data.get("image_base64") or []
+            if image_urls and isinstance(image_urls[0], str):
+                image_url = image_urls[0]
+            elif image_base64_list and isinstance(image_base64_list[0], str):
+                b64_str = image_base64_list[0]
+
+        if not image_url and not b64_str and items and isinstance(items[0], dict):
+            image_url = items[0].get("url")
 
         if image_url:
             dl_resp = requests.get(image_url, timeout=60)
@@ -287,8 +367,8 @@ class MinimaxImageModel(ImageGenModel):
                 raise RuntimeError(f"Failed to download generated image from {image_url}")
             with open(output_path, "wb") as f:
                 f.write(dl_resp.content)
-        elif image_base64_list and isinstance(image_base64_list[0], str):
-            b64_data = base64.b64decode(image_base64_list[0])
+        elif b64_str:
+            b64_data = base64.b64decode(b64_str)
             with open(output_path, "wb") as f:
                 f.write(b64_data)
         else:

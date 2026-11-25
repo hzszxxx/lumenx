@@ -558,10 +558,11 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 !currentFav,
             );
             await confirmProjectAck(currentProject.id, updated);
-        } catch (error) {
+        } catch (error: any) {
+            const detail = error?.response?.data?.detail || error?.message || "favorite failed";
             toast.error(t(error instanceof ProjectReadbackError ? "toastReadbackFailed" : "toastSelectErr"), {
                 projectId: currentProject.id,
-                body: error instanceof ProjectReadbackError ? t("toastReadbackFailedBody") : undefined,
+                body: error instanceof ProjectReadbackError ? t("toastReadbackFailedBody") : String(detail),
             });
         }
     };

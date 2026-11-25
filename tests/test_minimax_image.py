@@ -165,7 +165,74 @@ def test_minimax_mplan_subscription_key_routing(tmp_path):
     with patch("requests.post", return_value=mock_post_resp) as mock_post, \
          patch("requests.get", return_value=mock_dl_resp):
         model.generate("an anime warrior", out_file)
-        assert mock_post.call_args[0][0] == "https://api.minimaxi.com/v1/image_generation"
+        assert mock_post.call_args[0][0] == "https://api.minimaxi.com/v1/images/generations"
         assert mock_post.call_args[1]["headers"]["Authorization"] == "Bearer sk-cp-SdhUg-explore-key"
+
+
+def test_minimax_h3_highspeed_routes_to_generations_and_parses_list_data(tmp_path):
+    out_file = str(tmp_path / "h3_fast.png")
+    model = MinimaxImageModel({"output_root": str(tmp_path)}, env={"MINIMAX_API_KEY": "sk-cp-key"})
+
+    mock_post_resp = Mock()
+    mock_post_resp.status_code = 200
+    mock_post_resp.json.return_value = {
+        "data": [{"url": "https://mock.minimax.io/h3_fast.png", "size": "1024x576"}],
+    }
+    mock_dl_resp = Mock()
+    mock_dl_resp.status_code = 200
+    mock_dl_resp.content = MINIMAL_PNG_BYTES
+
+    with patch("requests.post", return_value=mock_post_resp) as mock_post, \
+         patch("requests.get", return_value=mock_dl_resp):
+        path, _ = model.generate("a cat", out_file, model_name="minimax/h3-image-highspeed", size="576*1024")
+        assert path == out_file
+        assert mock_post.call_args[0][0] == "https://api.minimaxi.com/v1/images/generations"
+        assert mock_post.call_args[1]["json"]["model"] == "MiniMax-H3-Image-Highspeed"
+        assert mock_post.call_args[1]["json"]["aspect_ratio"] == "9:16"
+
+
+def test_minimax_h3_with_ref_routes_to_edits_multipart(tmp_path):
+    ref_file = tmp_path / "ref.png"
+    ref_file.write_bytes(MINIMAL_PNG_BYTES)
+    out_file = str(tmp_path / "h3_edit.png")
+    model = MinimaxImageModel({"output_root": str(tmp_path)}, env={"MINIMAX_API_KEY": "sk-cp-key"})
+
+    mock_post_resp = Mock()
+    mock_post_resp.status_code = 200
+    mock_post_resp.json.return_value = {
+        "data": [{"url": "https://mock.minimax.io/h3_edit.png"}],
+    }
+    mock_dl_resp = Mock()
+    mock_dl_resp.status_code = 200
+    mock_dl_resp.content = MINIMAL_PNG_BYTES
+
+    with patch("requests.post", return_value=mock_post_resp) as mock_post, \
+         patch("requests.get", return_value=mock_dl_resp):
+        path, _ = model.generate("edit cat", out_file, ref_image_path=str(ref_file), model_name="minimax/h3-image")
+        assert path == out_file
+        assert mock_post.call_args[0][0] == "https://api.minimaxi.com/v1/images/edits"
+        assert mock_post.call_args[1]["data"]["model"] == "MiniMax-H3-Image"
+        assert len(mock_post.call_args[1]["files"]) == 1
+
+
+def test_minimax_image_01_routes_to_legacy_endpoint(tmp_path):
+    out_file = str(tmp_path / "img01.png")
+    model = MinimaxImageModel({"output_root": str(tmp_path)}, env={"MINIMAX_API_KEY": "sk-cp-key"})
+
+    mock_post_resp = Mock()
+    mock_post_resp.status_code = 200
+    mock_post_resp.json.return_value = {
+        "base_resp": {"status_code": 0, "status_msg": "success"},
+        "data": {"image_urls": ["https://mock.minimax.chat/img01.png"]},
+    }
+    mock_dl_resp = Mock()
+    mock_dl_resp.status_code = 200
+    mock_dl_resp.content = MINIMAL_PNG_BYTES
+
+    with patch("requests.post", return_value=mock_post_resp) as mock_post, \
+         patch("requests.get", return_value=mock_dl_resp):
+        model.generate("a dog", out_file, model_name="minimax/image-01")
+        assert mock_post.call_args[0][0] == "https://api.minimaxi.com/v1/image_generation"
+        assert mock_post.call_args[1]["json"]["model"] == "image-01"
 
 
