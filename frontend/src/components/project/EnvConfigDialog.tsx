@@ -28,6 +28,7 @@ type EnvConfig = EnvConfigPayload & {
   KLING_SECRET_KEY: string;
   VIDU_API_KEY: string;
   MULEROUTER_API_KEY: string;
+  MINIMAX_API_KEY: string;
   MULERUN_CLI_LOGGED_IN?: boolean;
   endpoint_overrides: Record<string, string>;
 };
@@ -37,6 +38,7 @@ const ENDPOINT_PROVIDERS = [
   { key: "KLING_BASE_URL", label: "Kling", placeholder: "https://api-beijing.klingai.com/v1" },
   { key: "VIDU_BASE_URL", label: "Vidu", placeholder: "https://api.vidu.cn/ent/v2" },
   { key: "MULEROUTER_BASE_URL", label: "MuleRouter", placeholder: "https://api.mulerouter.ai" },
+  { key: "MINIMAX_BASE_URL", label: "MiniMax", placeholder: "https://api.minimaxi.chat" },
 ];
 
 const DEFAULT_CONFIG: EnvConfig = {
@@ -53,6 +55,7 @@ const DEFAULT_CONFIG: EnvConfig = {
   KLING_SECRET_KEY: "",
   VIDU_API_KEY: "",
   MULEROUTER_API_KEY: "",
+  MINIMAX_API_KEY: "",
   endpoint_overrides: {},
 };
 
@@ -545,6 +548,33 @@ export default function EnvConfigDialog({ isOpen, onClose }: EnvConfigDialogProp
                       <p className="text-[0.6875rem] text-text-secondary/50 mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
                     </div>
                   </details>
+                </div>
+
+                {/* MiniMax 开放平台 */}
+                <div className="space-y-3 pt-4 border-t border-glass-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-foreground">MiniMax 开放平台</span>
+                    <a
+                      href="https://platform.minimaxi.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      获取 Key
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    </a>
+                  </div>
+                  <p className="text-xs text-text-secondary/60">用于 MiniMax H3-Image (原生 4K/多图参考) 与 Image-01 (¥0.025/张) 图像生成</p>
+                  <div>
+                    <label className="block text-xs text-text-secondary mb-1">API Key</label>
+                    <input
+                      type="password"
+                      value={config.MINIMAX_API_KEY}
+                      onChange={(e) => handleChange("MINIMAX_API_KEY", e.target.value)}
+                      placeholder="eyJhbGciOi..."
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-glass-border">

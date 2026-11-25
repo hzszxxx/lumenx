@@ -8,6 +8,7 @@ export default function ApiKeySettings() {
   const [config, setConfig] = useState<EnvConfigPayload>({
     DASHSCOPE_API_KEY: "",
     MULEROUTER_API_KEY: "",
+    MINIMAX_API_KEY: "",
     VIDU_API_KEY: "",
     KLING_ACCESS_KEY: "",
     KLING_SECRET_KEY: "",
@@ -82,6 +83,7 @@ export default function ApiKeySettings() {
   const secrets = config.secrets_configured || {};
   const hasDashScope = Boolean(secrets.DASHSCOPE_API_KEY || (typeof config.DASHSCOPE_API_KEY === "string" && config.DASHSCOPE_API_KEY.trim()));
   const hasMuleRouter = Boolean(secrets.MULEROUTER_API_KEY || (typeof config.MULEROUTER_API_KEY === "string" && config.MULEROUTER_API_KEY.trim()));
+  const hasMiniMax = Boolean(secrets.MINIMAX_API_KEY || (typeof config.MINIMAX_API_KEY === "string" && config.MINIMAX_API_KEY.trim()));
 
   return (
     <div className="space-y-6">
@@ -256,6 +258,68 @@ export default function ApiKeySettings() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-foreground"
                 >
                   {visibleFields.MULEROUTER_API_KEY ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* MiniMax 开放平台 (H3-Image & Image-01) */}
+          <div className="glass-panel p-6 sm:p-7 rounded-2xl border-glass-border/80 bg-surface/60 space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                  MM
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground">
+                      MiniMax 开放平台 · 图像大模型
+                    </h3>
+                    <a
+                      href="https://platform.minimaxi.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      获取 Key <ExternalLink size={12} />
+                    </a>
+                  </div>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    支持 MiniMax H3-Image (原生 4K / 多图参考) 与 Image-01 (¥0.025/张极致性价比)。
+                  </p>
+                </div>
+              </div>
+
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-md border font-semibold ${
+                  hasMiniMax
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : "bg-surface-inset border-glass-border text-text-muted"
+                }`}
+              >
+                {hasMiniMax ? "已配置生效" : "选填 (未配置)"}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <label className="text-text-muted font-medium font-mono">MINIMAX_API_KEY</label>
+                <span className="text-text-muted">MiniMax 开放平台 API 密钥</span>
+              </div>
+              <div className="relative">
+                <input
+                  type={visibleFields.MINIMAX_API_KEY ? "text" : "password"}
+                  className="glass-input w-full pr-10 font-mono text-xs"
+                  placeholder="如: eyJhbGciOi..."
+                  value={(config as Record<string, string>).MINIMAX_API_KEY || ""}
+                  onChange={(e) => handleChange("MINIMAX_API_KEY", e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleVisibility("MINIMAX_API_KEY")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-foreground"
+                >
+                  {visibleFields.MINIMAX_API_KEY ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>

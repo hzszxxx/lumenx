@@ -55,6 +55,7 @@ type EnvConfig = EnvConfigPayload & {
   KLING_SECRET_KEY: string;
   VIDU_API_KEY: string;
   MULEROUTER_API_KEY: string;
+  MINIMAX_API_KEY: string;
   MULERUN_CLI_LOGGED_IN?: boolean;
   endpoint_overrides: Record<string, string>;
 };
@@ -64,6 +65,7 @@ const ENDPOINT_PROVIDERS = [
   { key: "KLING_BASE_URL", label: "Kling", placeholder: "https://api-beijing.klingai.com/v1" },
   { key: "VIDU_BASE_URL", label: "Vidu", placeholder: "https://api.vidu.cn/ent/v2" },
   { key: "MULEROUTER_BASE_URL", label: "MuleRouter", placeholder: "https://api.mulerouter.ai" },
+  { key: "MINIMAX_BASE_URL", label: "MiniMax", placeholder: "https://api.minimaxi.chat" },
 ];
 
 const DEFAULT_CONFIG: EnvConfig = {
@@ -81,6 +83,7 @@ const DEFAULT_CONFIG: EnvConfig = {
   KLING_SECRET_KEY: "",
   VIDU_API_KEY: "",
   MULEROUTER_API_KEY: "",
+  MINIMAX_API_KEY: "",
   endpoint_overrides: {},
 };
 
@@ -1143,6 +1146,27 @@ export default function SettingsPage() {
                 <p className="text-[0.6875rem] text-text-muted mt-1">{t("mulerunKeyHint")}</p>
               </div>
             </details>
+          </FormRow>
+
+          <FormRow label="MiniMax 开放平台" hint="配置 MiniMax API Key，支持 H3-Image 旗舰图像大模型与超低成本 Image-01">
+            <FieldLabel>MINIMAX_API_KEY</FieldLabel>
+            <KeyField
+              value={config.MINIMAX_API_KEY}
+              onChange={(v) => setConfig((c) => ({ ...c, MINIMAX_API_KEY: v }))}
+              placeholder="eyJhbGciOi..."
+            />
+            <div className="mt-2 text-xs text-text-muted">
+              可前往{" "}
+              <a
+                href="https://platform.minimaxi.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                MiniMax 开放平台控制台
+              </a>{" "}
+              获取 API 密钥。支持 H3-Image 原生 4K / 多图参考生图，单张低至 ¥0.025。
+            </div>
           </FormRow>
 
           <FormRow label={t("advancedEndpointsLabel")} hint={t("advancedEndpointsHint")}>

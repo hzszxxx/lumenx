@@ -185,6 +185,8 @@ export interface EnvConfigPayload {
     KLING_ACCESS_KEY?: string;
     KLING_SECRET_KEY?: string;
     VIDU_API_KEY?: string;
+    MULEROUTER_API_KEY?: string;
+    MINIMAX_API_KEY?: string;
     endpoint_overrides?: Record<string, string>;
     // Secrets from GET are masked (bullets + last 4 chars). This map reports
     // which credential fields are actually configured on the backend.
