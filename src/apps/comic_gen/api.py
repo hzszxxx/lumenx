@@ -313,6 +313,16 @@ def _ensure_output_dirs(data_dir: Path) -> None:
 
 
 def _mount_output_routes(target_app: FastAPI, data_dir: Path) -> None:
+    import mimetypes
+    from starlette.staticfiles import StaticFiles
+    static_shell_dir = Path(__file__).resolve().parent.parent.parent.parent / "static"
+    if static_shell_dir.is_dir() and (static_shell_dir / "index.html").is_file():
+        existing_static = {getattr(route, "path", None) for route in target_app.router.routes}
+        if "/static" not in existing_static:
+            mimetypes.add_type("text/css", ".css")
+            mimetypes.add_type("application/javascript", ".js")
+            target_app.mount("/static", StaticFiles(directory=str(static_shell_dir), html=True), name="static")
+
     output_prefixes = (
         "uploads",
         "assets",

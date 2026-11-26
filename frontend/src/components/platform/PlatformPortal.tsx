@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { BriefcaseBusiness, GraduationCap, KeyRound, LogIn, ShieldCheck, Sparkles, Trophy, UserRound, Users } from "lucide-react";
-import { platformApi } from "@/lib/platformApi";
+import { formatPlatformError, platformApi } from "@/lib/platformApi";
 import { readAppAccessSession } from "@/lib/appAccess";
 import { usePlatformStore } from "@/store/platformStore";
 import ComputeHub, { type ComputeSubTab } from "@/components/platform/ComputeHub";
@@ -201,7 +201,7 @@ export default function PlatformPortal() {
         </button>
         {(error || message) && (
           <p role="status" className={`mt-4 text-sm ${error ? "text-status-failed-fg" : "text-status-success-fg"}`}>
-            {error || message}
+            {error ? formatPlatformError(error) : message}
           </p>
         )}
       </div>
