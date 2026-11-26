@@ -9,11 +9,13 @@ import {
   Coins,
   Copy,
   Edit2,
+  Edit3,
   FileSpreadsheet,
   GraduationCap,
   KeyRound,
   Package,
   Percent,
+  Phone,
   Plus,
   RefreshCw,
   Search,
@@ -23,6 +25,7 @@ import {
   UserCheck,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   platformApi,
@@ -69,6 +72,7 @@ export default function AgentCenter() {
   const [contactPhone, setContactPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
 
   // Note edit in table
   const [editingNoteInviteId, setEditingNoteInviteId] = useState<string | null>(null);
@@ -263,12 +267,37 @@ export default function AgentCenter() {
                   终身消费返佣 {((profile?.commission_rate ?? 0.01) * 100).toFixed(1)}%
                 </span>
               </div>
-              <p className="text-sm text-text-secondary mt-1">
-                负责人：{profile?.contact_name || user?.username || "—"} · 电话：{profile?.contact_phone || "未设置"} · 批量采购注册码与学员归属统一管理
-              </p>
+              <div className="flex items-center gap-1.5 flex-wrap text-sm text-text-secondary mt-1">
+                <span>负责人：{profile?.contact_name || user?.username || "—"}</span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  电话：
+                  <span className={profile?.contact_phone ? "text-foreground font-mono font-medium" : "text-amber-500 font-medium"}>
+                    {profile?.contact_phone || "未设置"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactModal(true)}
+                    className="text-xs text-primary hover:underline ml-0.5 inline-flex items-center gap-0.5 font-medium cursor-pointer"
+                  >
+                    <Edit3 size={11} />
+                    {profile?.contact_phone ? "修改" : "点击设置"}
+                  </button>
+                </span>
+                <span>·</span>
+                <span className="text-text-muted text-xs">批量采购注册码与学员归属统一管理</span>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowContactModal(true)}
+              className="glass-button text-xs py-2 px-3 flex items-center gap-1.5 hover:border-primary/50 text-foreground cursor-pointer"
+            >
+              <Phone size={13} className="text-primary" />
+              修改联系电话
+            </button>
             <button
               type="button"
               onClick={() => void refreshAll()}
@@ -1061,6 +1090,93 @@ export default function AgentCenter() {
             </button>
           </form>
         </section>
+      )}
+
+      {/* Contact Phone & Name Edit Modal */}
+      {showContactModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-md animate-fade-in"
+        >
+          <div className="relative w-full max-w-md rounded-2xl border border-glass-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-glass-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <Phone size={16} />
+                </div>
+                <h3 className="text-base font-bold text-foreground">设置与修改联系电话</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowContactModal(false)}
+                className="text-text-muted hover:text-foreground p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                await handleUpdateProfile(e);
+                setShowContactModal(false);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs text-text-secondary mb-1 block font-medium">负责人姓名</label>
+                <input
+                  type="text"
+                  className="glass-input w-full text-sm"
+                  placeholder="请输入负责人姓名"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-text-secondary mb-1 block font-medium">联系电话 / 手机号</label>
+                <input
+                  type="tel"
+                  required
+                  className="glass-input w-full text-sm"
+                  placeholder="例如：13800000000"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                />
+                <p className="text-[11px] text-text-muted mt-1">用于平台紧急通知、结算联系及认证导师对接</p>
+              </div>
+
+              <div>
+                <label className="text-xs text-text-secondary mb-1 block font-medium">机构全称 / 个人品牌（选填）</label>
+                <input
+                  type="text"
+                  className="glass-input w-full text-sm"
+                  placeholder="例如：北京星火数媒培训工作室"
+                  value={institutionName}
+                  onChange={(e) => setInstitutionName(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-glass-border">
+                <button
+                  type="button"
+                  onClick={() => setShowContactModal(false)}
+                  className="glass-button text-xs py-2 px-3"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingProfile}
+                  className="bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-primary-hover transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                >
+                  {updatingProfile ? "保存中..." : "保存联系电话"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -83,4 +83,33 @@ describe("AuthModal Validation & Error Display", () => {
     expect(alert.textContent).not.toContain("string_too_short");
     expect(alert.textContent).not.toContain("[{");
   });
+
+  it("enforces invite code requirement when registration_invite_required is true", async () => {
+    const { platformApi } = await import("@/lib/platformApi");
+    vi.spyOn(platformApi, "authConfig").mockResolvedValueOnce({ registration_invite_required: true });
+
+    render(<AuthModal isOpen={true} onClose={vi.fn()} />);
+
+    // Switch to register mode
+    const registerBtn = screen.getByRole("button", { name: "免费注册" });
+    fireEvent.click(registerBtn);
+
+    // Fill valid username and password, but leave invite code empty
+    const usernameInput = screen.getByPlaceholderText(/至少 2 个字符/);
+    const passwordInput = screen.getByPlaceholderText(/至少 12 位字符/);
+
+    fireEvent.change(usernameInput, { target: { value: "李四" } });
+    fireEvent.change(passwordInput, { target: { value: "validpassword123" } });
+
+    // Wait for authConfig resolution
+    await vi.waitFor(() => {
+      expect(screen.getByText("（必填）")).toBeDefined();
+    });
+
+    const submitBtn = screen.getByRole("button", { name: "立即注册并登录" });
+    const form = submitBtn.closest("form")!;
+    fireEvent.submit(form);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("当前平台开放注册需要有效的内测邀请码");
+  });
 });

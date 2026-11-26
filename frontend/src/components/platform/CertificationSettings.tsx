@@ -332,9 +332,22 @@ export default function CertificationSettings() {
 
             {!isCertified && !isReviewing && (
               <form onSubmit={handleSubmitExam} className="space-y-4 pt-3 border-t border-glass-border/70">
-                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                  <Video size={14} className="text-primary" /> 提交考核实操作品
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <Video size={14} className="text-primary" /> 提交考核实操作品
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectTitle("【验收测试】雨夜黎明分镜实操考核样片");
+                      setSubmissionDesc("使用电影级分镜流 + 6:3:1 镜头景别层次，已完成 3 组分镜与角色一致性检验，参考样片 /sample-assets/sample_preview.mp4");
+                    }}
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 font-medium cursor-pointer"
+                  >
+                    <Sparkles size={12} />
+                    填入考核测试素材
+                  </button>
+                </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-text-muted mb-1.5 block font-medium">考核作品名称</label>

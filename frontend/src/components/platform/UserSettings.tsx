@@ -1,23 +1,64 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { UserRound, Shield, Coins, Activity, LogOut, LayoutDashboard, KeyRound, CheckCircle2 } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { UserRound, Shield, Coins, Activity, LogOut, LayoutDashboard, KeyRound, CheckCircle2, Phone, Edit3, X, AlertCircle } from "lucide-react";
 import { usePlatformStore } from "@/store/platformStore";
-import { platformApi } from "@/lib/platformApi";
+import { platformApi, type AgentProfile } from "@/lib/platformApi";
 
 export default function UserSettings() {
   const { user, walletCents, logout } = usePlatformStore();
   const [tokenUsage, setTokenUsage] = useState<{ prompt_tokens: number; completion_tokens: number; total_tokens: number; records: any[] } | null>(null);
+  const [profile, setProfile] = useState<AgentProfile | null>(null);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void platformApi.tokenUsage(20).then(setTokenUsage).catch(() => null);
+    void platformApi.agentProfile().then((p) => {
+      setProfile(p);
+      setPhoneInput(p.contact_phone || "");
+      setNameInput(p.contact_name || "");
+    }).catch(() => null);
   }, []);
+
+  const handleSavePhone = async (e: FormEvent) => {
+    e.preventDefault();
+    setSavingPhone(true);
+    setErrorMessage(null);
+    try {
+      const updated = await platformApi.updateAgentProfile({
+        agency_type: profile?.agency_type || "individual",
+        institution_name: profile?.institution_name || "",
+        contact_name: nameInput.trim() || user?.username,
+        contact_phone: phoneInput.trim(),
+        notes: profile?.notes || "",
+      });
+      setProfile(updated);
+      setShowPhoneModal(false);
+      setMessage("联系电话已更新成功");
+      setTimeout(() => setMessage(null), 3500);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "保存电话失败，请重试");
+    } finally {
+      setSavingPhone(false);
+    }
+  };
 
   if (!user) return null;
 
   return (
     <div className="space-y-6">
+      {message && (
+        <div role="status" className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 flex items-center gap-2">
+          <CheckCircle2 size={16} />
+          <span>{message}</span>
+        </div>
+      )}
+
       {/* User Info Card */}
       <div className="glass-panel p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -32,13 +73,46 @@ export default function UserSettings() {
                   {user.role === "admin" ? "系统管理员" : user.role === "agent" ? "渠道代理商" : user.role === "creator" ? "认证创作者" : user.role === "reviewer" ? "审核验收员" : user.role === "client" ? "商单发包方" : "普通用户"}
                 </span>
               </div>
-              <p className="text-xs text-text-secondary mt-1">
-                {user.email || "未绑定邮箱"} · 创作者平台统一账户
-              </p>
+              <div className="text-xs text-text-secondary mt-1 flex items-center gap-2 flex-wrap">
+                <span>{user.email || "未绑定邮箱"}</span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  联系电话：
+                  <span className={profile?.contact_phone ? "text-foreground font-mono font-medium" : "text-amber-500 font-medium"}>
+                    {profile?.contact_phone || "未设置"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneInput(profile?.contact_phone || "");
+                      setNameInput(profile?.contact_name || user.username);
+                      setShowPhoneModal(true);
+                    }}
+                    className="text-primary hover:underline ml-0.5 inline-flex items-center gap-0.5 font-medium cursor-pointer"
+                  >
+                    <Edit3 size={11} />
+                    {profile?.contact_phone ? "修改" : "点击设置"}
+                  </button>
+                </span>
+                <span>·</span>
+                <span>创作者平台统一账户</span>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setPhoneInput(profile?.contact_phone || "");
+                setNameInput(profile?.contact_name || user.username);
+                setShowPhoneModal(true);
+              }}
+              className="glass-button text-xs font-medium text-foreground hover:border-primary/50 flex items-center gap-1.5"
+            >
+              <Phone size={13} className="text-primary" />
+              {profile?.contact_phone ? "修改联系电话" : "设置联系电话"}
+            </button>
             {user.role === "admin" && (
               <button
                 type="button"
@@ -137,6 +211,84 @@ export default function UserSettings() {
           <p className="text-xs text-text-muted py-2">暂无消耗记录</p>
         )}
       </div>
+
+      {/* Edit Phone Modal */}
+      {showPhoneModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-md animate-fade-in"
+        >
+          <div className="relative w-full max-w-md rounded-2xl border border-glass-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-glass-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <Phone size={16} />
+                </div>
+                <h3 className="text-base font-bold text-foreground">填写与修改联系电话</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPhoneModal(false)}
+                className="text-text-muted hover:text-foreground p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {errorMessage && (
+              <div role="alert" className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+                <AlertCircle size={14} />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSavePhone} className="space-y-4">
+              <div>
+                <label className="text-xs text-text-secondary mb-1 block font-medium">称呼 / 姓名</label>
+                <input
+                  type="text"
+                  className="glass-input w-full text-sm"
+                  placeholder="请输入您的称呼"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-text-secondary mb-1 block font-medium">联系电话 / 手机号</label>
+                <input
+                  type="tel"
+                  required
+                  autoFocus
+                  className="glass-input w-full text-sm"
+                  placeholder="例如：13800000000"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                />
+                <p className="text-[11px] text-text-muted mt-1">用于平台商单签约通知、赏金结算核对与紧急联络</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-glass-border">
+                <button
+                  type="button"
+                  onClick={() => setShowPhoneModal(false)}
+                  className="glass-button text-xs py-2 px-3"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPhone}
+                  className="bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-primary-hover transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                >
+                  {savingPhone ? "保存中..." : "保存联系电话"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

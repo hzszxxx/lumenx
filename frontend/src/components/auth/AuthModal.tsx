@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { LogIn, UserPlus, X, Sparkles } from "lucide-react";
 import { usePlatformStore } from "@/store/platformStore";
-import { formatPlatformError } from "@/lib/platformApi";
+import { formatPlatformError, platformApi } from "@/lib/platformApi";
 import LumenXBranding from "@/components/layout/LumenXBranding";
 
 interface AuthModalProps {
@@ -26,9 +26,22 @@ export default function AuthModal({
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [inviteRequired, setInviteRequired] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const { login, register, loading, error: storeError, devLogin, clearError } = usePlatformStore();
+
+  useEffect(() => {
+    if (isOpen) {
+      platformApi.authConfig()
+        .then((cfg) => {
+          if (typeof cfg?.registration_invite_required === "boolean") {
+            setInviteRequired(cfg.registration_invite_required);
+          }
+        })
+        .catch(() => null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -43,6 +56,10 @@ export default function AuthModal({
       }
       if (password.length < 12) {
         setLocalError("密码长度不能少于 12 位字符");
+        return;
+      }
+      if (inviteRequired && !inviteCode.trim()) {
+        setLocalError("当前平台开放注册需要有效的内测邀请码");
         return;
       }
     }
@@ -150,14 +167,27 @@ export default function AuthModal({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">邀请码（选填）</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">
+                  邀请码{" "}
+                  {inviteRequired ? (
+                    <span className="text-amber-500 font-semibold">（必填）</span>
+                  ) : (
+                    <span className="text-text-muted">（选填）</span>
+                  )}
+                </label>
                 <input
                   type="text"
+                  required={inviteRequired}
                   className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
-                  placeholder="如有内测邀请码请输入"
+                  placeholder={inviteRequired ? "请输入内测邀请码（必填）" : "如有内测邀请码请输入（选填）"}
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                 />
+                {inviteRequired && (
+                  <p className="mt-1 text-[11px] text-amber-500/80">
+                    当前测试阶段需凭有效邀请码完成注册
+                  </p>
+                )}
               </div>
             </>
           )}

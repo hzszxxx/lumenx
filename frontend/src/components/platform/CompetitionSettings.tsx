@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Trophy, Calendar, Award, CheckCircle2, ChevronRight, FileText, Users, Sparkles, Loader2, Zap, Flame, ShieldCheck } from "lucide-react";
 import { platformApi, type PlatformCompetition } from "@/lib/platformApi";
 import { usePlatformStore } from "@/store/platformStore";
+import PlatformMarkdownView from "@/components/platform/PlatformMarkdownView";
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   enrolling: { label: "报名中", color: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
@@ -322,8 +323,8 @@ export default function CompetitionSettings() {
                     <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                       <FileText size={13} /> 详细赛制指南与评选维度
                     </h4>
-                    <div className="bg-surface-inset/80 rounded-2xl p-5 text-xs text-text-secondary leading-relaxed whitespace-pre-line border border-glass-border font-sans shadow-inner">
-                      {comp.rules_markdown}
+                    <div className="bg-surface-inset/80 rounded-2xl p-5 border border-glass-border font-sans shadow-inner">
+                      <PlatformMarkdownView content={comp.rules_markdown} />
                     </div>
                     <div className="mt-4 flex justify-end">
                       <button

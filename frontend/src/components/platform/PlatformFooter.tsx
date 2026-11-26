@@ -1,9 +1,13 @@
 "use client";
 
-import { ShieldCheck, Sparkles, Film, GraduationCap, Trophy, BriefcaseBusiness, Cpu, FileCheck, Layers, ChevronRight, Lock } from "lucide-react";
+import { useState } from "react";
+import { ShieldCheck, Sparkles, Film, GraduationCap, Trophy, BriefcaseBusiness, Cpu, FileCheck, Layers, ChevronRight, Lock, Package } from "lucide-react";
 import LumenXBranding from "@/components/layout/LumenXBranding";
+import TestAssetsModal from "@/components/platform/TestAssetsModal";
 
 export default function PlatformFooter() {
+  const [showTestAssetsModal, setShowTestAssetsModal] = useState(false);
+
   const navigateTo = (hash: string) => {
     window.location.hash = hash;
   };
@@ -26,6 +30,14 @@ export default function PlatformFooter() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowTestAssetsModal(true)}
+              className="glass-button text-xs font-medium flex items-center gap-1.5 hover:border-primary/50 text-foreground"
+            >
+              <Package size={13} className="text-primary" />
+              验收测试素材箱
+            </button>
             <button
               type="button"
               onClick={() => navigateTo("#/atelier")}
@@ -220,6 +232,11 @@ export default function PlatformFooter() {
           </div>
         </div>
       </div>
+
+      <TestAssetsModal
+        isOpen={showTestAssetsModal}
+        onClose={() => setShowTestAssetsModal(false)}
+      />
     </footer>
   );
 }

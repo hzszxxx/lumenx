@@ -923,9 +923,22 @@ export default function TaskSettings() {
                         {deliveringTaskId === task.id ? (
                           <div className="space-y-3 pt-2 border-t border-glass-border">
                             <div>
-                              <label className="text-[11px] text-text-muted block mb-1">
-                                交付说明 / 样片信息
-                              </label>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] text-text-muted block">
+                                  交付说明 / 样片信息
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeliveryNote("【验收测试】已根据 Brief 完成前 3 集电影级分镜，画幅 9:16，1080P，内置影伴初审半透明防盗水印，交付测试样片地址：/sample-assets/sample_preview.mp4");
+                                    setWatermarkConfirmed(true);
+                                  }}
+                                  className="text-[11px] text-primary hover:underline inline-flex items-center gap-1 font-medium cursor-pointer"
+                                >
+                                  <Sparkles size={11} />
+                                  一键填入验收测试样片
+                                </button>
+                              </div>
                               <textarea
                                 className="glass-input w-full min-h-[70px] text-xs font-sans"
                                 value={deliveryNote}
