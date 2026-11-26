@@ -149,6 +149,88 @@ export function clearPlatformToken() {
   if (typeof window !== "undefined") window.localStorage.removeItem(TOKEN_KEY);
 }
 
+export function formatPlatformError(detail: unknown): string {
+  if (typeof detail === "string") {
+    const trimmed = detail.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return formatPlatformError(parsed);
+      } catch {
+        // Not valid JSON, continue with string handling
+      }
+    }
+    const knownMessages: Record<string, string> = {
+      invalid_credentials: "账号或密码错误",
+      weak_password: "密码长度至少需要 12 位字符",
+      invite_required: "需要有效的内测邀请码",
+      invalid_invite: "邀请码无效、已过期或已被使用",
+      user_exists: "该用户名已被注册，请尝试其他用户名或直接登录",
+      user_not_found: "用户不存在",
+      account_disabled: "账户已被禁用，请联系管理员",
+      session_invalid: "登录会话已失效，请重新登录",
+      permission_denied: "权限不足",
+    };
+    return knownMessages[trimmed] || trimmed;
+  }
+  if (!detail) return "请求处理失败，请稍后重试";
+
+  if (typeof detail === "object" && !Array.isArray(detail)) {
+    const obj = detail as Record<string, any>;
+    if (obj.message && typeof obj.message === "string") {
+      return formatPlatformError(obj.message);
+    }
+    if (obj.code && typeof obj.code === "string") {
+      return formatPlatformError(obj.code);
+    }
+    if (obj.error && typeof obj.error === "string") {
+      return formatPlatformError(obj.error);
+    }
+  }
+
+  if (Array.isArray(detail)) {
+    const fieldLabels: Record<string, string> = {
+      username: "用户名",
+      password: "密码",
+      email: "电子邮箱",
+      invite_code: "邀请码",
+      code: "邀请码",
+    };
+
+    const messages = detail.map((err) => {
+      if (typeof err === "string") return formatPlatformError(err);
+      if (!err || typeof err !== "object") return "输入内容不符合要求";
+      const loc = Array.isArray(err.loc) ? err.loc : [];
+      const fieldKey = String(loc[loc.length - 1] || "");
+      const fieldLabel = fieldLabels[fieldKey] || (fieldKey ? fieldKey : "输入项");
+      const errType = String(err.type || "");
+      const ctx = (err.ctx && typeof err.ctx === "object") ? err.ctx : {};
+      const msg = String(err.msg || "");
+
+      if (errType === "string_too_short" || msg.includes("at least")) {
+        const minLen = ctx.min_length || (msg.match(/at least (\d+)/)?.[1]);
+        return `${fieldLabel}长度不能少于 ${minLen || ""} 位字符`.replace(/\s+/g, " ").trim();
+      }
+      if (errType === "string_too_long" || msg.includes("at most")) {
+        const maxLen = ctx.max_length || (msg.match(/at most (\d+)/)?.[1]);
+        return `${fieldLabel}长度不能超过 ${maxLen || ""} 位字符`.replace(/\s+/g, " ").trim();
+      }
+      if (errType === "value_error.email" || fieldKey === "email") {
+        return "请输入有效的电子邮箱格式";
+      }
+      if (msg) {
+        return `${fieldLabel}: ${msg}`;
+      }
+      return `${fieldLabel}格式不符合要求`;
+    });
+
+    const uniqueMessages = Array.from(new Set(messages.filter(Boolean)));
+    return uniqueMessages.join("；");
+  }
+
+  return String(detail);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
@@ -157,8 +239,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${getApiUrl()}/api/platform${path}`, { ...init, headers });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = body?.detail?.message || body?.detail || `Platform request failed (${response.status})`;
-    throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+    const rawDetail = body?.detail?.message || body?.detail;
+    const message = formatPlatformError(rawDetail) || `Platform request failed (${response.status})`;
+    throw new Error(message);
   }
   return body as T;
 }

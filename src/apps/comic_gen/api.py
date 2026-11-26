@@ -1317,7 +1317,8 @@ def create_app(
             "src.apps.atelier.agent_loop_api",
             "src.apps.atelier.project_package_api",
         }
-        if not atelier_validation and (
+        platform_validation = bool(endpoint_module and endpoint_module.startswith("src.apps.platform"))
+        if not atelier_validation and not platform_validation and (
             request.method != "POST" or route_path not in safe_validation_routes
         ):
             return await request_validation_exception_handler(request, exc)

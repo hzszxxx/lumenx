@@ -50,7 +50,7 @@ def handle(fn):
 
 
 class RegisterIn(BaseModel):
-    username: str = Field(min_length=3, max_length=50)
+    username: str = Field(min_length=2, max_length=50)
     password: str = Field(min_length=12, max_length=200)
     email: str | None = None
     invite_code: str = Field(default="", max_length=64)

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { LogIn, UserPlus, X, Sparkles } from "lucide-react";
 import { usePlatformStore } from "@/store/platformStore";
+import { formatPlatformError } from "@/lib/platformApi";
 import LumenXBranding from "@/components/layout/LumenXBranding";
 
 interface AuthModalProps {
@@ -27,18 +28,29 @@ export default function AuthModal({
   const [inviteCode, setInviteCode] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { login, register, loading, error: storeError, devLogin } = usePlatformStore();
+  const { login, register, loading, error: storeError, devLogin, clearError } = usePlatformStore();
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    const trimmedUsername = username.trim();
+    if (isRegister) {
+      if (trimmedUsername.length < 2) {
+        setLocalError("用户名长度不能少于 2 位字符");
+        return;
+      }
+      if (password.length < 12) {
+        setLocalError("密码长度不能少于 12 位字符");
+        return;
+      }
+    }
     try {
       if (isRegister) {
-        await register(username, password, email || undefined, inviteCode || undefined);
+        await register(trimmedUsername, password, email || undefined, inviteCode || undefined);
       } else {
-        await login(username, password);
+        await login(trimmedUsername, password);
       }
       setPassword("");
       if (onSuccess) {
@@ -46,11 +58,13 @@ export default function AuthModal({
       }
       onClose();
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : "登录或注册失败，请检查账号密码");
+      const msg = err instanceof Error ? err.message : "登录或注册失败，请检查账号密码";
+      setLocalError(formatPlatformError(msg));
     }
   };
 
-  const currentError = localError || storeError;
+  const rawError = localError || storeError;
+  const currentError = rawError ? formatPlatformError(rawError) : null;
 
   return (
     <div
@@ -95,8 +109,10 @@ export default function AuthModal({
               type="text"
               required
               autoFocus
+              minLength={2}
+              maxLength={50}
               className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
-              placeholder="请输入用户名"
+              placeholder={isRegister ? "请输入用户名（至少 2 个字符）" : "请输入用户名"}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -107,11 +123,17 @@ export default function AuthModal({
             <input
               type="password"
               required
+              minLength={isRegister ? 12 : 1}
               className="glass-input w-full text-sm text-foreground placeholder:text-text-muted"
-              placeholder="请输入密码"
+              placeholder={isRegister ? "请输入密码（至少 12 位字符）" : "请输入密码"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {isRegister && (
+              <p className="mt-1 text-[11px] text-text-muted">
+                密码需至少 12 位字符，建议混合数字与字母
+              </p>
+            )}
           </div>
 
           {isRegister && (
@@ -163,7 +185,7 @@ export default function AuthModal({
               已有账号？{" "}
               <button
                 type="button"
-                onClick={() => { setIsRegister(false); setLocalError(null); }}
+                onClick={() => { setIsRegister(false); setLocalError(null); clearError?.(); }}
                 className="text-primary font-medium hover:underline ml-1"
               >
                 直接登录
@@ -174,7 +196,7 @@ export default function AuthModal({
               还没有账号？{" "}
               <button
                 type="button"
-                onClick={() => { setIsRegister(true); setLocalError(null); }}
+                onClick={() => { setIsRegister(true); setLocalError(null); clearError?.(); }}
                 className="text-primary font-medium hover:underline ml-1"
               >
                 免费注册
