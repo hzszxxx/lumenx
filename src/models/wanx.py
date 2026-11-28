@@ -1633,7 +1633,29 @@ class WanxModel(VideoGenModel):
         
         if response.status_code != 200:
             error_data = response.json() if response.text else {}
+            error_code = error_data.get('code', '')
             error_msg = error_data.get('message', response.text)
+            if response.status_code == 403 and error_code == "AccessDenied.Unpurchased" and model_name == "wan2.7-i2v":
+                logger.warning("DashScope wan2.7-i2v returned AccessDenied.Unpurchased; falling back to wan2.6-i2v")
+                return self._generate_wan_i2v_http(
+                    img_url=img_url,
+                    prompt=prompt,
+                    duration=duration,
+                    resolution=resolution,
+                    prompt_extend=prompt_extend,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    model_name="wan2.6-i2v",
+                    audio_url=audio_url,
+                    generate_audio=generate_audio,
+                    shot_type=shot_type,
+                    watermark=watermark,
+                    extra_headers=extra_headers,
+                )
+            if error_code == "AccessDenied.Unpurchased":
+                raise RuntimeError(f"{model_name} 尚未在阿里云百炼开通使用权限 (AccessDenied.Unpurchased): {error_msg}")
+            if response.status_code == 401:
+                raise RuntimeError(f"{model_name} 鉴权失败，请检查 DashScope API Key 是否正确配置 (401)")
             raise RuntimeError(f"{model_name} task creation failed: {error_msg}")
         
         result = response.json()
@@ -1739,7 +1761,29 @@ class WanxModel(VideoGenModel):
         
         if response.status_code != 200:
             error_data = response.json() if response.text else {}
+            error_code = error_data.get('code', '')
             error_msg = error_data.get('message', response.text)
+            if response.status_code == 403 and error_code == "AccessDenied.Unpurchased" and model_name == "wan2.7-i2v":
+                logger.warning("DashScope wan2.7-i2v returned AccessDenied.Unpurchased; falling back to wan2.6-i2v")
+                return self._generate_wan_i2v_http(
+                    img_url=img_url,
+                    prompt=prompt,
+                    duration=duration,
+                    resolution=resolution,
+                    prompt_extend=prompt_extend,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    model_name="wan2.6-i2v",
+                    audio_url=audio_url,
+                    generate_audio=generate_audio,
+                    shot_type=shot_type,
+                    watermark=watermark,
+                    extra_headers=extra_headers,
+                )
+            if error_code == "AccessDenied.Unpurchased":
+                raise RuntimeError(f"{model_name} 尚未在阿里云百炼开通使用权限 (AccessDenied.Unpurchased): {error_msg}")
+            if response.status_code == 401:
+                raise RuntimeError(f"{model_name} 鉴权失败，请检查 DashScope API Key 是否正确配置 (401)")
             raise RuntimeError(f"{model_name} task creation failed: {error_msg}")
         
         result = response.json()
@@ -1856,7 +1900,29 @@ class WanxModel(VideoGenModel):
 
         if response.status_code != 200:
             error_data = response.json() if response.text else {}
+            error_code = error_data.get('code', '')
             error_msg = error_data.get('message', response.text)
+            if response.status_code == 403 and error_code == "AccessDenied.Unpurchased" and model_name == "wan2.7-i2v":
+                logger.warning("DashScope wan2.7-i2v returned AccessDenied.Unpurchased; falling back to wan2.6-i2v")
+                return self._generate_wan_i2v_http(
+                    img_url=img_url,
+                    prompt=prompt,
+                    duration=duration,
+                    resolution=resolution,
+                    prompt_extend=prompt_extend,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    model_name="wan2.6-i2v",
+                    audio_url=audio_url,
+                    generate_audio=generate_audio,
+                    shot_type=shot_type,
+                    watermark=watermark,
+                    extra_headers=extra_headers,
+                )
+            if error_code == "AccessDenied.Unpurchased":
+                raise RuntimeError(f"{model_name} 尚未在阿里云百炼开通使用权限 (AccessDenied.Unpurchased): {error_msg}")
+            if response.status_code == 401:
+                raise RuntimeError(f"{model_name} 鉴权失败，请检查 DashScope API Key 是否正确配置 (401)")
             raise RuntimeError(f"{model_name} task creation failed: {error_msg}")
 
         result = response.json()

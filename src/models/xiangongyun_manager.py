@@ -185,6 +185,43 @@ class XiangongyunClient:
         )
 
 
+_H3_PREFERRED_GPU_KEYWORDS = ("4090", "a100", "l40", "h100", "h800", "4090d")
+
+
+def resolve_gpu_model_for_instance(inst: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Return the instance's GPU model or recommended H3 default for auto-boot."""
+    if not isinstance(inst, dict):
+        return None
+    raw_gpu = str(inst.get("gpu_model") or inst.get("gpu") or "").strip()
+    if raw_gpu:
+        return raw_gpu
+    name = str(inst.get("name") or "").lower()
+    for kw in _H3_PREFERRED_GPU_KEYWORDS:
+        if kw in name:
+            return kw.upper()
+    return "RTX 4090"
+
+
+def select_best_h3_instance(instances: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Automatically match the best Xiangongyun instance (running + H3-capable GPU first)."""
+    if not instances:
+        return None
+
+    def _score(inst: Dict[str, Any]) -> tuple[int, int, int]:
+        status = str(inst.get("status") or "").lower()
+        is_running = 1 if status == "running" else 0
+        gpu_text = f"{inst.get('gpu_model', '')} {inst.get('name', '')}".lower()
+        is_h3 = 1 if ("h3" in gpu_text or "minimax" in gpu_text) else 0
+        gpu_rank = 0
+        for idx, kw in enumerate(_H3_PREFERRED_GPU_KEYWORDS):
+            if kw in gpu_text:
+                gpu_rank = len(_H3_PREFERRED_GPU_KEYWORDS) - idx
+                break
+        return (is_running, is_h3, gpu_rank)
+
+    return max(instances, key=_score)
+
+
 class XiangongyunBatchRegistry:
     """In-memory thread-safe state registry for active and recent batch jobs."""
 

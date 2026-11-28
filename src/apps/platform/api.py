@@ -57,6 +57,7 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel): username: str; password: str
+class UserProfileUpdateIn(BaseModel): email: str | None = Field(default=None, max_length=120)
 class RegistrationInviteIn(BaseModel):
     code: str | None = Field(default=None, min_length=6, max_length=64)
     max_uses: int = Field(default=1, ge=1, le=100000)
@@ -300,6 +301,10 @@ def login(body: LoginIn, svc: PlatformService = Depends(service)): return handle
 @router.get("/auth/me")
 def me(user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: {**user, "wallet": svc.wallet(user)})
 
+@router.patch("/auth/me")
+def update_me(body: UserProfileUpdateIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.update_user_email(user, body.email))
+
 @router.post("/auth/logout")
 def logout(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), svc: PlatformService = Depends(service)):
     if credentials: svc.logout(credentials.credentials)
@@ -525,6 +530,14 @@ def square(user=Depends(optional_user), svc: PlatformService = Depends(service))
 
 @router.post("/tasks")
 def create_task(body: TaskIn, user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.create_task(user, body.model_dump()))
+
+@router.patch("/tasks/{task_id}")
+def update_task(task_id: str, body: TaskIn, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.update_task(user, task_id, body.model_dump()))
+
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: str, user=Depends(current_user), svc: PlatformService = Depends(service)):
+    return handle(lambda: svc.delete_task(user, task_id))
 
 @router.post("/tasks/{task_id}/claim")
 def claim(task_id: str, idempotency_key: str = Header(..., alias="Idempotency-Key"), user=Depends(current_user), svc: PlatformService = Depends(service)): return handle(lambda: svc.claim_task(user, task_id, idempotency_key))

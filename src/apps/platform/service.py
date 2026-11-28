@@ -1324,23 +1324,83 @@ class PlatformService:
             "reference_media_json": json.dumps(payload["reference_media_json"], ensure_ascii=False) if isinstance(payload.get("reference_media_json"), list) else str(payload.get("reference_media_json") or "[]"),
             "client_name": str(payload.get("client_name") or ""),
             "level_tier": str(payload.get("level_tier") or "standard"),
+            "created_by": actor["id"],
             "version": 0,
             "created_at": now(),
         }
         with connect(self.path) as c:
             c.execute(
-                "INSERT INTO commercial_tasks (id,title,category,brief_markdown,bounty_cents,required_level,deadline,status,version,created_at,demand_type,deliverable_specs_json,budget_mode,budget_min_cents,budget_max_cents,settlement_mode,milestone_specs_json,copyright_terms_json,acceptance_criteria_json,reference_media_json,client_name,level_tier) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO commercial_tasks (id,title,category,brief_markdown,bounty_cents,required_level,deadline,status,version,created_at,demand_type,deliverable_specs_json,budget_mode,budget_min_cents,budget_max_cents,settlement_mode,milestone_specs_json,copyright_terms_json,acceptance_criteria_json,reference_media_json,client_name,level_tier,created_by) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     item["id"], item["title"], item["category"], item["brief_markdown"], item["bounty_cents"],
                     item.get("required_level", "standard"), item["deadline"], item["status"], 0, item["created_at"],
                     item["demand_type"], item["deliverable_specs_json"], item["budget_mode"], item["budget_min_cents"],
                     item["budget_max_cents"], item["settlement_mode"], item["milestone_specs_json"],
                     item["copyright_terms_json"], item["acceptance_criteria_json"], item["reference_media_json"],
-                    item["client_name"], item["level_tier"],
+                    item["client_name"], item["level_tier"], item["created_by"],
                 ),
             )
         return item
+
+    def update_user_email(self, actor: dict[str, Any], email: str | None) -> dict[str, Any]:
+        cleaned = (email or "").strip() or None
+        if cleaned is not None and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", cleaned):
+            raise PlatformError("invalid_email", "请输入有效的电子邮箱格式", 422)
+        timestamp = now()
+        with connect(self.path) as c:
+            c.execute("UPDATE platform_users SET email=?, updated_at=? WHERE id=?", (cleaned, timestamp, actor["id"]))
+            self._audit(c, actor["id"], "user.email.updated", "user", actor["id"], {"email_set": bool(cleaned)})
+            row = c.execute("SELECT id,username,email,role,is_active,created_at,updated_at FROM platform_users WHERE id=?", (actor["id"],)).fetchone()
+        if not row:
+            raise PlatformError("user_not_found", "user not found", 404)
+        return dict(zip(("id", "username", "email", "role", "is_active", "created_at", "updated_at"), row))
+
+    def update_task(self, actor: dict[str, Any], task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        with connect(self.path) as c:
+            row = c.execute("SELECT id,status,created_by,claimed_by,version FROM commercial_tasks WHERE id=?", (task_id,)).fetchone()
+            if not row:
+                raise PlatformError("task_not_found", "task not found", 404)
+            _, status, created_by, claimed_by, version = row
+            if actor["role"] != "admin" and created_by != actor["id"]:
+                raise PlatformError("forbidden", "仅任务发布者或管理员可修改该商业需求", 403)
+            if status not in {"draft", "published"} or claimed_by:
+                raise PlatformError("invalid_task_state", "已被认领或进入交付阶段的任务不可修改", 409)
+            specs_json = json.dumps(payload["deliverable_specs_json"], ensure_ascii=False) if isinstance(payload.get("deliverable_specs_json"), (dict, list)) else str(payload.get("deliverable_specs_json") or "{}")
+            milestone_json = json.dumps(payload["milestone_specs_json"], ensure_ascii=False) if isinstance(payload.get("milestone_specs_json"), list) else str(payload.get("milestone_specs_json") or "[]")
+            copyright_json = json.dumps(payload["copyright_terms_json"], ensure_ascii=False) if isinstance(payload.get("copyright_terms_json"), dict) else str(payload.get("copyright_terms_json") or "{}")
+            criteria_json = json.dumps(payload["acceptance_criteria_json"], ensure_ascii=False) if isinstance(payload.get("acceptance_criteria_json"), list) else str(payload.get("acceptance_criteria_json") or "[]")
+            ref_json = json.dumps(payload["reference_media_json"], ensure_ascii=False) if isinstance(payload.get("reference_media_json"), list) else str(payload.get("reference_media_json") or "[]")
+            c.execute(
+                "UPDATE commercial_tasks SET title=?,category=?,brief_markdown=?,bounty_cents=?,required_level=?,deadline=?,status=?,demand_type=?,deliverable_specs_json=?,budget_mode=?,budget_min_cents=?,budget_max_cents=?,settlement_mode=?,milestone_specs_json=?,copyright_terms_json=?,acceptance_criteria_json=?,reference_media_json=?,client_name=?,level_tier=?,version=? WHERE id=?",
+                (
+                    payload["title"], payload["category"], payload["brief_markdown"], int(payload["bounty_cents"]),
+                    payload.get("required_level", "standard"), payload["deadline"], payload.get("status", status),
+                    payload.get("demand_type", "ai_drama"), specs_json, payload.get("budget_mode", "fixed"),
+                    int(payload.get("budget_min_cents") or 0), int(payload.get("budget_max_cents") or 0),
+                    payload.get("settlement_mode", "one_time"), milestone_json, copyright_json, criteria_json, ref_json,
+                    str(payload.get("client_name") or ""), str(payload.get("level_tier") or "standard"), int(version) + 1, task_id,
+                ),
+            )
+            self._audit(c, actor["id"], "task.updated", "task", task_id, {"title": payload["title"]})
+        items = [t for t in self.task_square(actor) if t["id"] == task_id]
+        return items[0] if items else {"id": task_id, "status": payload.get("status", status)}
+
+    def delete_task(self, actor: dict[str, Any], task_id: str) -> dict[str, Any]:
+        with connect(self.path) as c:
+            row = c.execute("SELECT id,status,created_by,claimed_by FROM commercial_tasks WHERE id=?", (task_id,)).fetchone()
+            if not row:
+                raise PlatformError("task_not_found", "task not found", 404)
+            _, status, created_by, claimed_by = row
+            if actor["role"] != "admin" and created_by != actor["id"]:
+                raise PlatformError("forbidden", "仅任务发布者或管理员可删除该商业需求", 403)
+            if status not in {"draft", "published"} or claimed_by:
+                raise PlatformError("invalid_task_state", "已被认领或进入交付阶段的任务不可删除", 409)
+            c.execute("DELETE FROM task_history WHERE task_id=?", (task_id,))
+            c.execute("DELETE FROM commercial_contracts WHERE task_id=?", (task_id,))
+            c.execute("DELETE FROM commercial_tasks WHERE id=?", (task_id,))
+            self._audit(c, actor["id"], "task.deleted", "task", task_id, {})
+        return {"deleted": True, "id": task_id}
 
     def task_square(self, actor: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         cols = [
@@ -1348,7 +1408,7 @@ class PlatformService:
             "status", "version", "created_at", "claimed_by", "demand_type", "deliverable_specs_json",
             "budget_mode", "budget_min_cents", "budget_max_cents", "settlement_mode", "milestone_specs_json",
             "copyright_terms_json", "acceptance_criteria_json", "reference_media_json", "client_name", "level_tier",
-            "contract_id", "contract_signed_at",
+            "contract_id", "contract_signed_at", "created_by",
         ]
         col_sql = ",".join(cols)
         with connect(self.path) as c:

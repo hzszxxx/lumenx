@@ -4881,8 +4881,10 @@ def run_xiangongyun_batch_worker(
 
         inst_status = str(inst.get("status", "")).lower()
         if inst_status != "running":
-            batch_registry.update_batch(batch_id, status="booting", current_step="正在开机启动服务器 (约需1-2分钟)...")
-            client.boot_instance(instance_id)
+            from ...models.xiangongyun_manager import resolve_gpu_model_for_instance
+            matched_gpu = resolve_gpu_model_for_instance(inst)
+            batch_registry.update_batch(batch_id, status="booting", current_step=f"正在自动匹配算力 ({matched_gpu or 'H3 GPU'}) 并开机启动服务器 (约需1-2分钟)...")
+            client.boot_instance(instance_id, gpu_model=matched_gpu)
         else:
             batch_registry.update_batch(batch_id, status="booting", current_step="实例已开机，正在验证端口就绪...")
 
@@ -5035,8 +5037,9 @@ def create_xiangongyun_batch(
 
     target_instance_id = batch_req.instance_id
     if not target_instance_id:
-        running_inst = next((i for i in instances if str(i.get("status", "")).lower() == "running"), None)
-        target_instance_id = str(running_inst.get("id")) if running_inst else str(instances[0].get("id"))
+        from ...models.xiangongyun_manager import select_best_h3_instance
+        matched_inst = select_best_h3_instance(instances)
+        target_instance_id = str(matched_inst.get("id")) if matched_inst else str(instances[0].get("id"))
 
     active_existing = batch_registry.find_active_batch_for_project(script_id)
     if active_existing:
