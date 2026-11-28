@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Server, Power, Loader2, CheckCircle2, AlertTriangle, Play, RefreshCw, XCircle } from "lucide-react";
+import { Server, Power, Loader2, CheckCircle2, AlertTriangle, Play, RefreshCw, XCircle, Sparkles } from "lucide-react";
 import {
     api,
     type XiangongyunServerStatusResponse,
@@ -208,9 +208,9 @@ export default function XiangongyunBatchBar({
                                     已自动匹配 {stoppedInstance.gpu_model || "RTX 4090"} (生成时自动开机)
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    未检测到实例 (请在控制台部署)
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary border border-primary/30">
+                                    <Sparkles className="w-3 h-3" />
+                                    自动调度就绪 (生成时自动匹配 GPU 并部署 H3 实例)
                                 </span>
                             )}
                             <span className="text-xs text-slate-400">

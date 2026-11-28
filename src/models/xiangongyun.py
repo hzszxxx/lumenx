@@ -213,7 +213,10 @@ class XiangongyunH3Model(VideoGenModel):
         if not endpoint:
             if not self.access_token:
                 raise RuntimeError("仙宫云 H3 模型未配置 Access Token 或 Endpoint，请先在平台凭证中绑定仙宫云账号。")
-            raise RuntimeError("仙宫云账号下未检测到运行中的 GPU 实例（实例列表为空）。请先在仙宫云控制台启动 H3 算力实例，或切换为 Wan / Kling 等云端模型。")
+            from .xiangongyun_manager import XiangongyunClient, ensure_h3_instance
+            client = XiangongyunClient(self.access_token, open_api_base=self.open_api_base)
+            instance_id, _, _ = ensure_h3_instance(client)
+            endpoint = client.wait_until_ready(instance_id, timeout_sec=300)
 
         # Live API dispatch
         image_payload = self._resolve_image_input(img_path or img_url)

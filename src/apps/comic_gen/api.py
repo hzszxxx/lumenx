@@ -5085,18 +5085,19 @@ def create_xiangongyun_batch(
         if balance <= 0:
             raise HTTPException(status_code=400, detail=f"仙宫云账户余额不足 (当前: ¥{balance:.2f})，请先充值")
         instances = client.list_instances()
-        if not instances:
-            raise HTTPException(status_code=400, detail="仙宫云账号下未找到任何 GPU 实例，请先在控制台创建 H3 实例")
+        target_instance_id = batch_req.instance_id
+        if not target_instance_id:
+            if instances:
+                from ...models.xiangongyun_manager import select_best_h3_instance
+                matched_inst = select_best_h3_instance(instances)
+                target_instance_id = str(matched_inst.get("id")) if matched_inst else str(instances[0].get("id"))
+            else:
+                from ...models.xiangongyun_manager import ensure_h3_instance
+                target_instance_id, _, _ = ensure_h3_instance(client)
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"连接仙宫云接口失败: {exc}")
-
-    target_instance_id = batch_req.instance_id
-    if not target_instance_id:
-        from ...models.xiangongyun_manager import select_best_h3_instance
-        matched_inst = select_best_h3_instance(instances)
-        target_instance_id = str(matched_inst.get("id")) if matched_inst else str(instances[0].get("id"))
+        raise HTTPException(status_code=400 if "库存" in str(exc) else 502, detail=f"{exc}")
 
     active_existing = batch_registry.find_active_batch_for_project(script_id)
     if active_existing:

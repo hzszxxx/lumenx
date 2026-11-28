@@ -95,3 +95,31 @@ def test_client_mock_methods(monkeypatch):
     )
     shutdown_res = client.shutdown_release_gpu("inst-1")
     assert shutdown_res.get("success") is True
+
+
+def test_ensure_h3_instance_auto_deploys_when_empty(monkeypatch):
+    from src.models.xiangongyun_manager import XiangongyunClient, ensure_h3_instance
+
+    client = XiangongyunClient("tok_test")
+    monkeypatch.setattr(client, "list_instances", lambda: [])
+    monkeypatch.setattr(
+        client,
+        "list_gpus",
+        lambda: [
+            {"gpu_model": "NVIDIA GeForce RTX 4090", "gpu_memory": 24, "price_per_hour": 1.89, "data_centers": [{"data_center_id": 1, "available": 2}]},
+            {"gpu_model": "NVIDIA GeForce RTX 4090 D 48G", "gpu_memory": 48, "price_per_hour": 2.59, "data_centers": [{"data_center_id": 1, "available": 1}]},
+        ],
+    )
+    deployed = {}
+
+    def fake_deploy(*, gpu_model, data_center_id=1, image_id=None, name=None):
+        deployed["gpu_model"] = gpu_model
+        deployed["data_center_id"] = data_center_id
+        return "inst_new_48g"
+
+    monkeypatch.setattr(client, "deploy_instance", fake_deploy)
+    inst_id, gpu_model, newly_deployed = ensure_h3_instance(client)
+    assert inst_id == "inst_new_48g"
+    assert gpu_model == "NVIDIA GeForce RTX 4090 D 48G"
+    assert newly_deployed is True
+    assert deployed["data_center_id"] == 1

@@ -18,6 +18,7 @@ from requests.adapters import HTTPAdapter
 logger = logging.getLogger(__name__)
 
 DEFAULT_XIANGONGYUN_OPEN_API = "https://api.xiangongyun.com"
+DEFAULT_H3_IMAGE_ID = os.environ.get("XIANGONGYUN_H3_IMAGE_ID", "4750495f-12bf-4bd7-93f4-f05b20dcbb77")
 MAX_BATCH_SIZE = 10
 _ORIG_REQUESTS_GET = requests.get
 _ORIG_REQUESTS_POST = requests.post
@@ -152,6 +153,100 @@ class XiangongyunClient:
             logger.warning(f"关机释放 GPU 网络异常: {exc}")
             return {}
 
+    def list_gpus(self) -> List[Dict[str, Any]]:
+        """List available GPU models and stock counts across datacenters."""
+        try:
+            resp = self._get(
+                f"{self.open_api_base}/open/gpus",
+                headers=self._headers(),
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                raise XiangongyunManagerError(f"查询仙宫云 GPU 库存失败 (HTTP {resp.status_code})")
+            payload = resp.json()
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if isinstance(data, list):
+                return [item for item in data if isinstance(item, dict)]
+            return []
+        except Exception as exc:
+            if isinstance(exc, XiangongyunManagerError):
+                raise
+            raise XiangongyunManagerError(f"无法连接仙宫云 GPU 库存接口: {exc}") from exc
+
+    def select_available_gpu_for_deploy(self, preferred_dc_id: int = 1) -> Optional[Tuple[str, int]]:
+        """Select the best in-stock GPU model and data_center_id (preferring 48G for H3)."""
+        gpus = self.list_gpus()
+        candidates: List[Tuple[int, float, str, int]] = []
+        for g in gpus:
+            gpu_model = str(g.get("gpu_model") or g.get("name") or "").strip()
+            if not gpu_model:
+                continue
+            gpu_mem = int(g.get("gpu_memory") or 0)
+            price = float(g.get("price_per_hour") or 999.0)
+            dcs = g.get("data_centers")
+            if isinstance(dcs, list) and dcs:
+                for dc in dcs:
+                    if not isinstance(dc, dict):
+                        continue
+                    avail = int(dc.get("available") or 0)
+                    if avail > 0:
+                        dc_id = int(dc.get("data_center_id") or preferred_dc_id)
+                        mem_tier = 2 if gpu_mem >= 48 else (1 if gpu_mem >= 24 else 0)
+                        candidates.append((mem_tier, -price, gpu_model, dc_id))
+            elif int(g.get("available") or 0) > 0:
+                mem_tier = 2 if gpu_mem >= 48 else (1 if gpu_mem >= 24 else 0)
+                candidates.append((mem_tier, -price, gpu_model, preferred_dc_id))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        _, _, best_gpu, best_dc = candidates[0]
+        return best_gpu, best_dc
+
+    def deploy_instance(
+        self,
+        *,
+        gpu_model: str,
+        data_center_id: int = 1,
+        image_id: str = DEFAULT_H3_IMAGE_ID,
+        name: Optional[str] = None,
+    ) -> str:
+        """Automatically deploy a new H3 GPU instance and return its instance ID."""
+        payload: Dict[str, Any] = {
+            "image_id": image_id,
+            "image_type": "community",
+            "gpu_model": gpu_model,
+            "gpu_used": 1,
+            "data_center_id": data_center_id,
+            "name": name or f"LumenX-H3-{int(time.time())}",
+        }
+        try:
+            resp = self._post(
+                f"{self.open_api_base}/open/instance/deploy",
+                json=payload,
+                headers=self._headers(),
+                timeout=20,
+            )
+            if resp.status_code != 200:
+                raise XiangongyunManagerError(
+                    f"仙宫云自动部署 H3 实例失败 (HTTP {resp.status_code}): {resp.text[:200]}"
+                )
+            result = resp.json()
+            if isinstance(result, dict) and result.get("success") is False:
+                msg = result.get("message") or result.get("msg") or "未知错误"
+                raise XiangongyunManagerError(f"仙宫云自动部署拒绝: {msg}")
+            data = result.get("data") if isinstance(result, dict) else None
+            inst_id = (
+                data.get("id") if isinstance(data, dict)
+                else (result.get("id") if isinstance(result, dict) else None)
+            )
+            if not inst_id:
+                raise XiangongyunManagerError(f"仙宫云部署返回格式异常（未包含实例 ID）: {result}")
+            return str(inst_id)
+        except Exception as exc:
+            if isinstance(exc, XiangongyunManagerError):
+                raise
+            raise XiangongyunManagerError(f"自动部署实例网络异常: {exc}") from exc
+
     def list_running_endpoints(self) -> List[str]:
         """Return all currently running instance endpoint URLs."""
         endpoints: List[str] = []
@@ -250,6 +345,28 @@ def select_best_h3_instance(instances: List[Dict[str, Any]]) -> Optional[Dict[st
         return (is_running, is_h3, gpu_rank)
 
     return max(instances, key=_score)
+
+
+def ensure_h3_instance(client: XiangongyunClient) -> Tuple[str, Optional[str], bool]:
+    """Return (instance_id, matched_gpu_model, newly_deployed) by auto-matching or auto-deploying."""
+    instances = client.list_instances()
+    if instances:
+        best = select_best_h3_instance(instances)
+        if best is not None:
+            inst_id = str(best.get("id"))
+            gpu_model = resolve_gpu_model_for_instance(best)
+            if str(best.get("status") or "").lower() != "running":
+                client.boot_instance(inst_id, gpu_model=gpu_model)
+            return inst_id, gpu_model, False
+
+    available = client.select_available_gpu_for_deploy()
+    if not available:
+        raise XiangongyunManagerError(
+            "仙宫云当前机房 GPU 算力库存已满（可用数为 0），暂时无法自动部署 H3 实例，请稍后再试或切换 Wan / Kling 等云端模型。"
+        )
+    gpu_model, dc_id = available
+    inst_id = client.deploy_instance(gpu_model=gpu_model, data_center_id=dc_id)
+    return inst_id, gpu_model, True
 
 
 class XiangongyunBatchRegistry:
