@@ -7,20 +7,49 @@ supporting I2V (image-to-video) and R2V (reference-to-video) with native audio/d
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import os
 import shutil
+import threading
 import time
+from collections import OrderedDict
 from types import MappingProxyType
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
 
 from .base import VideoGenModel
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_XIANGONGYUN_OPEN_API = "https://api.xiangongyun.com"
+
+_HTTP_SESSION = requests.Session()
+_HTTP_ADAPTER = HTTPAdapter(pool_connections=16, pool_maxsize=16)
+_HTTP_SESSION.mount("http://", _HTTP_ADAPTER)
+_HTTP_SESSION.mount("https://", _HTTP_ADAPTER)
+_ORIG_REQUESTS_GET = requests.get
+_ORIG_REQUESTS_POST = requests.post
+
+
+def _http_get(url: str, **kwargs):
+    if requests.get is _ORIG_REQUESTS_GET:
+        return _HTTP_SESSION.get(url, **kwargs)
+    return requests.get(url, **kwargs)
+
+
+def _http_post(url: str, **kwargs):
+    if requests.post is _ORIG_REQUESTS_POST:
+        return _HTTP_SESSION.post(url, **kwargs)
+    return requests.post(url, **kwargs)
+
+_CACHE_LOCK = threading.Lock()
+_IMAGE_B64_CACHE: OrderedDict[Tuple[str, float, int], str] = OrderedDict()
+_IMAGE_B64_CACHE_MAX = 64
+_ENDPOINT_CACHE: Dict[str, Tuple[float, str]] = {}
+_ENDPOINT_CACHE_TTL = 15.0
 
 # Path to standard test fixture MP4 for offline/simulation mode
 FIXTURE_MP4_PATH = os.path.abspath(
@@ -60,8 +89,14 @@ class XiangongyunH3Model(VideoGenModel):
         """Query Xiangongyun OpenAPI for running GPU instances if access_token is set."""
         if not self.access_token:
             return None
+        cache_key = hashlib.sha256(f"{self.open_api_base}:{self.access_token}".encode("utf-8")).hexdigest()
+        now = time.monotonic()
+        with _CACHE_LOCK:
+            cached = _ENDPOINT_CACHE.get(cache_key)
+            if cached and now - cached[0] < _ENDPOINT_CACHE_TTL:
+                return cached[1]
         try:
-            resp = requests.get(
+            resp = _http_get(
                 f"{self.open_api_base}/open/instances",
                 headers={"Authorization": f"Bearer {self.access_token}", "Accept": "application/json"},
                 timeout=5,
@@ -76,7 +111,10 @@ class XiangongyunH3Model(VideoGenModel):
                             ip = inst.get("public_ip") or inst.get("ip")
                             port = inst.get("port") or 8000
                             if ip:
-                                return f"http://{ip}:{port}"
+                                endpoint = f"http://{ip}:{port}"
+                                with _CACHE_LOCK:
+                                    _ENDPOINT_CACHE[cache_key] = (time.monotonic(), endpoint)
+                                return endpoint
         except Exception as exc:
             logger.debug(f"Failed to query Xiangongyun instances: {exc}")
         return None
@@ -96,6 +134,13 @@ class XiangongyunH3Model(VideoGenModel):
         for path in candidates:
             if os.path.isfile(path):
                 try:
+                    stat = os.stat(path)
+                    cache_key = (os.path.abspath(path), stat.st_mtime, stat.st_size)
+                    with _CACHE_LOCK:
+                        cached = _IMAGE_B64_CACHE.get(cache_key)
+                        if cached is not None:
+                            _IMAGE_B64_CACHE.move_to_end(cache_key)
+                            return cached
                     with open(path, "rb") as f:
                         data = f.read()
                     mime = "image/png"
@@ -104,7 +149,13 @@ class XiangongyunH3Model(VideoGenModel):
                     elif path.lower().endswith(".webp"):
                         mime = "image/webp"
                     encoded = base64.b64encode(data).decode("utf-8")
-                    return f"data:{mime};base64,{encoded}"
+                    uri = f"data:{mime};base64,{encoded}"
+                    with _CACHE_LOCK:
+                        _IMAGE_B64_CACHE[cache_key] = uri
+                        _IMAGE_B64_CACHE.move_to_end(cache_key)
+                        while len(_IMAGE_B64_CACHE) > _IMAGE_B64_CACHE_MAX:
+                            _IMAGE_B64_CACHE.popitem(last=False)
+                    return uri
                 except Exception as exc:
                     logger.warning(f"Failed to read image file {path}: {exc}")
                     break
@@ -194,7 +245,7 @@ class XiangongyunH3Model(VideoGenModel):
             headers["Authorization"] = f"Bearer {self.access_token}"
 
         api_url = f"{endpoint}/v1/video/generation"
-        response = requests.post(api_url, json=payload, headers=headers, timeout=600)
+        response = _http_post(api_url, json=payload, headers=headers, timeout=600)
         if response.status_code != 200:
             raise RuntimeError(
                 f"Xiangongyun H3 generation failed with HTTP {response.status_code}: {response.text[:300]}"
@@ -213,7 +264,7 @@ class XiangongyunH3Model(VideoGenModel):
             res_json = response.json()
             if isinstance(res_json, dict) and res_json.get("video_url"):
                 video_url = res_json["video_url"]
-                dl_resp = requests.get(video_url, timeout=300)
+                dl_resp = _http_get(video_url, timeout=300)
                 if dl_resp.status_code != 200:
                     raise RuntimeError(f"Failed to download generated video from {video_url}")
                 with open(output_path, "wb") as f:

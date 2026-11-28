@@ -6082,13 +6082,16 @@ class ComicGenPipeline:
             )
 
             if use_xiangongyun:
-                from ...models.xiangongyun import XiangongyunH3Model
-                cfg: Dict[str, Any] = {"output_root": str(self.data_dir)}
-                if endpoint:
-                    cfg["endpoint"] = endpoint
-                if access_token:
-                    cfg["access_token"] = access_token
-                active_model = XiangongyunH3Model(cfg, env=video_env)
+                if not endpoint and not access_token and self._xiangongyun_model is not None:
+                    active_model = self._xiangongyun_model
+                else:
+                    from ...models.xiangongyun import XiangongyunH3Model
+                    cfg: Dict[str, Any] = {"output_root": str(self.data_dir)}
+                    if endpoint:
+                        cfg["endpoint"] = endpoint
+                    if access_token:
+                        cfg["access_token"] = access_token
+                    active_model = XiangongyunH3Model(cfg, env=video_env)
                 active_model.generate(
                     prompt=request.prompt,
                     output_path=output_path,

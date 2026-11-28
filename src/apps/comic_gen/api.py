@@ -4871,8 +4871,35 @@ def run_xiangongyun_batch_worker(
     task_ids: List[str],
     auto_shutdown: bool,
 ):
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from ...models.xiangongyun import XiangongyunH3Model
     from ...models.xiangongyun_manager import XiangongyunClient, batch_registry, XiangongyunManagerError
     client = XiangongyunClient(access_token)
+
+    def _prewarm_images():
+        try:
+            script_obj = active_pipeline.get_script(script_id)
+            if not script_obj:
+                return
+            refs: List[str] = []
+            task_set = set(task_ids)
+            for vt in getattr(script_obj, "video_tasks", []) or []:
+                if getattr(vt, "id", None) in task_set:
+                    if getattr(vt, "image_url", None):
+                        refs.append(vt.image_url)
+                    refs.extend(getattr(vt, "reference_image_urls", []) or [])
+            unique_refs = list(dict.fromkeys(r for r in refs if r))
+            if not unique_refs:
+                return
+            prewarm_model = XiangongyunH3Model({"output_root": str(active_pipeline.data_dir), "access_token": access_token})
+            with ThreadPoolExecutor(max_workers=min(4, len(unique_refs))) as img_pool:
+                list(img_pool.map(prewarm_model._resolve_image_input, unique_refs))
+        except Exception as exc:
+            logger.debug(f"Prewarm images skipped: {exc}")
+
+    prewarm_thread = threading.Thread(target=_prewarm_images, daemon=True)
+    prewarm_thread.start()
+
     try:
         batch_registry.update_batch(batch_id, status="booting", current_step="正在检查或启动仙宫云实例...")
         inst = client.get_instance(instance_id)
@@ -4889,21 +4916,51 @@ def run_xiangongyun_batch_worker(
             batch_registry.update_batch(batch_id, status="booting", current_step="实例已开机，正在验证端口就绪...")
 
         endpoint = client.wait_until_ready(instance_id, timeout_sec=300)
-        batch_registry.update_batch(batch_id, status="running", current_step="服务器已就绪，开始批量生成视频...")
+        prewarm_thread.join(timeout=5.0)
 
-        for index, task_id in enumerate(task_ids):
-            step_msg = f"正在生成第 {index + 1}/{len(task_ids)} 个视频..."
-            batch_registry.update_batch(batch_id, current_step=step_msg)
+        # Collect any additional already-running GPU instances for parallel dispatch (zero extra cost)
+        endpoints = [endpoint]
+        try:
+            for extra_ep in client.list_running_endpoints():
+                if extra_ep not in endpoints:
+                    endpoints.append(extra_ep)
+        except Exception:
+            pass
+
+        worker_count = min(len(endpoints), max(1, len(task_ids)))
+        batch_registry.update_batch(
+            batch_id,
+            status="running",
+            current_step=f"服务器已就绪（{worker_count} 路并发），开始生成 {len(task_ids)} 个视频...",
+        )
+
+        completed_lock = threading.Lock()
+        completed_so_far = 0
+
+        def _run_one(idx: int, tid: str) -> None:
+            nonlocal completed_so_far
+            ep = endpoints[idx % len(endpoints)]
             try:
-                active_pipeline.process_video_task(script_id, task_id, endpoint=endpoint, access_token=access_token)
+                active_pipeline.process_video_task(script_id, tid, endpoint=ep, access_token=access_token)
             except Exception as e:
-                logger.error(f"Task {task_id} in batch {batch_id} failed: {e}")
-            batch_registry.update_batch(batch_id, completed_count=index + 1)
+                logger.error(f"Task {tid} in batch {batch_id} failed: {e}")
+            finally:
+                with completed_lock:
+                    completed_so_far += 1
+                    batch_registry.update_batch(
+                        batch_id,
+                        completed_count=completed_so_far,
+                        current_step=f"已完成 {completed_so_far}/{len(task_ids)} 个视频...",
+                    )
+
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+            futures = [pool.submit(_run_one, idx, tid) for idx, tid in enumerate(task_ids)]
+            for fut in as_completed(futures):
+                fut.result()
 
         if auto_shutdown:
-            batch_registry.update_batch(batch_id, current_step="所有分镜已完成，正在关机释放 GPU 算力...")
-            client.shutdown_release_gpu(instance_id)
-            batch_registry.update_batch(batch_id, status="completed", current_step="批次已完成，服务器已自动关机释放算力")
+            batch_registry.update_batch(batch_id, status="completed", current_step="批次已完成，正在后台关机释放 GPU 算力...")
+            threading.Thread(target=client.shutdown_release_gpu, args=(instance_id,), daemon=True).start()
         else:
             batch_registry.update_batch(batch_id, status="completed", current_step="批次已完成，服务器保持运行")
     except Exception as exc:

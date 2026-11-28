@@ -13,11 +13,14 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import requests
+from requests.adapters import HTTPAdapter
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_XIANGONGYUN_OPEN_API = "https://api.xiangongyun.com"
 MAX_BATCH_SIZE = 10
+_ORIG_REQUESTS_GET = requests.get
+_ORIG_REQUESTS_POST = requests.post
 
 
 class XiangongyunManagerError(RuntimeError):
@@ -33,6 +36,10 @@ class XiangongyunClient:
             raise XiangongyunManagerError("未配置仙宫云 Access Token，请在平台设置中先绑定账号。")
         self.access_token = access_token.strip()
         self.open_api_base = open_api_base.rstrip("/")
+        self._session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=8, pool_maxsize=8)
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
 
     def _headers(self) -> Dict[str, str]:
         return {
@@ -41,10 +48,20 @@ class XiangongyunClient:
             "Content-Type": "application/json",
         }
 
+    def _get(self, url: str, **kwargs):
+        if requests.get is _ORIG_REQUESTS_GET:
+            return self._session.get(url, **kwargs)
+        return requests.get(url, **kwargs)
+
+    def _post(self, url: str, **kwargs):
+        if requests.post is _ORIG_REQUESTS_POST:
+            return self._session.post(url, **kwargs)
+        return requests.post(url, **kwargs)
+
     def get_balance(self) -> float:
         """Fetch current balance in CNY."""
         try:
-            resp = requests.get(
+            resp = self._get(
                 f"{self.open_api_base}/open/balance",
                 headers=self._headers(),
                 timeout=10,
@@ -64,7 +81,7 @@ class XiangongyunClient:
     def list_instances(self) -> List[Dict[str, Any]]:
         """List all instances under the account."""
         try:
-            resp = requests.get(
+            resp = self._get(
                 f"{self.open_api_base}/open/instances",
                 headers=self._headers(),
                 timeout=10,
@@ -97,7 +114,7 @@ class XiangongyunClient:
         if gpu_model:
             payload["gpu_model"] = gpu_model
         try:
-            resp = requests.post(
+            resp = self._post(
                 f"{self.open_api_base}/open/instance/boot",
                 json=payload,
                 headers=self._headers(),
@@ -120,7 +137,7 @@ class XiangongyunClient:
     def shutdown_release_gpu(self, instance_id: str) -> Dict[str, Any]:
         """Shutdown instance and release GPU to immediately stop billing."""
         try:
-            resp = requests.post(
+            resp = self._post(
                 f"{self.open_api_base}/open/instance/shutdown_release_gpu",
                 json={"id": instance_id},
                 headers=self._headers(),
@@ -135,11 +152,22 @@ class XiangongyunClient:
             logger.warning(f"关机释放 GPU 网络异常: {exc}")
             return {}
 
+    def list_running_endpoints(self) -> List[str]:
+        """Return all currently running instance endpoint URLs."""
+        endpoints: List[str] = []
+        for inst in self.list_instances():
+            if str(inst.get("status") or "").lower() == "running":
+                ip = inst.get("public_ip") or inst.get("ip")
+                port = inst.get("port") or 8000
+                if ip:
+                    endpoints.append(f"http://{ip}:{port}")
+        return endpoints
+
     def wait_until_ready(
         self,
         instance_id: str,
         timeout_sec: int = 300,
-        poll_interval: int = 4,
+        poll_interval: Optional[float] = None,
         probe_fn: Optional[Callable[[str], bool]] = None,
     ) -> str:
         """Poll instance until it is running and service endpoint responds.
@@ -164,7 +192,7 @@ class XiangongyunClient:
                             is_ready = probe_fn(endpoint)
                         else:
                             try:
-                                h_resp = requests.get(f"{endpoint}/health", timeout=2)
+                                h_resp = self._get(f"{endpoint}/health", timeout=1.5)
                                 if h_resp.status_code in {200, 404, 405}:
                                     is_ready = True
                             except Exception:
@@ -178,7 +206,9 @@ class XiangongyunClient:
                 elif status in {"error", "failed", "aborted"}:
                     raise XiangongyunManagerError(f"仙宫云实例启动失败，状态异常: {status}")
 
-            time.sleep(poll_interval)
+            elapsed = time.time() - start_time
+            sleep_for = poll_interval if poll_interval is not None else (1.5 if elapsed < 30 else 2.5)
+            time.sleep(sleep_for)
 
         raise XiangongyunManagerError(
             f"仙宫云实例开机超时（超过 {timeout_sec} 秒未就绪）。请登录仙宫云控制台检查实例日志。"

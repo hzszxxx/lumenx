@@ -96,7 +96,7 @@ export default function XiangongyunBatchBar({
             } catch (err) {
                 console.error("Error polling batch status:", err);
             }
-        }, 3000);
+        }, 1500);
 
         return () => clearInterval(pollTimer);
     }, [activeBatch, projectId, refreshServerStatus, onRefreshProject]);
