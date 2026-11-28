@@ -44,10 +44,12 @@ export default function WalletSettings() {
 
   // 提现弹窗状态
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [withdrawYuan, setWithdrawYuan] = useState<number>(500);
+  const [withdrawInput, setWithdrawInput] = useState<string>("500");
   const [payoutChannel, setPayoutChannel] = useState("alipay");
   const [accountInfo, setAccountInfo] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
+  const withdrawYuan = withdrawInput === "" ? 0 : Number(withdrawInput);
+  const maxWithdrawYuan = Math.floor(balanceCents / 100);
 
   const loadWalletData = async () => {
     setLoading(true);
@@ -95,7 +97,7 @@ export default function WalletSettings() {
   // 申请提现
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (withdrawYuan <= 0 || !accountInfo.trim()) return;
+    if (!Number.isFinite(withdrawYuan) || withdrawYuan <= 0 || !accountInfo.trim()) return;
     setWithdrawing(true);
     setMessage(null);
     setError(null);
@@ -374,13 +376,37 @@ export default function WalletSettings() {
                 <label className="text-text-muted block mb-1">提现金额 (元，当前可用余额 ¥{balanceYuan})</label>
                 <input
                   type="number"
-                  min={1}
-                  max={Math.floor(balanceCents / 100)}
+                  min={maxWithdrawYuan >= 1 ? 1 : 0}
+                  max={maxWithdrawYuan}
+                  step={1}
                   className="glass-input w-full font-mono text-base font-bold text-amber-400"
-                  value={withdrawYuan}
-                  onChange={(e) => setWithdrawYuan(Number(e.target.value))}
+                  value={withdrawInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setWithdrawInput("");
+                      return;
+                    }
+                    const cleaned = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+                    if (cleaned === "") {
+                      setWithdrawInput("");
+                      return;
+                    }
+                    const num = Number(cleaned);
+                    if (maxWithdrawYuan > 0 && num > maxWithdrawYuan) {
+                      setWithdrawInput(String(maxWithdrawYuan));
+                    } else {
+                      setWithdrawInput(cleaned);
+                    }
+                  }}
+                  placeholder={maxWithdrawYuan >= 1 ? `请输入 1 ~ ${maxWithdrawYuan} 元` : "当前可提现余额不足 1 元"}
                   required
                 />
+                {maxWithdrawYuan < 1 && (
+                  <p className="text-[11px] text-amber-400/90 mt-1">
+                    当前可用余额不足 ¥1，暂无法提交提现申请。
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-text-muted block mb-1">收款渠道</label>
@@ -400,7 +426,7 @@ export default function WalletSettings() {
                   className="glass-input w-full"
                   value={accountInfo}
                   onChange={(e) => setAccountInfo(e.target.value)}
-                  placeholder="例如: 13800000000 (张三) 或 招商银行卡号"
+                  placeholder="例如: 13800000000 (张三) 或 622202... 招商银行卡号 (张三)"
                   required
                 />
               </div>

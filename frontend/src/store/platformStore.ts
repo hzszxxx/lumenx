@@ -11,6 +11,7 @@ type PlatformStore = {
   devLogin?: (role?: "admin" | "creator") => Promise<void>;
   register: (username: string, password: string, email: string | undefined, inviteCode?: string) => Promise<void>;
   logout: () => Promise<void>;
+  setUser: (user: PlatformUser | null) => void;
   clearError: () => void;
 };
 
@@ -78,6 +79,7 @@ export const usePlatformStore = create<PlatformStore>((set) => ({
     set({ user: null, walletCents: 0 });
     notifyUserChanged(null);
   },
+  setUser: (user) => set({ user }),
   clearError: () => set({ error: null }),
 }));
 

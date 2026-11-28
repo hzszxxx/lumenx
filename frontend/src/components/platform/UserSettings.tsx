@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { UserRound, Shield, Coins, Activity, LogOut, LayoutDashboard, KeyRound, CheckCircle2, Phone, Edit3, X, AlertCircle } from "lucide-react";
+import { UserRound, Shield, Coins, Activity, LogOut, LayoutDashboard, KeyRound, CheckCircle2, Phone, Mail, Edit3, X, AlertCircle } from "lucide-react";
 import { usePlatformStore } from "@/store/platformStore";
 import { platformApi, type AgentProfile } from "@/lib/platformApi";
 
 export default function UserSettings() {
-  const { user, walletCents, logout } = usePlatformStore();
+  const { user, walletCents, logout, setUser } = usePlatformStore();
   const [tokenUsage, setTokenUsage] = useState<{ prompt_tokens: number; completion_tokens: number; total_tokens: number; records: any[] } | null>(null);
   const [profile, setProfile] = useState<AgentProfile | null>(null);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -48,6 +51,28 @@ export default function UserSettings() {
     }
   };
 
+  const handleSaveEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = emailInput.trim();
+    if (!trimmed || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
+      setErrorMessage("请输入有效的电子邮箱格式");
+      return;
+    }
+    setSavingEmail(true);
+    setErrorMessage(null);
+    try {
+      const updatedUser = await platformApi.updateProfile({ email: trimmed });
+      setUser(user ? { ...user, email: updatedUser.email } : updatedUser);
+      setShowEmailModal(false);
+      setMessage("电子邮箱已绑定更新成功");
+      setTimeout(() => setMessage(null), 3500);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "绑定邮箱失败，请重试");
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -74,7 +99,23 @@ export default function UserSettings() {
                 </span>
               </div>
               <div className="text-xs text-text-secondary mt-1 flex items-center gap-2 flex-wrap">
-                <span>{user.email || "未绑定邮箱"}</span>
+                <span className="flex items-center gap-1">
+                  <span className={user.email ? "text-foreground" : "text-amber-500 font-medium"}>
+                    {user.email || "未绑定邮箱"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailInput(user.email || "");
+                      setErrorMessage(null);
+                      setShowEmailModal(true);
+                    }}
+                    className="text-primary hover:underline ml-0.5 inline-flex items-center gap-0.5 font-medium cursor-pointer"
+                  >
+                    <Edit3 size={11} />
+                    {user.email ? "修改邮箱" : "绑定邮箱"}
+                  </button>
+                </span>
                 <span>·</span>
                 <span className="flex items-center gap-1">
                   联系电话：
@@ -283,6 +324,72 @@ export default function UserSettings() {
                   className="bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-primary-hover transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                 >
                   {savingPhone ? "保存中..." : "保存联系电话"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Edit Email Modal */}
+      {showEmailModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-md animate-fade-in"
+        >
+          <div className="relative w-full max-w-md rounded-2xl border border-glass-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-glass-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <Mail size={16} />
+                </div>
+                <h3 className="text-base font-bold text-foreground">{user.email ? "修改绑定邮箱" : "绑定电子邮箱"}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(false)}
+                className="text-text-muted hover:text-foreground p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {errorMessage && (
+              <div role="alert" className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+                <AlertCircle size={14} />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEmail} className="space-y-4">
+              <div>
+                <label className="text-xs text-text-secondary mb-1 block font-medium">电子邮箱地址</label>
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  className="glass-input w-full text-sm"
+                  placeholder="例如：creator@example.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                />
+                <p className="text-[11px] text-text-muted mt-1">用于接收账户安全提醒、商单签约回执及结算通知</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-glass-border">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailModal(false)}
+                  className="glass-button text-xs py-2 px-3"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEmail}
+                  className="bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-primary-hover transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                >
+                  {savingEmail ? "保存中..." : "保存邮箱"}
                 </button>
               </div>
             </form>

@@ -1411,15 +1411,23 @@ const assertRevisionNotBefore = (project: AtelierProject, expectedRevision: numb
     return project;
 };
 
-const DELETE_RECEIPT_GROUP_FIELDS: Record<string, Set<string>> = {
-    references: new Set(["reference_node_ids", "reference_image_urls", "reference_video_urls", "reference_audio_urls"]),
-    parent: new Set(["parent_node_id", "reference_role"]),
-    region: new Set(["region_id"]),
+const DELETE_RECEIPT_GROUP_FIELDS: Record<string, Set<string>[]> = {
+    references: [
+        new Set(["reference_node_ids", "reference_image_urls", "reference_video_urls", "reference_audio_urls"]),
+        new Set(["reference_node_ids", "pending_reference_nodes", "reference_image_urls", "reference_video_urls", "reference_audio_urls"]),
+    ],
+    parent: [new Set(["parent_node_id", "reference_role"])],
+    region: [new Set(["region_id"])],
 };
 
 const hasExactFieldSet = (value: Record<string, unknown>, expected: Set<string>): boolean => {
     const keys = Object.keys(value);
     return keys.length === expected.size && keys.every(key => expected.has(key));
+};
+
+const matchesAllowedFieldSets = (before: Record<string, unknown>, after: Record<string, unknown>, allowedSets: Set<string>[] | undefined): boolean => {
+    if (!allowedSets) return false;
+    return allowedSets.some(expected => hasExactFieldSet(before, expected) && hasExactFieldSet(after, expected));
 };
 
 const generationCallKey = (turnId: string, callId: string): string => `${turnId}:${callId}`;
@@ -1791,7 +1799,7 @@ const assertProjectGraphIntegrity = (project: AtelierProject): AtelierProject =>
             }
             groupKeys.add(groupKey);
             const allowed = DELETE_RECEIPT_GROUP_FIELDS[group.group];
-            if (!allowed || !hasExactFieldSet(group.before, allowed) || !hasExactFieldSet(group.after, allowed)) {
+            if (!matchesAllowedFieldSets(group.before, group.after, allowed)) {
                 throw new AtelierProjectApiError("Atelier delete receipt data group fields are invalid", "atelier_delete_receipt_group_fields_invalid");
             }
             for (const proof of group.source_proofs) {

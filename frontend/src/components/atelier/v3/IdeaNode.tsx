@@ -12,6 +12,7 @@ interface Props {
   x: number;
   y: number;
   onSelect?: (id: string) => void;
+  onDoubleClick?: (id: string) => void;
   onAddNextStep?: (id: string) => void;
   onDelete?: (id: string) => void;
   /** When true, the shell is overlaying an inline textarea editor — skip
@@ -30,7 +31,7 @@ interface Props {
 // float shadow; we lay only a whisper-soft warm-ochre CATEGORY wash over it so
 // the slip reads premium and quiet, never garish. The body sits in calm Inter
 // body text, signed off by a single muted sentence-case line.
-export function IdeaNode({ id, body, selected, x, y, onSelect, editing, onOpenEditor, onAddNextStep, onDelete }: Props) {
+export function IdeaNode({ id, body, selected, x, y, onSelect, onDoubleClick, editing, onOpenEditor, onAddNextStep, onDelete }: Props) {
   const t = useTranslations("atelier.node");
   // Uplift b6 · long text: bodies past the clamp threshold get an
   // expand/collapse toggle + a char-count caption instead of silently
@@ -55,6 +56,10 @@ export function IdeaNode({ id, body, selected, x, y, onSelect, editing, onOpenEd
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect?.(id);
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        onDoubleClick?.(id);
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {

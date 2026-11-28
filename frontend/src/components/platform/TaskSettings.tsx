@@ -31,6 +31,8 @@ import {
   TrendingUp,
   Award,
   ArrowRight,
+  Edit3,
+  Trash2,
 } from "lucide-react";
 import {
   platformApi,
@@ -73,8 +75,19 @@ export default function TaskSettings() {
   const { user } = usePlatformStore();
   const [tasks, setTasks] = useState<PlatformTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTask, setSelectedTask] = useState<PlatformTask | null>(null);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState<PlatformTask | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+
+  const toggleTaskExpanded = (taskId: string) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   // 筛选器状态
   const [selectedStatusTab, setSelectedStatusTab] = useState<"all" | "mine" | "open" | "delivered">("all");
@@ -607,9 +620,15 @@ export default function TaskSettings() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {filteredTasks.map((task) => {
-            const isSelected = selectedTask?.id === task.id;
+            const isSelected = expandedTaskIds.has(task.id);
+            const canManageTask = Boolean(
+              user &&
+                (user.role === "admin" || task.created_by === user.id) &&
+                (task.status === "draft" || task.status === "published") &&
+                !task.claimed_by
+            );
             const bountyYuan = (task.bounty_cents / 100).toLocaleString();
             const isClaimed = Boolean(
               (task.claimed_by && task.claimed_by === user?.id) ||
@@ -695,7 +714,7 @@ export default function TaskSettings() {
 
                   {/* 标题 */}
                   <h3
-                    onClick={() => setSelectedTask(isSelected ? null : task)}
+                    onClick={() => toggleTaskExpanded(task.id)}
                     className="font-bold text-base sm:text-lg text-foreground hover:text-primary transition-colors cursor-pointer leading-snug"
                   >
                     {task.title}
@@ -766,15 +785,58 @@ export default function TaskSettings() {
                 </div>
 
                 {/* 卡片底部操作栏 */}
-                <div className="mt-4 pt-4 border-t border-glass-border flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTask(isSelected ? null : task)}
-                    className="glass-button text-xs py-1.5 px-3 flex items-center gap-1 font-medium cursor-pointer"
-                  >
-                    {isSelected ? "收起简报" : "结构化需求"}
-                    {isSelected ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  </button>
+                <div className="mt-4 pt-4 border-t border-glass-border flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleTaskExpanded(task.id)}
+                      className="glass-button text-xs py-1.5 px-3 flex items-center gap-1 font-medium cursor-pointer"
+                    >
+                      {isSelected ? "收起简报" : "结构化需求"}
+                      {isSelected ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                    {canManageTask && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTask(task);
+                            setShowCreateTaskDialog(true);
+                          }}
+                          className="glass-button text-xs py-1.5 px-2.5 flex items-center gap-1 text-text-secondary hover:text-primary cursor-pointer"
+                          title="修改商业需求"
+                        >
+                          <Edit3 size={12} />
+                          <span>编辑</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingTaskId === task.id}
+                          onClick={async () => {
+                            if (!confirm(`确定要删除商业需求【${task.title}】吗？`)) return;
+                            setDeletingTaskId(task.id);
+                            setMessage(null);
+                            try {
+                              await platformApi.deleteTask(task.id);
+                              setMessageType("success");
+                              setMessage(`商业需求【${task.title}】已删除`);
+                              await loadTasks();
+                            } catch (err) {
+                              setMessageType("error");
+                              setMessage(err instanceof Error ? err.message : "删除任务失败");
+                            } finally {
+                              setDeletingTaskId(null);
+                            }
+                          }}
+                          className="glass-button text-xs py-1.5 px-2.5 flex items-center gap-1 text-text-secondary hover:text-red-400 cursor-pointer disabled:opacity-50"
+                          title="删除商业需求"
+                        >
+                          <Trash2 size={12} />
+                          <span>{deletingTaskId === task.id ? "删除中..." : "删除"}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {task.status === "settled" || task.status === "accepted" ? (
@@ -1094,15 +1156,22 @@ export default function TaskSettings() {
         </div>
       )}
 
-      {/* 发布商业需求弹窗 */}
+      {/* 发布 / 编辑商业需求弹窗 */}
       <TaskCreateDialog
         isOpen={showCreateTaskDialog}
-        onClose={() => setShowCreateTaskDialog(false)}
-        onSuccess={(created) => {
+        editingTask={editingTask}
+        onClose={() => {
+          setShowCreateTaskDialog(false);
+          setEditingTask(null);
+        }}
+        onSuccess={(saved) => {
           setMessageType("success");
           setMessage(
-            `【${created.title}】发布成功！赏金 ¥${(created.bounty_cents / 100).toLocaleString()} 已转入官方托管资金池，已同步至大厅供创作者接单。`
+            editingTask
+              ? `【${saved.title}】修改已保存！`
+              : `【${saved.title}】发布成功！赏金 ¥${(saved.bounty_cents / 100).toLocaleString()} 已转入官方托管资金池，已同步至大厅供创作者接单。`
           );
+          setEditingTask(null);
           void loadTasks();
         }}
       />

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Award, CheckCircle2, Clock, FileText, Send, Sparkles, AlertCircle, ChevronRight, Loader2, Zap, Star, Video, Layers } from "lucide-react";
+import { ShieldCheck, Award, CheckCircle2, Clock, FileText, Send, Sparkles, AlertCircle, ChevronRight, Loader2, Zap, Star, Video, Layers, Upload, Trash2 } from "lucide-react";
 import { platformApi, type PlatformCertification, type PlatformExam } from "@/lib/platformApi";
+import { publicAssetPath } from "@/lib/publicAsset";
+import { getAssetUrl } from "@/lib/utils";
 import { usePlatformStore } from "@/store/platformStore";
 
 export default function CertificationSettings() {
@@ -12,6 +14,9 @@ export default function CertificationSettings() {
   const [submitting, setSubmitting] = useState(false);
   const [projectTitle, setProjectTitle] = useState("");
   const [submissionDesc, setSubmissionDesc] = useState("");
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState("");
+  const [uploadedVideoName, setUploadedVideoName] = useState("");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const { user } = usePlatformStore();
 
@@ -45,6 +50,9 @@ export default function CertificationSettings() {
     setSubmitting(true);
     setMessage(null);
     try {
+      const descWithVideo = uploadedVideoUrl
+        ? `${submissionDesc || "遵循电影级分镜流规范制作的实操考题样片"}\n[考核样片地址: ${uploadedVideoUrl}]`
+        : submissionDesc || "遵循电影级分镜流规范制作的实操考题样片";
       const artifactPayload = {
         product: "atelier",
         artifact_id: `exam-${Date.now()}`,
@@ -54,7 +62,7 @@ export default function CertificationSettings() {
         project_id: "exam-project-direct",
         project_title_snapshot: projectTitle || "实操考核提交作品",
         title: projectTitle || "实操考核提交作品",
-        description: submissionDesc || "遵循电影级分镜流规范制作的实操考题样片",
+        description: descWithVideo,
       };
       await platformApi.applyCertification({
         exam_id: exam.id,
@@ -340,7 +348,9 @@ export default function CertificationSettings() {
                     type="button"
                     onClick={() => {
                       setProjectTitle("【验收测试】雨夜黎明分镜实操考核样片");
-                      setSubmissionDesc("使用电影级分镜流 + 6:3:1 镜头景别层次，已完成 3 组分镜与角色一致性检验，参考样片 /sample-assets/sample_preview.mp4");
+                      setSubmissionDesc("使用电影级分镜流 + 6:3:1 镜头景别层次，已完成 3 组分镜与角色一致性检验");
+                      setUploadedVideoUrl("/sample-assets/sample_preview.mp4");
+                      setUploadedVideoName("sample_preview.mp4 (测试样片)");
                     }}
                     className="text-xs text-primary hover:underline inline-flex items-center gap-1 font-medium cursor-pointer"
                   >
@@ -368,6 +378,79 @@ export default function CertificationSettings() {
                       onChange={e => setSubmissionDesc(e.target.value)}
                     />
                   </div>
+                </div>
+
+                {/* 考核实操视频上传区域 */}
+                <div className="space-y-2">
+                  <label className="text-xs text-text-muted block font-medium">考核实操视频文件 (MP4 / MOV / WebM)</label>
+                  {uploadedVideoUrl ? (
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-3.5 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium truncate">
+                          <CheckCircle2 size={14} className="shrink-0" />
+                          <span className="truncate">已上传实操样片：{uploadedVideoName || uploadedVideoUrl}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedVideoUrl("");
+                            setUploadedVideoName("");
+                          }}
+                          className="text-xs text-text-muted hover:text-red-400 inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                        >
+                          <Trash2 size={12} />
+                          移除重传
+                        </button>
+                      </div>
+                      <div className="aspect-video max-h-56 bg-black rounded-xl overflow-hidden border border-glass-border">
+                        <video
+                          src={uploadedVideoUrl.startsWith("/sample-assets/") ? publicAssetPath(uploadedVideoUrl) : getAssetUrl(uploadedVideoUrl)}
+                          controls
+                          playsInline
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-glass-border hover:border-primary/50 bg-surface-inset/50 p-6 cursor-pointer transition-colors">
+                      <input
+                        type="file"
+                        accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+                        className="hidden"
+                        disabled={uploadingVideo}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingVideo(true);
+                          setMessage(null);
+                          try {
+                            const uploaded = await platformApi.uploadMedia(file);
+                            setUploadedVideoUrl(uploaded.local_url || uploaded.url);
+                            setUploadedVideoName(file.name);
+                          } catch (err) {
+                            setMessage(err instanceof Error ? err.message : "上传视频失败，请检查文件格式与网络");
+                          } finally {
+                            setUploadingVideo(false);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                      {uploadingVideo ? (
+                        <>
+                          <Loader2 size={22} className="animate-spin text-primary" />
+                          <span className="text-xs text-text-secondary font-medium">正在上传考核视频…</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                            <Upload size={18} />
+                          </div>
+                          <span className="text-xs text-foreground font-medium">点击选择或上传实操考核视频（MP4 / MOV / WebM）</span>
+                          <span className="text-[11px] text-text-muted">也可点击右上角“填入考核测试素材”快速载入验收样片</span>
+                        </>
+                      )}
+                    </label>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">

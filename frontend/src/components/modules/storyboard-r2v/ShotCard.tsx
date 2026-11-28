@@ -67,6 +67,8 @@ export interface ShotNode {
     videoUrl?: string;
     videoTaskId?: string;
     videoStatus?: "pending" | "processing" | "completed" | "failed" | "needs_confirmation";
+    videoError?: string;
+    t2iError?: string;
     /** Issue 16 — final take selection (Z plan). Set in Assembly stage; read
      *  by Storyboard's ShotCard top preview as the canonical "this is the
      *  shipped output". Falls back to latest starred / latest completed /
@@ -397,8 +399,13 @@ export default function ShotCard({
             }
             if (shot.videoStatus === "failed") {
                 return (
-                    <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
+                    <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 px-4 text-center">
                         <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
+                        {shot.videoError ? (
+                            <span className="text-[0.625rem] text-status-failed-fg/80 line-clamp-3 max-w-full" title={shot.videoError}>
+                                {shot.videoError}
+                            </span>
+                        ) : null}
                         <button
                             onClick={onGenerateVideo}
                             className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
@@ -492,8 +499,13 @@ export default function ShotCard({
         }
         if (shot.videoStatus === "failed") {
             return (
-                <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
+                <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 px-4 text-center">
                     <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
+                    {shot.videoError ? (
+                        <span className="text-[0.625rem] text-status-failed-fg/80 line-clamp-3 max-w-full" title={shot.videoError}>
+                            {shot.videoError}
+                        </span>
+                    ) : null}
                     <button
                         onClick={onGenerateVideo}
                         className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"

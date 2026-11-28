@@ -85,6 +85,7 @@ export type PlatformTask = {
   level_tier?: "beginner" | "standard" | "pro";
   contract_id?: string | null;
   contract_signed_at?: string | null;
+  created_by?: string | null;
 };
 
 export type PlatformContract = {
@@ -254,6 +255,7 @@ export const platformApi = {
     return session;
   },
   me: () => request<PlatformUser & { wallet?: { simulated_balance_cents: number } }>("/auth/me"),
+  updateProfile: (payload: { email?: string | null }) => request<PlatformUser>("/auth/me", { method: "PATCH", body: JSON.stringify(payload) }),
   logout: async () => { await request("/auth/logout", { method: "POST" }); clearPlatformToken(); },
   competitions: () => request<PlatformCompetition[]>("/competitions"),
   competitionDetail: (id: string) => request<PlatformCompetition>(`/competitions/${id}`),
@@ -286,6 +288,8 @@ export const platformApi = {
     client_name?: string;
     level_tier?: string;
   }) => request<PlatformTask>("/tasks", { method: "POST", body: JSON.stringify(payload) }),
+  updateTask: (taskId: string, payload: Record<string, unknown>) => request<PlatformTask>(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteTask: (taskId: string) => request<{ deleted: boolean; id: string }>(`/tasks/${taskId}`, { method: "DELETE" }),
   claimTask: (taskId: string, idempotencyKey = crypto.randomUUID()) => request<{ task_id: string; status: string; contract_id?: string; contract_signed_at?: string; digest_hash?: string }>(`/tasks/${taskId}/claim`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey } }),
   taskContract: (taskId: string) => request<PlatformContract>(`/tasks/${taskId}/contract`),
   deliverTask: (taskId: string, payload: {
@@ -309,6 +313,24 @@ export const platformApi = {
   certification: () => request<PlatformCertification | null>("/certifications/status"),
   activeExam: () => request<PlatformExam | null>("/certifications/exam/prompt"),
   applyCertification: (payload: { exam_id: string; artifact: Record<string, unknown> }) => request("/certifications/apply", { method: "POST", body: JSON.stringify(payload) }),
+  uploadMedia: async (file: File): Promise<{ url: string; local_url?: string }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const token = getPlatformToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${getApiUrl()}/upload`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: formData,
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(formatPlatformError(body?.detail) || `上传失败 (${response.status})`);
+    }
+    return body as { url: string; local_url?: string };
+  },
   tokenUsage: (limit = 20) => request<{ prompt_tokens: number; completion_tokens: number; total_tokens: number; records: Array<Record<string, unknown>> }>(`/usage/tokens?limit=${limit}`),
   creditPricing: () => request<Array<{ provider: string; model: string; pricing_version: string; input_credits_per_1k: number; output_credits_per_1k: number }>>("/credits/pricing"),
   creditBalance: () => request<{ user_id: string; available_credits: number; credited_credits: number; debited_credits: number }>("/credits/balance"),

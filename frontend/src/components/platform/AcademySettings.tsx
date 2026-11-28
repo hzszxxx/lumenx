@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GraduationCap, Play, FileBox, CheckCircle2, Video, Sparkles, ExternalLink, ChevronRight, Loader2, BookOpen, Layers, Users, Film } from "lucide-react";
+import { GraduationCap, Play, FileBox, CheckCircle2, Video, Sparkles, ExternalLink, ChevronRight, Loader2, BookOpen, Layers, Users, Film, Download, AlertCircle } from "lucide-react";
 import { platformApi, type PlatformCourse, type PlatformTemplate } from "@/lib/platformApi";
+import { publicAssetPath } from "@/lib/publicAsset";
 import { usePlatformStore } from "@/store/platformStore";
 
 export default function AcademySettings() {
@@ -11,9 +12,45 @@ export default function AcademySettings() {
   const [activeTab, setActiveTab] = useState<"courses" | "templates">("courses");
   const [loading, setLoading] = useState(true);
   const [playingCourse, setPlayingCourse] = useState<PlatformCourse | null>(null);
+  const [videoFallbackUsed, setVideoFallbackUsed] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [forkingId, setForkingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const { user } = usePlatformStore();
+
+  const resolveCourseVideoUrl = (rawUrl?: string | null, useFallback = false) => {
+    const fallback = publicAssetPath("/sample-assets/sample_preview.mp4");
+    if (useFallback || !rawUrl) return fallback;
+    if (rawUrl.includes("yingban.dajilin.net/assets/courses/")) return fallback;
+    if (rawUrl.startsWith("/")) return publicAssetPath(rawUrl);
+    return rawUrl;
+  };
+
+  const handleDownloadVideo = async (course: PlatformCourse) => {
+    setDownloadingId(course.id);
+    const url = resolveCourseVideoUrl(course.video_url);
+    try {
+      let res = await fetch(url);
+      if (!res.ok) {
+        res = await fetch(publicAssetPath("/sample-assets/sample_preview.mp4"));
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${course.title.replace(/[《》\s/:*?"<>|]+/g, "_")}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      setMessage(err instanceof Error ? `下载课程视频失败: ${err.message}` : "下载课程视频失败");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -261,14 +298,30 @@ export default function AcademySettings() {
                       <Video size={13} className="text-primary" />
                       附带电影级分镜流提示词与镜头预设
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setPlayingCourse(course)}
-                      className="bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-md shrink-0"
-                    >
-                      <Play size={12} fill="currentColor" />
-                      开始学习
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={downloadingId === course.id}
+                        onClick={() => void handleDownloadVideo(course)}
+                        className="glass-button text-xs px-3 py-2 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="下载课程实操视频"
+                      >
+                        {downloadingId === course.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        下载
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVideoFallbackUsed(false);
+                          setVideoLoadError(false);
+                          setPlayingCourse(course);
+                        }}
+                        className="bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-md shrink-0 cursor-pointer"
+                      >
+                        <Play size={12} fill="currentColor" />
+                        开始学习
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -372,13 +425,28 @@ export default function AcademySettings() {
               </button>
             </div>
 
-            <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-glass-border shadow-inner">
+            <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-glass-border shadow-inner relative">
               <video
-                src={playingCourse.video_url}
+                key={`${playingCourse.id}-${videoFallbackUsed ? "fb" : "main"}`}
+                src={resolveCourseVideoUrl(playingCourse.video_url, videoFallbackUsed)}
                 controls
                 autoPlay
+                playsInline
+                onError={() => {
+                  if (!videoFallbackUsed) {
+                    setVideoFallbackUsed(true);
+                  } else {
+                    setVideoLoadError(true);
+                  }
+                }}
                 className="w-full h-full object-contain"
               />
+              {videoLoadError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-xs text-text-secondary gap-2 p-4">
+                  <AlertCircle size={20} className="text-amber-400" />
+                  <span>视频资源加载失败，请点击下方下载按钮离线观看</span>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-text-muted pt-2 border-t border-glass-border/60">
@@ -386,13 +454,24 @@ export default function AcademySettings() {
                 <CheckCircle2 size={14} className="text-emerald-400" />
                 配套资源：电影级分镜提示词已在画布中自动挂载，随课练习无需重复调参。
               </span>
-              <button
-                type="button"
-                onClick={() => { setPlayingCourse(null); window.location.hash = "#/atelier"; }}
-                className="text-primary hover:underline flex items-center gap-1 font-semibold"
-              >
-                前往 Atelier 画布实操演练 <ChevronRight size={13} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={downloadingId === playingCourse.id}
+                  onClick={() => void handleDownloadVideo(playingCourse)}
+                  className="glass-button text-xs px-3 py-1.5 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {downloadingId === playingCourse.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  下载课程视频
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPlayingCourse(null); window.location.hash = "#/atelier"; }}
+                  className="text-primary hover:underline flex items-center gap-1 font-semibold"
+                >
+                  前往 Atelier 画布实操演练 <ChevronRight size={13} />
+                </button>
+              </div>
             </div>
           </div>
         </div>

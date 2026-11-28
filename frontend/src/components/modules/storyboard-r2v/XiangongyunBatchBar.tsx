@@ -205,7 +205,7 @@ export default function XiangongyunBatchBar({
                             ) : stoppedInstance ? (
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/50 text-slate-300 border border-slate-600">
                                     <span className="w-2 h-2 rounded-full bg-slate-400" />
-                                    已关机保留 (生成时自动起机)
+                                    已自动匹配 {stoppedInstance.gpu_model || "RTX 4090"} (生成时自动开机)
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">

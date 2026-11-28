@@ -9,6 +9,7 @@ interface Props {
   x: number;
   y: number;
   onSelect?: (id: string) => void;
+  onDoubleClick?: (id: string) => void;
   /** When true, the AtelierShellV3 overlay textarea owns the visual frame —
    *  render nothing here to avoid a double-shell halo around the editor.
    *  Same fix as IdeaNode. */
@@ -19,7 +20,7 @@ interface Props {
 // frosted glass shell (.atelier-node-shell) with the Idea slip; here the soft
 // CATEGORY wash is mauve instead of ochre. The body sits above a single
 // muted sentence-case signature line carrying the author + index.
-export function CommentNode({ id, body, author, selected, x, y, onSelect, editing }: Props) {
+export function CommentNode({ id, body, author, selected, x, y, onSelect, onDoubleClick, editing }: Props) {
   // Editing: skip rendering so only the overlay textarea paints a frame.
   if (editing) return null;
   const borderClass = selected
@@ -35,6 +36,10 @@ export function CommentNode({ id, body, author, selected, x, y, onSelect, editin
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect?.(id);
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        onDoubleClick?.(id);
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {

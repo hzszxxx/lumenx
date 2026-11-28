@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Sparkles,
@@ -25,6 +25,7 @@ interface TaskCreateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (task: PlatformTask) => void;
+  editingTask?: PlatformTask | null;
 }
 
 // 快速预设模板
@@ -153,7 +154,7 @@ const TEMPLATES = [
   },
 ];
 
-export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCreateDialogProps) {
+export default function TaskCreateDialog({ isOpen, onClose, onSuccess, editingTask }: TaskCreateDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,7 +164,7 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
   const [demandType, setDemandType] = useState("ai_drama");
   const [category, setCategory] = useState("短剧分镜");
   const [levelTier, setLevelTier] = useState("standard");
-  const [bountyYuan, setBountyYuan] = useState<number>(3500);
+  const [bountyInput, setBountyInput] = useState<string>("3500");
   const [deadline, setDeadline] = useState("2026-12-15");
 
   // 交付规格
@@ -179,6 +180,40 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
   const [criteria, setCriteria] = useState<string[]>(TEMPLATES[0].data.criteria);
   const [newCriterion, setNewCriterion] = useState("");
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setError(null);
+    if (editingTask) {
+      setTitle(editingTask.title || "");
+      setClientName(editingTask.client_name || "");
+      setDemandType(editingTask.demand_type || "ai_drama");
+      setCategory(editingTask.category || "短剧分镜");
+      setLevelTier(editingTask.level_tier || editingTask.required_level || "standard");
+      setBountyInput(String(Math.max(1, Math.round((editingTask.bounty_cents || 0) / 100))));
+      setDeadline(editingTask.deadline ? editingTask.deadline.slice(0, 10) : "2026-12-15");
+      setSettlementMode(editingTask.settlement_mode || "milestone");
+      setBriefMarkdown((editingTask.brief_markdown || "").replace(/\\n/g, "\n"));
+      try {
+        const parsedSpecs = editingTask.deliverable_specs_json ? JSON.parse(editingTask.deliverable_specs_json) : {};
+        if (parsedSpecs.format) setFormat(parsedSpecs.format);
+        if (parsedSpecs.resolution) setResolution(parsedSpecs.resolution);
+        if (parsedSpecs.fps) setFps(Number(parsedSpecs.fps));
+        if (parsedSpecs.duration_seconds) setDurationSeconds(Number(parsedSpecs.duration_seconds));
+        if (parsedSpecs.deliverable_count) setDeliverableCount(Number(parsedSpecs.deliverable_count));
+      } catch {
+        // ignore invalid json
+      }
+      try {
+        const parsedCriteria = editingTask.acceptance_criteria_json ? JSON.parse(editingTask.acceptance_criteria_json) : [];
+        if (Array.isArray(parsedCriteria) && parsedCriteria.length > 0) setCriteria(parsedCriteria);
+      } catch {
+        // ignore invalid json
+      }
+    }
+  }, [isOpen, editingTask]);
+
+  const bountyYuan = bountyInput === "" ? 0 : Number(bountyInput);
+
   if (!isOpen) return null;
 
   const applyTemplate = (tmpl: (typeof TEMPLATES)[number]) => {
@@ -187,7 +222,7 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
     setDemandType(tmpl.data.demand_type);
     setCategory(tmpl.data.category);
     setLevelTier(tmpl.data.level_tier);
-    setBountyYuan(tmpl.data.bountyYuan);
+    setBountyInput(String(tmpl.data.bountyYuan));
     setFormat(tmpl.data.format);
     setResolution(tmpl.data.resolution);
     setFps(tmpl.data.fps);
@@ -250,14 +285,14 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
         require_ai_label: true,
       });
 
-      const res = await platformApi.createTask({
+      const payload = {
         title: title.trim(),
         client_name: clientName.trim() || "官方认证发包方",
         category,
         demand_type: demandType,
         level_tier: levelTier,
         required_level: levelTier,
-        status: "published",
+        status: editingTask ? editingTask.status : "published",
         bounty_cents: Math.round(bountyYuan * 100),
         deadline: new Date(deadline || Date.now() + 14 * 86400000).toISOString(),
         deliverable_specs_json: specsJson,
@@ -266,7 +301,10 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
         copyright_terms_json: copyrightJson,
         acceptance_criteria_json: JSON.stringify(criteria),
         brief_markdown: briefMarkdown.trim(),
-      });
+      };
+      const res = editingTask
+        ? await platformApi.updateTask(editingTask.id, payload)
+        : await platformApi.createTask(payload);
 
       onSuccess(res);
       onClose();
@@ -458,12 +496,23 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
               <div className="relative">
                 <input
                   type="number"
-                  className="glass-input w-full pl-7 font-mono font-bold text-amber-400"
-                  value={bountyYuan}
-                  onChange={(e) => setBountyYuan(Number(e.target.value))}
+                  min={1}
+                  step={1}
+                  className="glass-input w-full pl-9 font-mono font-bold text-amber-400"
+                  value={bountyInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setBountyInput("");
+                      return;
+                    }
+                    const cleaned = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+                    setBountyInput(cleaned);
+                  }}
+                  placeholder="请输入大于 0 的金额"
                   required
                 />
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted text-xs">¥</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-xs pointer-events-none select-none">¥</span>
               </div>
               <span className="text-[11px] text-text-muted mt-1 block">
                 资金将由影伴平台官方托管，创作者终审验收通过后方才放款。
@@ -557,7 +606,7 @@ export default function TaskCreateDialog({ isOpen, onClose, onSuccess }: TaskCre
                 className="bg-primary text-white font-semibold px-5 py-2 rounded-xl hover:bg-primary-hover transition-opacity flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
               >
                 {submitting ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
-                立即托管赏金并发布 (¥{bountyYuan})
+                {editingTask ? `保存商业需求修改 (¥${bountyYuan})` : `立即托管赏金并发布 (¥${bountyYuan})`}
               </button>
             </div>
           </div>

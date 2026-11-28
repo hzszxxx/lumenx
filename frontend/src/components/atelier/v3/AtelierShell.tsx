@@ -372,6 +372,8 @@ export function AtelierShell() {
   const [workflowNotice, setWorkflowNotice] = useState<WorkflowNotice | null>(null);
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>({ owner: null, title: "", prompt: "", body: "" });
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [editingBody, setEditingBody] = useState("");
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [preview, setPreview] = useState<Record<string, Preview>>({});
@@ -1322,6 +1324,60 @@ export function AtelierShell() {
     }
   };
 
+  const startInlineEdit = useCallback((node: AtelierNode) => {
+    if (writeDisabled) return;
+    selectNode(node.id);
+    setEditingNodeId(node.id);
+    setEditingBody(bodyOf(node));
+  }, [selectNode, writeDisabled]);
+
+  const commitInlineEdit = useCallback((node: AtelierNode, nextBody: string) => {
+    setEditingNodeId(current => (current === node.id ? null : current));
+    if (writeDisabled) return;
+    const prevBody = bodyOf(node);
+    if (nextBody === prevBody) return;
+    if (selectedNodeId === node.id) {
+      setDraft(current => ({ ...current, body: nextBody }));
+    }
+    void run(async () => {
+      await updateNodeText(node.id, { title: node.title, prompt: nextBody });
+    }, t("textError"));
+  }, [run, selectedNodeId, t, updateNodeText, writeDisabled]);
+
+  const renderInlineBodyEditor = (node: AtelierNode, x: number, y: number) => (
+    <div
+      style={{ transform: `translate(${x}px, ${y}px)` }}
+      onPointerDownCapture={e => e.stopPropagation()}
+      onPointerDown={e => e.stopPropagation()}
+      className="atelier-node-shell absolute z-40 w-[260px] border-white/30 p-3 shadow-2xl ring-1 ring-white/25"
+    >
+      <textarea
+        autoFocus
+        rows={4}
+        value={editingBody}
+        placeholder={node.type === "idea" ? t("ideaEmpty") : "输入评论内容…"}
+        onChange={e => setEditingBody(e.target.value)}
+        onBlur={() => commitInlineEdit(node, editingBody)}
+        onKeyDown={e => {
+          e.stopPropagation();
+          if (e.key === "Escape") {
+            setEditingNodeId(null);
+            return;
+          }
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.preventDefault();
+            commitInlineEdit(node, editingBody);
+          }
+        }}
+        className="w-full resize-y rounded-lg bg-black/40 p-2 text-[13px] leading-[1.6] text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-primary/50"
+      />
+      <div className="mt-1.5 flex items-center justify-between text-[10px] text-white/40">
+        <span>Ctrl/⌘ + Enter 保存</span>
+        <span>Esc 取消</span>
+      </div>
+    </div>
+  );
+
   const renderNode = (node: AtelierNode) => {
     const p = preview[node.id] ?? {};
     const x = p.x ?? node.x;
@@ -1329,18 +1385,43 @@ export function AtelierShell() {
     const width = p.width ?? node.width;
     const height = p.height ?? node.height;
     const selected = node.id === selectedNodeId;
+    const isEditing = editingNodeId === node.id;
     if (collapsedOf(currentProject?.nodes.find(region => region.id === stringValue(node.data?.region_id)))) return null;
     if (node.type === "idea") {
       return (
-        <div key={node.id} onPointerDownCapture={event => beginDrag(node, event)}>
-          <IdeaNode id={node.id} body={bodyOf(node)} x={x} y={y} selected={selected} onSelect={selectNode} onAddNextStep={handleAddNextStep} onDelete={handleDeleteNode} />
+        <div key={node.id} onPointerDownCapture={isEditing ? undefined : event => beginDrag(node, event)}>
+          <IdeaNode
+            id={node.id}
+            body={bodyOf(node)}
+            x={x}
+            y={y}
+            selected={selected}
+            editing={isEditing}
+            onSelect={selectNode}
+            onDoubleClick={() => startInlineEdit(node)}
+            onOpenEditor={() => startInlineEdit(node)}
+            onAddNextStep={handleAddNextStep}
+            onDelete={handleDeleteNode}
+          />
+          {isEditing && renderInlineBodyEditor(node, x, y)}
         </div>
       );
     }
     if (node.type === "comment") {
       return (
-        <div key={node.id} onPointerDownCapture={event => beginDrag(node, event)}>
-          <CommentNode id={node.id} body={bodyOf(node)} author={authorOf(node)} x={x} y={y} selected={selected} onSelect={selectNode} />
+        <div key={node.id} onPointerDownCapture={isEditing ? undefined : event => beginDrag(node, event)}>
+          <CommentNode
+            id={node.id}
+            body={bodyOf(node)}
+            author={authorOf(node)}
+            x={x}
+            y={y}
+            selected={selected}
+            editing={isEditing}
+            onSelect={selectNode}
+            onDoubleClick={() => startInlineEdit(node)}
+          />
+          {isEditing && renderInlineBodyEditor(node, x, y)}
         </div>
       );
     }

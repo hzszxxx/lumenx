@@ -225,6 +225,7 @@ export function frameToShotNode(
         selectedSource.kind === "preview" || selectedSource.kind === "applied" || selectedSource.kind === "original";
     let videoTaskId: string | undefined = hasSelectedTaskVideo ? selectedSource.taskId : undefined;
 
+    let videoError: string | undefined;
     if (inFlightTask) {
         videoStatus = inFlightTask.status === "pending" ? "pending" : "processing";
         videoTaskId = inFlightTask.id || undefined;
@@ -236,8 +237,12 @@ export function frameToShotNode(
         videoStatus = "needs_confirmation";
         videoTaskId = needsConfirmationTask.id || undefined;
         videoUrl = needsConfirmationTask.video_url || videoUrl;
-    } else if (frameTasks.some((t: VideoTaskLike) => t.status === "failed")) {
-        videoStatus = "failed";
+    } else {
+        const latestFailed = [...frameTasks].reverse().find((t: VideoTaskLike) => t.status === "failed") as (VideoTaskLike & { error?: string | null }) | undefined;
+        if (latestFailed) {
+            videoStatus = "failed";
+            videoError = typeof latestFailed.error === "string" && latestFailed.error ? latestFailed.error : undefined;
+        }
     }
 
     const imageHistory = Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [];
@@ -251,6 +256,7 @@ export function frameToShotNode(
         tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined) ?? defaultTabMode,
         videoUrl,
         videoStatus,
+        videoError,
         videoTaskId,
         imageUrl: frame.rendered_image_url || frame.image_url || undefined,
         lastFrameUrl: typeof frame.last_frame_url === "string" && frame.last_frame_url ? frame.last_frame_url : undefined,
